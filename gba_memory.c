@@ -2171,10 +2171,9 @@ static s32 parse_config_line(char *current_line, char *current_variable, char *c
 
 typedef struct
 {
-   char romtitle[256];
-   char gamepak_title[256];
-   char gamepak_code[256];
-   char gamepak_maker[256];
+   char gamepak_title[13];
+   char gamepak_code[5];
+   char gamepak_maker[3];
    int flash_size;
    flash_device_id_type flash_device_id;
    int save_type;
@@ -2194,18 +2193,14 @@ static s32 load_game_config_over(char *gamepak_title, char *gamepak_code, char *
 {
   unsigned i = 0;
 
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < sizeof(gbaover)/sizeof(gbaover[0]); i++)
   {
-     if (gbaover[i].romtitle[0] == '\0')
-        return -1;
-
      if (strcmp(gbaover[i].gamepak_code, gamepak_code))
         continue;
 
      if (strcmp(gbaover[i].gamepak_title, gamepak_title))
         continue;
      
-     printf("romtitle     : %s\n", gbaover[i].romtitle);
      printf("gamepak title: %s\n", gbaover[i].gamepak_title);
      printf("gamepak code : %s\n", gbaover[i].gamepak_code);
      printf("gamepak maker: %s\n", gbaover[i].gamepak_maker);

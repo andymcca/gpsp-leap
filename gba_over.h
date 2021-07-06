@@ -1,6 +1,6 @@
-static const ini_t gbaover[256] = {
+static const ini_t gbaover[] = {
    {
-      "007 - Nightfire (U)",       /* rom title            */
+      // 007 - Nightfire (U)
       "NIGHTFIRE",                 /* gamepak_title        */
       "A7OE",                      /* gamepak_code         */
       "69",                        /* gamepak_maker        */
@@ -17,7 +17,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Advance Wars (E)",          /* rom title            */
+      // Advance Wars (E)
       "ADVANCEWARSP",              /* gamepak_title        */
       "AWRP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -34,7 +34,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Advance Wars (U)",          /* rom title            */
+      // Advance Wars (U)
       "ADVANCEWARS",               /* gamepak_title        */
       "AWRE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -51,7 +51,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Advance Wars 2: Black Hole Rising (E)", /* rom title            */
+      // Advance Wars 2: Black Hole Rising (E)
       "ADVANCEWARS2",              /* gamepak_title        */
       "AW2P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -68,7 +68,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Advance Wars 2: Black Hole Rising (U)", /* rom title            */
+      // Advance Wars 2: Black Hole Rising (U)
       "ADVANCEWARS2",              /* gamepak_title        */
       "AW2E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -85,7 +85,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Animal Yokochou Dokidoki Shinkyuu Shiken (J)",  /* rom title            */
+      // Animal Yokochou Dokidoki Shinkyuu Shiken (J)
       "ANIYOKO2",                  /* gamepak_title        */
       "BAXJ",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -102,7 +102,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Another World (Homebrew)",  /* rom title            */
+      // Another World (Homebrew)
       "FoxAnWorld",                /* gamepak_title        */
       "Home",                      /* gamepak_code         */
       "00",                        /* gamepak_maker        */
@@ -119,7 +119,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Asterix & Obelix XXL (E)",  /* rom title            */
+      // Asterix & Obelix XXL (E)
       "ASTERIX",                   /* gamepak_title        */
       "BLXP",                      /* gamepak_code         */
       "70",                        /* gamepak_maker        */
@@ -136,7 +136,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Battle Network RockMan EXE (J)",/* rom title            */
+      // Battle Network RockMan EXE (J)
       "ROCKMAN_EXE",               /* gamepak_title        */
       "AREJ",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -153,7 +153,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Bleach Advance (J)",        /* rom title            */
+      // Bleach Advance (J)
       "BLEACH ADV1",               /* gamepak_title        */
       "BLEJ",                      /* gamepak_code         */
       "6L",                        /* gamepak_maker        */
@@ -170,7 +170,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Bomberman Jetters Game Collection (J)",  /* rom title            */
+      // Bomberman Jetters Game Collection (J)
       "BOMBERMANJGC",              /* gamepak_title        */
       "BOMJ",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
@@ -187,7 +187,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Bomberman Tournament (U)",  /* rom title            */
+      // Bomberman Tournament (U)
       "BOMSTORYUSA",               /* gamepak_title        */
       "ABSE",                      /* gamepak_code         */
       "52",                        /* gamepak_maker        */
@@ -204,7 +204,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Bookworm (U)",              /* rom title            */
+      // Bookworm (U)
       "BOOKWORM",                  /* gamepak_title        */
       "BKWE",                      /* gamepak_code         */
       "5G",                        /* gamepak_maker        */
@@ -221,7 +221,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Broken Sword - The Shadow of the Templars (U)",  /* rom title            */
+      // Broken Sword - The Shadow of the Templars (U)
       "BROKENSWORD",               /* gamepak_title        */
       "ABJE",                      /* gamepak_code         */
       "6L",                        /* gamepak_maker        */
@@ -238,7 +238,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Calciobit (J)",             /* rom title            */
+      // Calciobit (J)
       "CALCIOBIT01",               /* gamepak_title        */
       "BIXJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -255,7 +255,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Castlevania (E)",           /* rom title            */
+      // Castlevania (E)
       "DRACULA AGB1",              /* gamepak_title        */
       "AAMP",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -272,7 +272,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Castlevania Circle Of The Moon (U)",/* rom title    */
+      // Castlevania Circle Of The Moon (U)
       "DRACULA AGB1",              /* gamepak_title        */
       "AAME",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -289,7 +289,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Chicken Little (J)",        /* rom title            */
+      // Chicken Little (J)
       "CLITTLEJ",                  /* gamepak_title        */
       "BCHJ",                      /* gamepak_code         */
       "G9",                        /* gamepak_maker        */
@@ -306,7 +306,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Defender Of The Crown (U)", /* rom title            */
+      // Defender Of The Crown (U)
       "DOTC",                      /* gamepak_title        */
       "ADHE",                      /* gamepak_code         */
       "5N",                        /* gamepak_maker        */
@@ -323,7 +323,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Digimon Battle Spirit (U)", /* rom title            */
+      // Digimon Battle Spirit (U)
       "DIGIMON BTSP",              /* gamepak_title        */
       "A8SE",                      /* gamepak_code         */
       "B2",                        /* gamepak_maker        */
@@ -340,7 +340,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Digimon Battle Spirit 2 (U)", /* rom title            */
+      // Digimon Battle Spirit 2 (U)
       "DIGIMON BS2",               /* gamepak_title        */
       "BDSE",                      /* gamepak_code         */
       "B2",                        /* gamepak_maker        */
@@ -357,7 +357,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Disney's Aladdin (J)",      /* rom title            */
+      // Disney's Aladdin (J)
       "ALADDIN",                   /* gamepak_title        */
       "AJ6J",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -374,7 +374,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Disney's Aladdin (E)",      /* rom title            */
+      // Disney's Aladdin (E)
       "ALADDIN",                   /* gamepak_title        */
       "BADP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -391,7 +391,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Disney's Aladdin (U)",      /* rom title            */
+      // Disney's Aladdin (U)
       "ALADDIN",                   /* gamepak_title        */
       "BADE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -408,7 +408,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Doom 2 (U)",                /* rom title            */
+      // Doom 2 (U)
       "DOOM II",                   /* gamepak_title        */
       "A9DE",                      /* gamepak_code         */
       "52",                        /* gamepak_maker        */
@@ -425,7 +425,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Donald Duck Advance (U)",   /* rom title            */
+      // Donald Duck Advance (U)
       "DISNEY'S DON",              /* gamepak_title        */
       "ADKE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -442,7 +442,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Drill Dozer (U)",           /* rom title            */
+      // Drill Dozer (U)
       "DRILL DOZER",               /* gamepak_title        */
       "V49E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -459,7 +459,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "F-Zero for Game Boy Advance (J)",        /* rom title            */
+      // F-Zero for Game Boy Advance (J)
       "F-ZERO ADVAN",              /* gamepak_title        */
       "AFZJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -476,7 +476,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "F-Zero - Maximum Velocity (U)",        /* rom title            */
+      // F-Zero - Maximum Velocity (U)
       "F-ZERO ADVAN",              /* gamepak_title        */
       "AFZE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -493,7 +493,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "F-Zero: Climax (U)",        /* rom title            */
+      // F-Zero: Climax (U)
       "F-ZEROCLIMAX",              /* gamepak_title        */
       "BFTJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -510,7 +510,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Final Fantasy IV Advance (U)", /* rom title            */
+      // Final Fantasy IV Advance (U)
       "FF4ADVANCE",                /* gamepak_title        */
       "BZ4E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -527,7 +527,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Final Fantasy Tactics Advance (U)", /* rom title            */
+      // Final Fantasy Tactics Advance (U)
       "FFTA_USVER.",               /* gamepak_title        */
       "AFXE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -544,7 +544,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Final Fight One (E)",       /* rom title            */
+      // Final Fight One (E)
       "FINAL FIGHT",               /* gamepak_title        */
       "AFFP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -561,7 +561,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Final Fight One (U)",       /* rom title            */
+      // Final Fight One (U)
       "FINAL FIGHT",               /* gamepak_title        */
       "AFFE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -578,7 +578,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Game Boy Wars Advance 1+2 (J)",/* rom title            */
+      // Game Boy Wars Advance 1+2 (J)
       "GBWARS1+2",                 /* gamepak_title        */
       "BGWJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -595,7 +595,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Golden Sun (U)",            /* rom title            */
+      // Golden Sun (U)
       "Golden_Sun_A",              /* gamepak_title        */
       "AGSE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -613,7 +613,7 @@ static const ini_t gbaover[256] = {
    },
    {
       /* Probably the most horrifically coded GBA game in existence. */
-      "Golden Sun: The Lost Age (U)",/* rom title            */
+      // Golden Sun: The Lost Age (U)
       "GOLDEN_SUN_B",              /* gamepak_title        */
       "AGFE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -633,7 +633,7 @@ static const ini_t gbaover[256] = {
       /* Badly coded game with several idle loops. This one works for level
        * one at least.
        */
-      "Gradius Galaxies (U)",      /* rom title            */
+      // Gradius Galaxies (U)
       "GRADIUSGALAX",              /* gamepak_title        */
       "AGAE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -650,7 +650,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Hoshi no Kirby: Yume no Izumi Deluxe (J)",        /* rom title            */
+      // Hoshi no Kirby: Yume no Izumi Deluxe (J)
       "AGB KIRBY DX",              /* gamepak_title        */
       "A7KJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -667,7 +667,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "J-League Pro Soccer Club wo Tsukurou Advance (J)",        /* rom title            */
+      // J-League Pro Soccer Club wo Tsukurou Advance (J)
       "SAKATUKUADV",               /* gamepak_title        */
       "AC2J",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
@@ -684,7 +684,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Kim Possible 2 (U)",        /* rom title            */
+      // Kim Possible 2 (U)
       "KIMPOSSIBLE2",              /* gamepak_title        */
       "BKME",                      /* gamepak_code         */
       "4Q",                        /* gamepak_maker        */
@@ -701,7 +701,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Kim Possible 2 (E)",        /* rom title            */
+      // Kim Possible 2 (E)
       "KIMPOSSIBLE2",              /* gamepak_title        */
       "BKMP",                      /* gamepak_code         */
       "4Q",                        /* gamepak_maker        */
@@ -718,7 +718,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Kirby: Nightmare in Dreamland (E)",        /* rom title            */
+      // Kirby: Nightmare in Dreamland (E)
       "AGB KIRBY DX",              /* gamepak_title        */
       "A7KP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -735,7 +735,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Kirby: Nightmare in Dreamland (U)",        /* rom title            */
+      // Kirby: Nightmare in Dreamland (U)
       "AGB KIRBY DX",              /* gamepak_title        */
       "A7KE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -752,7 +752,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Koinu-Chan no Hajimete no Osanpo (J)",        /* rom title            */
+      // Koinu-Chan no Hajimete no Osanpo (J)
       "OSANPO",                    /* gamepak_title        */
       "BISJ",                      /* gamepak_code         */
       "IQ",                        /* gamepak_maker        */
@@ -769,7 +769,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Magical Houshin (J)",       /* rom title            */
+      // Magical Houshin (J)
       "M HOUSHIN",                 /* gamepak_title        */
       "AJOJ",                      /* gamepak_code         */
       "C8",                        /* gamepak_maker        */
@@ -786,7 +786,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Magical Quest 2 Starring Mickey & Minnie (U)",       /* rom title            */
+      // Magical Quest 2 Starring Mickey & Minnie (U)
       "M&M MAGICAL2",              /* gamepak_title        */
       "AQME",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -803,7 +803,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Magical Quest 3 Starring Mickey & Donald (U)",       /* rom title            */
+      // Magical Quest 3 Starring Mickey & Donald (U)
       "M&D MAGICAL3",              /* gamepak_title        */
       "BMQE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -820,7 +820,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (U)",  /* rom title            */
+      // Mario Golf: Advance Tour (U)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -837,7 +837,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (J)",  /* rom title            */
+      // Mario Golf: Advance Tour (J)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -854,7 +854,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (E)",  /* rom title            */
+      // Mario Golf: Advance Tour (E)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -871,7 +871,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (S)",  /* rom title            */
+      // Mario Golf: Advance Tour (S)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGS",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -888,7 +888,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (F)",  /* rom title            */
+      // Mario Golf: Advance Tour (F)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -905,7 +905,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (I)",  /* rom title            */
+      // Mario Golf: Advance Tour (I)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -922,7 +922,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (G)",  /* rom title            */
+      // Mario Golf: Advance Tour (G)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGD",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -939,7 +939,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Golf: Advance Tour (A)",  /* rom title            */
+      // Mario Golf: Advance Tour (A)
       "MARIOGOLFGBA",              /* gamepak_title        */
       "BMGU",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -956,7 +956,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Vs Donkey Kong (U)",  /* rom title            */
+      // Mario Vs Donkey Kong (U)
       "MARIOVSDK",                 /* gamepak_title        */
       "BM5E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -973,7 +973,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Party Advance (U)",  /* rom title            */
+      // Mario Party Advance (U)
       "MARIOPARTYUS",              /* gamepak_title        */
       "B8ME",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -990,7 +990,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Party Advance (J)",  /* rom title            */
+      // Mario Party Advance (J)
       "MARIOPARTYJA",              /* gamepak_title        */
       "B8MJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1007,7 +1007,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Mario Party Advance (E)",  /* rom title            */
+      // Mario Party Advance (E)
       "MARIOPARTYEU",              /* gamepak_title        */
       "B8MP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1024,7 +1024,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Medal of Honor (J)",        /* rom title            */
+      // Medal of Honor (J)
       "INFILTRATOR",               /* gamepak_title        */
       "BMHJ",                      /* gamepak_code         */
       "13",                        /* gamepak_maker        */
@@ -1041,7 +1041,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network (E)",/* rom title            */
+      // Megaman Battle Network (E)
       "MEGAMANEXEBN",              /* gamepak_title        */
       "AREP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1058,7 +1058,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network (U)",/* rom title            */
+      // Megaman Battle Network (U)
       "MEGAMAN_BN",                /* gamepak_title        */
       "AREE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1075,7 +1075,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 2 (U)",/* rom title            */
+      // Megaman Battle Network 2 (U)
       "MEGAMAN_EXE2",              /* gamepak_title        */
       "AE2E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1092,7 +1092,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 3 White (U)",/* rom title            */
+      // Megaman Battle Network 3 White (U)
       "MEGA_EXE3_WH",              /* gamepak_title        */
       "A6BE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1109,7 +1109,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 3 Blue (U)",/* rom title            */
+      // Megaman Battle Network 3 Blue (U)
       "MEGA_EXE3_BL",              /* gamepak_title        */
       "A3XE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1126,7 +1126,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 4 Red Sun (U)",/* rom title            */
+      // Megaman Battle Network 4 Red Sun (U)
       "MEGAMANBN4RS",              /* gamepak_title        */
       "B4WE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1143,7 +1143,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 4 Blue Moon (U)",/* rom title            */
+      // Megaman Battle Network 4 Blue Moon (U)
       "MEGAMANBN4BM",              /* gamepak_title        */
       "B4BE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1160,7 +1160,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 5 Team Protoman (U)",/* rom title            */
+      // Megaman Battle Network 5 Team Protoman (U)
       "MEGAMAN5_TP_",              /* gamepak_title        */
       "BRBE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1177,7 +1177,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 5 Team Colonel (U)",/* rom title            */
+      // Megaman Battle Network 5 Team Colonel (U)
       "MEGAMAN5_TC_",              /* gamepak_title        */
       "BRKE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1194,7 +1194,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Network 6 Cybeast Gregar (U)",/* rom title            */
+      // Megaman Battle Network 6 Cybeast Gregar (U)
       "MEGAMAN6_GXX",              /* gamepak_title        */
       "BR5E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1211,7 +1211,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Battle Chip Challenge (U)",/* rom title            */
+      // Megaman Battle Chip Challenge (U)
       "BATTLECHIPGP",              /* gamepak_title        */
       "A89E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1228,7 +1228,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Zero (E/U)",        /* rom title            */
+      // Megaman Zero (E/U)
       "MEGAMAN ZERO",              /* gamepak_title        */
       "AZCE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1245,7 +1245,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Zero 2 (U)",        /* rom title            */
+      // Megaman Zero 2 (U)
       "MEGAMANZERO2",              /* gamepak_title        */
       "A62E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1262,7 +1262,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Zero 3 (U)",        /* rom title            */
+      // Megaman Zero 3 (U)
       "MEGAMANZERO3",              /* gamepak_title        */
       "BZ3E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1279,7 +1279,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Megaman Zero 4 (U)",        /* rom title            */
+      // Megaman Zero 4 (U)
       "MEGAMANZERO4",              /* gamepak_title        */
       "B4ZP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -1296,7 +1296,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Metal Slug Advance (U)",    /* rom title            */
+      // Metal Slug Advance (U)
       "METAL SLUG",                /* gamepak_title        */
       "BSME",                      /* gamepak_code         */
       "B7",                        /* gamepak_maker        */
@@ -1313,7 +1313,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Momotarou Densetsu G - Gold Deck wo Tsukure! (J)",     /* rom title            */
+      // Momotarou Densetsu G - Gold Deck wo Tsukure! (J)
       "MOMOTETSU-G",              /* gamepak_title        */
       "BM2J",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
@@ -1330,7 +1330,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Monster Force (U)",         /* rom title            */
+      // Monster Force (U)
       "MONSTERFORCE",              /* gamepak_title        */
       "AM8E",                      /* gamepak_code         */
       "7D",                        /* gamepak_maker        */
@@ -1347,7 +1347,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Monster Rancher Advance (U)", /* rom title            */
+      // Monster Rancher Advance (U)
       "MONSRANCHERA",              /* gamepak_title        */
       "AMFE",                      /* gamepak_code         */
       "9B",                        /* gamepak_maker        */
@@ -1364,7 +1364,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Monster Rancher Advance 2 (U)", /* rom title            */
+      // Monster Rancher Advance 2 (U)
       "MONSTERRANC2",              /* gamepak_title        */
       "A2QE",                      /* gamepak_code         */
       "9B",                        /* gamepak_maker        */
@@ -1381,7 +1381,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Motoracer Advance (E)",     /* rom title            */
+      // Motoracer Advance (E)
       "MOTORACERADV",              /* gamepak_title        */
       "A9MP",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -1398,7 +1398,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Ninja Cop (E)",          /* rom title            */
+      // Ninja Cop (E)
       "NINJA COP",              /* gamepak_title        */
       "ANXP",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -1415,7 +1415,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Ninja Five-0 (U)",          /* rom title            */
+      // Ninja Five-0 (U)
       "NINJA FIVE 0",              /* gamepak_title        */
       "ANXE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -1432,7 +1432,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Nishihara Rieko no Dendou Mahjong (J)",          /* rom title            */
+      // Nishihara Rieko no Dendou Mahjong (J)
       "DENDOHMAJANG",              /* gamepak_title        */
       "ASMJ",                      /* gamepak_code         */
       "AG",                        /* gamepak_maker        */
@@ -1449,7 +1449,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Open Season (U)",           /* rom title            */
+      // Open Season (U)
       "OPEN SEASON",               /* gamepak_title        */
       "BOAE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -1466,7 +1466,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Oriental Blue - Ao no Tengai (J)",     /* rom title            */
+      // Oriental Blue - Ao no Tengai (J)
       "ORIENTALBLUE",              /* gamepak_title        */
       "AORJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1483,7 +1483,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pinball Challenge Deluxe (E)",     /* rom title            */
+      // Pinball Challenge Deluxe (E)
       "PINBALL CHAL",              /* gamepak_title        */
       "APLP",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -1500,7 +1500,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Emerald (E/U)",     /* rom title            */
+      // Pokemon Emerald (E/U)
       "POKEMON EMER",              /* gamepak_title        */
       "BPEE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1517,7 +1517,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Emerald (J)",       /* rom title            */
+      // Pokemon Emerald (J)
       "POKEMON EMER",              /* gamepak_title        */
       "BPEJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1534,7 +1534,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Emerald (G)",       /* rom title            */
+      // Pokemon Emerald (G)
       "POKEMON EMER",              /* gamepak_title        */
       "BPED",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1551,7 +1551,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Emerald (F)",       /* rom title            */
+      // Pokemon Emerald (F)
       "POKEMON EMER",              /* gamepak_title        */
       "BPEF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1568,7 +1568,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Emerald (S)",       /* rom title            */
+      // Pokemon Emerald (S)
       "POKEMON EMER",              /* gamepak_title        */
       "BPES",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1585,7 +1585,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Emerald (I)",       /* rom title            */
+      // Pokemon Emerald (I)
       "POKEMON EMER",              /* gamepak_title        */
       "BPEI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1602,7 +1602,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Sapphire (U)",      /* rom title            */
+      // Pokemon Sapphire (U)
       "POKEMON SAPP",              /* gamepak_title        */
       "AXPE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1619,7 +1619,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Sapphire (J)",      /* rom title            */
+      // Pokemon Sapphire (J)
       "POKEMON SAPP",              /* gamepak_title        */
       "AXPJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1636,7 +1636,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Sapphire (G)",      /* rom title            */
+      // Pokemon Sapphire (G)
       "POKEMON SAPP",              /* gamepak_title        */
       "AXPD",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1653,7 +1653,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Sapphire (I)",      /* rom title            */
+      // Pokemon Sapphire (I)
       "POKEMON SAPP",              /* gamepak_title        */
       "AXPI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1670,7 +1670,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Sapphire (S)",      /* rom title            */
+      // Pokemon Sapphire (S)
       "POKEMON SAPP",              /* gamepak_title        */
       "AXPS",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1687,7 +1687,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Sapphire (F)",      /* rom title            */
+      // Pokemon Sapphire (F)
       "POKEMON SAPP",              /* gamepak_title        */
       "AXPF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1704,7 +1704,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Ruby (U)",          /* rom title            */
+      // Pokemon Ruby (U)
       "POKEMON RUBY",              /* gamepak_title        */
       "AXVE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1721,7 +1721,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Ruby (J)",          /* rom title            */
+      // Pokemon Ruby (J)
       "POKEMON RUBY",              /* gamepak_title        */
       "AXVJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1738,7 +1738,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Ruby (G)",          /* rom title            */
+      // Pokemon Ruby (G)
       "POKEMON RUBY",              /* gamepak_title        */
       "AXVD",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1755,7 +1755,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Ruby (I)",          /* rom title            */
+      // Pokemon Ruby (I)
       "POKEMON RUBY",              /* gamepak_title        */
       "AXVI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1772,7 +1772,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Ruby (S)",          /* rom title            */
+      // Pokemon Ruby (S)
       "POKEMON RUBY",              /* gamepak_title        */
       "AXVS",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1789,7 +1789,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon Ruby (F)",          /* rom title            */
+      // Pokemon Ruby (F)
       "POKEMON RUBY",              /* gamepak_title        */
       "AXVF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1806,7 +1806,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fire Red (J)",     /* rom title            */
+      // Pokemon: Fire Red (J)
       "POKEMON FIRE",              /* gamepak_title        */
       "BPRJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1823,7 +1823,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fire Red (E/U)",   /* rom title            */
+      // Pokemon: Fire Red (E/U)
       "POKEMON FIRE",              /* gamepak_title        */
       "BPRE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1840,7 +1840,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fire Red (S)",     /* rom title            */
+      // Pokemon: Fire Red (S)
       "POKEMON FIRE",              /* gamepak_title        */
       "BPRS",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1857,7 +1857,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fire Red (G)",     /* rom title            */
+      // Pokemon: Fire Red (G)
       "POKEMON FIRE",              /* gamepak_title        */
       "BPRG",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1874,7 +1874,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fire Red (I)",     /* rom title            */
+      // Pokemon: Fire Red (I)
       "POKEMON FIRE",              /* gamepak_title        */
       "BPRI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1891,7 +1891,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fire Red (F)",     /* rom title            */
+      // Pokemon: Fire Red (F)
       "POKEMON FIRE",              /* gamepak_title        */
       "BPRF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1909,7 +1909,7 @@ static const ini_t gbaover[256] = {
    },
    {
       /* Hey, this one is the same as Fire Red, who'd have thought? :B */
-      "Pokemon: Leaf Green (E/U)", /* rom title            */
+      // Pokemon: Leaf Green (E/U)
       "POKEMON LEAF",              /* gamepak_title        */
       "BPGE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1926,7 +1926,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Leaf Green (S)",   /* rom title            */
+      // Pokemon: Leaf Green (S)
       "POKEMON LEAF",              /* gamepak_title        */
       "BPGS",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1943,7 +1943,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Leaf Green (G)",   /* rom title            */
+      // Pokemon: Leaf Green (G)
       "POKEMON LEAF",              /* gamepak_title        */
       "BPGD",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1960,7 +1960,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Leaf Green (I)",   /* rom title            */
+      // Pokemon: Leaf Green (I)
       "POKEMON LEAF",              /* gamepak_title        */
       "BPGI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1977,7 +1977,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Leaf Green (F)",   /* rom title            */
+      // Pokemon: Leaf Green (F)
       "POKEMON LEAF",              /* gamepak_title        */
       "BPGF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -1994,7 +1994,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Leaf Green (J)",   /* rom title            */
+      // Pokemon: Leaf Green (J)
       "POKEMON LEAF",              /* gamepak_title        */
       "BPGJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2011,7 +2011,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Fushigi no Dungeon Aka no Kyuujotai (J)",   /* rom title            */
+      // Pokemon: Fushigi no Dungeon Aka no Kyuujotai (J)
       "POKE DUNGEON",              /* gamepak_title        */
       "B24J",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2028,7 +2028,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Red Rescue Team (U)",   /* rom title            */
+      // Pokemon: Red Rescue Team (U)
       "POKE DUNGEON",              /* gamepak_title        */
       "B24E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2045,7 +2045,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Pokemon: Red Rescue Team (E)",   /* rom title            */
+      // Pokemon: Red Rescue Team (E)
       "POKE DUNGEON",              /* gamepak_title        */
       "B24P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2062,7 +2062,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Prince of Persia - The Sands of Time (U)",     /* rom title            */
+      // Prince of Persia - The Sands of Time (U)
       "PRINCEPERSIA",              /* gamepak_title        */
       "BPYE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -2084,7 +2084,7 @@ static const ini_t gbaover[256] = {
        * even close to dominant, and it jumps around too much when things
        * matter....
        */
-      "Rebelstar Tactical Command (U)", /* rom title            */
+      // Rebelstar Tactical Command (U)
       "REBELSTAR",                 /* gamepak_title        */
       "BRLE",                      /* gamepak_code         */
       "AF",                        /* gamepak_maker        */
@@ -2101,7 +2101,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "River City Ransom EX (J)",  /* rom title            */
+      // River City Ransom EX (J)
       "DOWNTOWN",                  /* gamepak_title        */
       "BDTJ",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2118,7 +2118,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "River City Ransom EX (U)",  /* rom title            */
+      // River City Ransom EX (U)
       "RIVERCRANSOM",              /* gamepak_title        */
       "BDTE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2135,7 +2135,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Rhythm Tengoku (J)",        /* rom title            */
+      // Rhythm Tengoku (J)
       "RHYTHMTENGOK",              /* gamepak_title        */
       "BRIJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2152,7 +2152,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Rockman Zero (J)",          /* rom title            */
+      // Rockman Zero (J)
       "ROCKMAN ZERO",              /* gamepak_title        */
       "ARZJ",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -2169,7 +2169,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Robopon 2 Cross Version (U)",          /* rom title            */
+      // Robopon 2 Cross Version (U)
       "ROBOPON2CROS",              /* gamepak_title        */
       "ACVE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2186,7 +2186,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Robopon 2 Ring Version (U)",          /* rom title            */
+      // Robopon 2 Ring Version (U)
       "ROBOPON2RING",              /* gamepak_title        */
       "ARPE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2203,7 +2203,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Robot Ponkotto 2 - Cross Version (J)",          /* rom title            */
+      // Robot Ponkotto 2 - Cross Version (J)
       "ROBOPON2CROS",              /* gamepak_title        */
       "ACVJ",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
@@ -2220,7 +2220,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Robot Ponkotto 2 - Ring Version (J)",          /* rom title            */
+      // Robot Ponkotto 2 - Ring Version (J)
       "ROBOPON2RING",              /* gamepak_title        */
       "ARPJ",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
@@ -2237,7 +2237,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Sennen Kazoku (J)",         /* rom title            */
+      // Sennen Kazoku (J)
       "SENNENKAZOKU",              /* gamepak_title        */
       "BKAJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2254,7 +2254,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Shining Soul (J)",          /* rom title            */
+      // Shining Soul (J)
       "SHINING SOUL",              /* gamepak_title        */
       "AHUJ",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
@@ -2271,7 +2271,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Shining Soul (U)",          /* rom title            */
+      // Shining Soul (U)
       "SHINING SOUL",              /* gamepak_title        */
       "AHUE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2288,7 +2288,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Shining Soul (E)",          /* rom title            */
+      // Shining Soul (E)
       "SHINING SOUL",              /* gamepak_title        */
       "AHUP",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
@@ -2305,7 +2305,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Shining Soul 2 (J)",        /* rom title            */
+      // Shining Soul 2 (J)
       "SHININGSOUL2",              /* gamepak_title        */
       "AU2J",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
@@ -2322,7 +2322,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Shining Soul 2 (U)",        /* rom title            */
+      // Shining Soul 2 (U)
       "SHININGSOUL2",              /* gamepak_title        */
       "AU2E",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2339,7 +2339,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Shining Soul 2 (E)",        /* rom title            */
+      // Shining Soul 2 (E)
       "SHININGSOUL2",              /* gamepak_title        */
       "AU2P",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
@@ -2356,7 +2356,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance (Demo/Kiosk)", /* rom title            */
+      // Super Mario Advance (Demo/Kiosk)
       "SUPER MARIOA",              /* gamepak_title        */
       "AMZE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2373,7 +2373,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance (E/U)", /* rom title            */
+      // Super Mario Advance (E/U)
       "SUPER MARIOA",              /* gamepak_title        */
       "AMAE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2390,7 +2390,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 2 (E)", /* rom title            */
+      // Super Mario Advance 2 (E)
       "SUPER MARIOB",              /* gamepak_title        */
       "AA2P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2407,7 +2407,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 2 (U)", /* rom title            */
+      // Super Mario Advance 2 (U)
       "SUPER MARIOB",              /* gamepak_title        */
       "AA2E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2424,7 +2424,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 3 (J)", /* rom title            */
+      // Super Mario Advance 3 (J)
       "SUPER MARIOC",              /* gamepak_title        */
       "A3AJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2441,7 +2441,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 3 (U)", /* rom title            */
+      // Super Mario Advance 3 (U)
       "SUPER MARIOC",              /* gamepak_title        */
       "A3AE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2458,7 +2458,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 4 (J)", /* rom title            */
+      // Super Mario Advance 4 (J)
       "SUPER MARIOD",              /* gamepak_title        */
       "AX4J",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2475,7 +2475,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 4 (E)", /* rom title            */
+      // Super Mario Advance 4 (E)
       "SUPER MARIOD",              /* gamepak_title        */
       "AX4P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2492,7 +2492,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Mario Advance 4 (U)", /* rom title            */
+      // Super Mario Advance 4 (U)
       "SUPER MARIOD",              /* gamepak_title        */
       "AX4E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2509,7 +2509,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Puzzle Fighter II Turbo (E)", /* rom title            */
+      // Super Puzzle Fighter II Turbo (E)
       "PUZZLEFIGHT2",              /* gamepak_title        */
       "AZ8P",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -2526,7 +2526,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Super Puzzle Fighter II Turbo (U)", /* rom title            */
+      // Super Puzzle Fighter II Turbo (U)
       "PUZZLEFIGHT2",              /* gamepak_title        */
       "AZ8E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
@@ -2543,7 +2543,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tales of Phantasia (U)",    /* rom title            */
+      // Tales of Phantasia (U)
       "PHANTASIA",                 /* gamepak_title        */
       "AN8E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2560,7 +2560,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tales of Phantasia (J)",    /* rom title            */
+      // Tales of Phantasia (J)
       "PHANTASIA",                 /* gamepak_title        */
       "AN8J",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2577,7 +2577,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tales of Phantasia (E)",    /* rom title            */
+      // Tales of Phantasia (E)
       "PHANTASIA",                 /* gamepak_title        */
       "AN8P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2594,7 +2594,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "The Pinball of The Dead",                /* rom title            */
+      // The Pinball of The Dead
       "PINBALL DEAD",              /* gamepak_title        */
       "APDE",                      /* gamepak_code         */
       "78",                        /* gamepak_maker        */
@@ -2611,7 +2611,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tom Clancy's Splinter Cell (U)",                /* rom title            */
+      // Tom Clancy's Splinter Cell (U)
       "SPLINTERCELL",              /* gamepak_title        */
       "A04E",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -2628,7 +2628,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tom Clancy's Splinter Cell: Pandora Tomorrow (U)",                /* rom title            */
+      // Tom Clancy's Splinter Cell: Pandora Tomorrow (U)
       "TOM CLANCY'S",              /* gamepak_title        */
       "BSLE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
@@ -2645,7 +2645,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tottoko Hamutaro Hamuhamu Sports (J/U)",                /* rom title            */
+      // Tottoko Hamutaro Hamuhamu Sports (J/U)
       "HAMSPORTS",                 /* gamepak_title        */
       "B85A",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2662,7 +2662,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Tringo (U)",                /* rom title            */
+      // Tringo (U)
       "TRINGO",                    /* gamepak_title        */
       "BTJE",                      /* gamepak_code         */
       "42",                        /* gamepak_maker        */
@@ -2679,7 +2679,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Ueki no Housoku Jingi Sakuretsu! Nouryokusya Battle (J)",                    /* rom title            */
+      // Ueki no Housoku Jingi Sakuretsu! Nouryokusya Battle (J)
       "UEKIJINGIBTL",              /* gamepak_title        */
       "BUHJ",                      /* gamepak_code         */
       "D9",                        /* gamepak_maker        */
@@ -2696,7 +2696,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "V-Rally 3 (E)",             /* rom title            */
+      // V-Rally 3 (E)
       "V_RALLY 3",                 /* gamepak_title        */
       "AVRP",                      /* gamepak_code         */
       "70",                        /* gamepak_maker        */
@@ -2713,7 +2713,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Virtual Kasparov (U)",      /* rom title            */
+      // Virtual Kasparov (U)
       "VIRTKASPAROV",              /* gamepak_title        */
       "AVKE",                      /* gamepak_code         */
       "60",                        /* gamepak_maker        */
@@ -2730,7 +2730,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Wario Ware, Inc. Mega Microgames (U)",                    /* rom title            */
+      // Wario Ware, Inc. Mega Microgames (U)
       "WARIOWAREINC",              /* gamepak_title        */
       "AZWE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
@@ -2747,7 +2747,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Yu-Gi-Oh! - Dungeon Dice Monsters (U)",                    /* rom title            */
+      // Yu-Gi-Oh! - Dungeon Dice Monsters (U)
       "YU-GI-OH DDM",              /* gamepak_title        */
       "AYDE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -2764,7 +2764,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Yu-Gi-Oh! - The Eternal Duelist Soul (U)",                    /* rom title            */
+      // Yu-Gi-Oh! - The Eternal Duelist Soul (U)
       "YU-GI-OH!EDS",              /* gamepak_title        */
       "AY5E",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -2781,7 +2781,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Yu-Gi-Oh! - The Sacred Cards (U)",                    /* rom title            */
+      // Yu-Gi-Oh! - The Sacred Cards (U)
       "YUGIOH DM7",                /* gamepak_title        */
       "AY7E",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -2798,7 +2798,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Yu-Gi-Oh! - World Championship Tournament 2004 (U)",                    /* rom title            */
+      // Yu-Gi-Oh! - World Championship Tournament 2004 (U)
       "YWCT2004USA",               /* gamepak_title        */
       "BYWE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -2815,7 +2815,7 @@ static const ini_t gbaover[256] = {
       0,                           /* translation_gate_target_3 */
    },
    {
-      "Yu-Gi-Oh! - Worldwide Edition - Stairway to the Destined Duel (U)",                    /* rom title            */
+      // Yu-Gi-Oh! - Worldwide Edition - Stairway to the Destined Duel (U)
       "YUGIOHWWE",                 /* gamepak_title        */
       "AYWE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
@@ -2833,7 +2833,7 @@ static const ini_t gbaover[256] = {
    },
 #if 0
    {
-      "Sample",                    /* rom title            */
+      // Sample
       "",                          /* gamepak_title        */
       "",                          /* gamepak_code         */
       "",                          /* gamepak_maker        */
