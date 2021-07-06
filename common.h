@@ -78,6 +78,9 @@
 #ifdef USE_BGR_FORMAT
   #define convert_palette(value)  \
     value = ((value & 0x7FE0) << 1) | (value & 0x1F)
+#elif defined(USE_XBGR1555_FORMAT)
+  #define convert_palette(value)  \
+    value = (value & 0x7FFF)
 #else
   #define convert_palette(value) \
     value = ((value & 0x1F) << 11) | ((value & 0x03E0) << 1) | (value >> 10)

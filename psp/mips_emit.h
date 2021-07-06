@@ -2635,7 +2635,6 @@ u8 swi_hle_handle[256] =
 extern u32 tmemld[11][16];
 extern u32 tmemst[ 4][16];
 extern u32 thnjal[15*16];
-void mips_lookup_pc();
 void smc_write();
 cpu_alert_type write_io_register8 (u32 address, u32 value);
 cpu_alert_type write_io_register16(u32 address, u32 value);
@@ -2977,6 +2976,10 @@ static void emit_pmemst_stub(
     mips_emit_sll(reg_temp, reg_a1, 1);           \
     mips_emit_andi(reg_temp, reg_temp, 0xFFC0);   \
     mips_emit_ins(reg_temp, reg_a1, 0, 5);
+#elif defined(USE_XBGR1555_FORMAT)
+  /* PS2's native format */
+  #define palette_convert()                       \
+    mips_emit_andi(reg_temp, reg_temp, 0x7FFF);
 #else
   /* 0BGR to RGB565 (clobbers a0) */
   #ifdef MIPS_HAS_R2_INSTS

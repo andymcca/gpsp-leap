@@ -3473,11 +3473,36 @@ fill_line_builder(color16);
 fill_line_builder(color32);
 
 
+// Blending is performed by separating an RGB value into 0G0R0B (32 bit)
+// Since blending factors are at most 16, mult/add operations do not overflow
+// to the neighbouring color and can be performed much faster than separatedly
+
+// Here follow the mask value to separate/expand the color to 32 bit,
+// the mask to detect overflows in the blend operation and
+
+#define BLND_MSK (SATR_MSK | SATG_MSK | SATB_MSK)
+
+#ifdef USE_XBGR1555_FORMAT
+  #define OVFG_MSK 0x04000000
+  #define OVFR_MSK 0x00008000
+  #define OVFB_MSK 0x00000020
+  #define SATG_MSK 0x03E00000
+  #define SATR_MSK 0x00007C00
+  #define SATB_MSK 0x0000001F
+#else
+  #define OVFG_MSK 0x08000000
+  #define OVFR_MSK 0x00010000
+  #define OVFB_MSK 0x00000020
+  #define SATG_MSK 0x07E00000
+  #define SATR_MSK 0x0000F800
+  #define SATB_MSK 0x0000001F
+#endif
+
 // Alpha blend two pixels (pixel_top and pixel_bottom).
 
 #define blend_pixel()                                                         \
   pixel_bottom = palette_ram_converted[(pixel_pair >> 16) & 0x1FF];           \
-  pixel_bottom = (pixel_bottom | (pixel_bottom << 16)) & 0x07E0F81F;          \
+  pixel_bottom = (pixel_bottom | (pixel_bottom << 16)) & BLND_MSK;            \
   pixel_top = ((pixel_top * blend_a) + (pixel_bottom * blend_b)) >> 4         \
 
 
@@ -3486,18 +3511,18 @@ fill_line_builder(color32);
 
 #define blend_saturate_pixel()                                                \
   pixel_bottom = palette_ram_converted[(pixel_pair >> 16) & 0x1FF];           \
-  pixel_bottom = (pixel_bottom | (pixel_bottom << 16)) & 0x07E0F81F;          \
+  pixel_bottom = (pixel_bottom | (pixel_bottom << 16)) & BLND_MSK;            \
   pixel_top = ((pixel_top * blend_a) + (pixel_bottom * blend_b)) >> 4;        \
-  if(pixel_top & 0x08010020)                                                  \
+  if(pixel_top & (OVFR_MSK | OVFG_MSK | OVFB_MSK))                            \
   {                                                                           \
-    if(pixel_top & 0x08000000)                                                \
-      pixel_top |= 0x07E00000;                                                \
+    if(pixel_top & OVFG_MSK)                                                  \
+      pixel_top |= SATG_MSK;                                                  \
                                                                               \
-    if(pixel_top & 0x00010000)                                                \
-      pixel_top |= 0x0000F800;                                                \
+    if(pixel_top & OVFR_MSK)                                                  \
+      pixel_top |= SATR_MSK;                                                  \
                                                                               \
-    if(pixel_top & 0x00000020)                                                \
-      pixel_top |= 0x0000001F;                                                \
+    if(pixel_top & OVFB_MSK)                                                  \
+      pixel_top |= SATB_MSK;                                                  \
   }                                                                           \
 
 #define brighten_pixel()                                                      \
@@ -3513,9 +3538,9 @@ fill_line_builder(color32);
   ((pixel_source & 0x00000200) == 0x00000200)                                 \
 
 #define expand_pixel_no_dest(expand_type, pixel_source)                       \
-  pixel_top = (pixel_top | (pixel_top << 16)) & 0x07E0F81F;                   \
+  pixel_top = (pixel_top | (pixel_top << 16)) & BLND_MSK;                     \
   expand_type##_pixel();                                                      \
-  pixel_top &= 0x07E0F81F;                                                    \
+  pixel_top &= BLND_MSK;                                                      \
   pixel_top = (pixel_top >> 16) | pixel_top                                   \
 
 #define expand_pixel(expand_type, pixel_source)                               \
@@ -3659,7 +3684,7 @@ static void expand_brighten(u16 *screen_src_ptr, u16 *screen_dest_ptr,
   if(blend > 16)
     blend = 16;
 
-  upper = ((0x07E0F81F * blend) >> 4) & 0x07E0F81F;
+  upper = ((BLND_MSK * blend) >> 4) & BLND_MSK;
   blend = 16 - blend;
 
   expand_loop(brighten, effect_condition_fade(pixel_top), pixel_top);
@@ -3709,7 +3734,7 @@ static void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_
   if(blend > 16)
     blend = 16;
 
-  upper = ((0x07E0F81F * blend) >> 4) & 0x07E0F81F;
+  upper = ((BLND_MSK * blend) >> 4) & BLND_MSK;
   blend = 16 - blend;
 
   if(blend_a > 16)
@@ -3899,7 +3924,7 @@ static void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_
           if(blend > 16)                                                      \
             blend = 16;                                                       \
                                                                               \
-          upper = ((0x07E0F81F * blend) >> 4) & 0x07E0F81F;                   \
+          upper = ((BLND_MSK * blend) >> 4) & BLND_MSK;                       \
           blend = 16 - blend;                                                 \
                                                                               \
           expand_pixel_no_dest(brighten, pixel_top);                          \
