@@ -31,38 +31,18 @@
   #define REG_S sw
 #endif
 
+#define defsymbl(symbol) \
+.type symbol, %function ;\
+.global symbol ;         \
+symbol:
+
+#define defobj(symbol) \
+.type symbol, %object ;\
+.global symbol ;       \
+symbol:
+
+
 .align 4
-
-.global mips_update_gba
-.global mips_indirect_branch_arm
-.global mips_indirect_branch_thumb
-.global mips_indirect_branch_dual
-.global execute_read_cpsr
-.global execute_read_spsr
-.global execute_swi
-.global execute_spsr_restore
-.global execute_store_cpsr
-.global execute_store_spsr
-.global execute_lsl_flags_reg
-.global execute_lsr_flags_reg
-.global execute_asr_flags_reg
-.global execute_arm_translate_internal
-.global palette_ram
-.global palette_ram_converted
-.global oam_ram
-.global mips_lookup_pc
-.global smc_write
-.global mips_cheat_hook
-
-.global write_io_epilogue
-.global memory_map_read
-.global tmemld
-.global tmemst
-.global thnjal
-.global reg
-.global spsr
-.global reg_mode
-.global oam_update
 
 # MIPS register layout:
 
@@ -252,7 +232,7 @@
 
 # This gets called every time the cycle counter runs out
 # (checked at every branch/jump)
-mips_update_gba:
+defsymbl(mips_update_gba)
   sw $4, REG_PC($16)              # current PC = $4
 
   sw $ra, REG_SAVE2($16)          # save return addr
@@ -279,7 +259,7 @@ mips_update_gba:
 
 
 # Processes cheats whenever we hit the master PC
-mips_cheat_hook:
+defsymbl(mips_cheat_hook)
   sw $ra, REG_SAVE2($16)
   save_registers
   cfncall process_cheats, 8
@@ -310,21 +290,21 @@ return_to_main:
 
 # $4: GBA address to branch to
 
-mips_indirect_branch_arm:
+defsymbl(mips_indirect_branch_arm)
   save_registers
   cfncall block_lookup_address_arm, 1
   restore_registers
   jr $2                           # $2 = value returned
   nop
 
-mips_indirect_branch_thumb:
+defsymbl(mips_indirect_branch_thumb)
   save_registers
   cfncall block_lookup_address_thumb, 2
   restore_registers
   jr $2                           # $2 = value returned
   nop
 
-mips_indirect_branch_dual:
+defsymbl(mips_indirect_branch_dual)
   save_registers
   cfncall block_lookup_address_dual, 3
   nop
@@ -333,7 +313,7 @@ mips_indirect_branch_dual:
   nop
 
 
-write_io_epilogue:
+defsymbl(write_io_epilogue)
   beq $2, $0, no_alert            # 0 means nothing happened
   addiu $4, $2, -2                # see if return value is 2 (delay slot)
   beq $4, $0, smc_dma             # is it an SMC alert? (return value = 2)
@@ -377,12 +357,11 @@ smc_dma:
   j lookup_pc
   nop
 
-smc_write:
+defsymbl(smc_write)
   save_registers
   sw $6, REG_PC($16)              # save PC
   cfncall flush_translation_cache_ram, 4
 
-mips_lookup_pc:
 lookup_pc:
   lw $2, REG_CPSR($16)            # $2 = cpsr
   andi $2, $2, 0x20               # isolate mode bit
@@ -405,14 +384,14 @@ lookup_pc_arm:
 
 # Return the current cpsr
 
-execute_read_cpsr:
+defsymbl(execute_read_cpsr)
   collapse_flags                  # fold flags into cpsr, put cpsr into $2
   jr $ra                          # return
   nop
 
 # Return the current spsr
 
-execute_read_spsr:
+defsymbl(execute_read_spsr)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
   sll $1, $1, 2                   # adjust to word offset size
   addu $2, $1, $16
@@ -422,7 +401,7 @@ execute_read_spsr:
 # Switch into SWI, has to collapse flags
 # $4: Current pc
 
-execute_swi:
+defsymbl(execute_swi)
   sw $ra, REG_SAVE3($16)
   sw $4, SUPERVISOR_LR($16)       # store next PC in the supervisor's LR
   collapse_flags                  # get cpsr in $2
@@ -442,7 +421,7 @@ execute_swi:
 # $4: pc to restore to
 # returns in $4
 
-execute_spsr_restore:
+defsymbl(execute_spsr_restore)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
 
   beq $1, $0, no_spsr_restore     # only restore if the cpu isn't usermode
@@ -468,7 +447,7 @@ no_spsr_restore:
 # $5: store mask
 # $6: current PC
 
-execute_store_cpsr:
+defsymbl(execute_store_cpsr)
   and $1, $4, $5                  # $1 = new_cpsr & store_mask
   lw $2, REG_CPSR($16)            # $2 = current cpsr
   nor $4, $5, $0                  # $4 = ~store_mask
@@ -500,7 +479,7 @@ changed_pc_cpsr:
 # $4: new spsr
 # $5: store mask
 
-execute_store_spsr:
+defsymbl(execute_store_spsr)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
   sll $1, $1, 2                   # adjust to word offset size
   addu $1, $1, $16
@@ -515,7 +494,7 @@ execute_store_spsr:
 # $4: value
 # $5: shift
 
-execute_lsl_flags_reg:
+defsymbl(execute_lsl_flags_reg)
   beq $5, $0, lsl_shift_zero      # is the shift zero?
   sltiu $1, $5, 32                # $1 = (shift < 32) (delay)
   beq $1, $0, lsl_shift_high      # is the shift >= 32?
@@ -541,7 +520,7 @@ lsl_shift_done:
   addu $4, $0, $0                 # value = 0 no matter what
 
 
-execute_lsr_flags_reg:
+defsymbl(execute_lsr_flags_reg)
   beq $5, $0, lsr_shift_zero      # is the shift zero?
   sltiu $1, $5, 32                # $1 = (shift < 32) (delay)
   beq $1, $0, lsr_shift_high      # is the shift >= 32?
@@ -566,7 +545,7 @@ lsr_shift_done:
   addu $4, $0, $0                 # value = 0 no matter what
 
 
-execute_asr_flags_reg:
+defsymbl(execute_asr_flags_reg)
   beq $5, $0, asr_shift_zero      # is the shift zero?
   sltiu $1, $5, 32                # $1 = (shift < 32) (delay)
   beq $1, $0, asr_shift_high      # is the shift >= 32?
@@ -588,7 +567,7 @@ asr_shift_high:
 # $4: cycle counter argument
 # $5: pointer to reg
 
-execute_arm_translate_internal:
+defsymbl(execute_arm_translate_internal)
 
   addiu $sp, $sp, -112            # Store the main thread context
   REG_S $s0,  4*SZREG($sp)
@@ -634,24 +613,24 @@ execute_arm_translate_internal:
 .data
 .align 6
 
-memory_map_read:
+defobj(memory_map_read)
   .space 0x8000
 
 # memory_map_read is immediately before arm_reg on purpose (offset used
 # to access it, via lw op). We do not use write though.
-reg:
+defobj(reg)
   .space 0x100
 
 # Placed here for easy access
-palette_ram:
+defobj(palette_ram)
   .space 0x400
-palette_ram_converted:
+defobj(palette_ram_converted)
   .space 0x400
-oam_ram:
+defobj(oam_ram)
   .space 0x400
-spsr:
+defobj(spsr)
   .space 24     # u32[6]
-reg_mode:
+defobj(reg_mode)
   .space 196    # u32[7][7];
 
 # Here we store:
@@ -659,11 +638,11 @@ reg_mode:
 #  void *tmemst[ 4][16];  #  3 types of stores
 # Essentially a list of pointers to the different mem load handlers
 # Keep them close for a fast patcher.
-tmemld:
+defobj(tmemld)
   .space 704
-tmemst:
+defobj(tmemst)
   .space 256
-thnjal:
+defobj(thnjal)
   .space 960
 fnptrs:
   .long update_gba                     # 0
@@ -680,17 +659,19 @@ fnptrs:
 
 # Make this section executable!
 .text
-.section .jit,"awx",%nobits
+#if defined(PSP) || defined(PS2)
+  .section .bss
+#else
+  # Need to mark the section as awx (for Linux)
+  .section .jit,"awx",%nobits
+#endif
 .align 2
-.global stub_arena
-.global rom_translation_cache
-.global ram_translation_cache
 
-stub_arena:
+defsymbl(stub_arena)
   .space STUB_ARENA_SIZE
-rom_translation_cache:
+defsymbl(rom_translation_cache)
   .space ROM_TRANSLATION_CACHE_SIZE
-ram_translation_cache:
+defsymbl(ram_translation_cache)
   .space RAM_TRANSLATION_CACHE_SIZE
 
 #endif
