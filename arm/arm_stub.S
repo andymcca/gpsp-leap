@@ -179,6 +179,7 @@ execute_pc_##mode:                                                           ;\
   .long 3f                                /* F Bad region                  */;\
                                                                              ;\
 3:                                                                           ;\
+  /* r0 already contains the PC to jump to */                                ;\
   call_c_function(block_lookup_address_##mode)                               ;\
   restore_flags()                                                            ;\
   bx r0                                                                      ;\
@@ -187,23 +188,23 @@ execute_pc_##mode:                                                           ;\
   mov r2, r0, lsl #14                     /* addr &= 0x3ffff               */;\
   mov r2, r2, lsr #14                                                        ;\
   ldrh r2, [r1, r2]                       /* Load half word there          */;\
-  ldr r1, =(ram_block_ptrs)                                                  ;\
-  ldr r1, [r1, r2, lsl #2]                /* Pointer to the cache          */;\
-  cmp r1, #0                              /* NULL means not translated     */;\
-  beq 3b                                  /* Need to translate             */;\
+  ldr r1, =(ram_translation_cache)                                           ;\
+  subs r2, #0x0104                        /* Check valid tag + rebase      */;\
+  ble 3b                                  /* Data/non-entry code -> transl.*/;\
+  mov r2, r2, lsr #1                      /* Ignores LSB                   */;\
   restore_flags()                                                            ;\
-  bx r1                                                                      ;\
+  add pc, r1, r2, lsl #4                  /* Offset is 16 byte aligned     */;\
 2:                                                                           ;\
   ldr r1, =(iwram)                        /* Load base addr                */;\
   mov r2, r0, lsl #17                     /* addr &= 0x7fff                */;\
   mov r2, r2, lsr #17                                                        ;\
   ldrh r2, [r1, r2]                       /* Load half word there          */;\
-  ldr r1, =(ram_block_ptrs)                                                  ;\
-  ldr r1, [r1, r2, lsl #2]                /* Pointer to the cache          */;\
-  cmp r1, #0                              /* NULL means not translated     */;\
-  beq 3b                                  /* Need to translate             */;\
+  ldr r1, =(ram_translation_cache)                                           ;\
+  subs r2, #0x0104                        /* Check valid tag + rebase      */;\
+  ble 3b                                  /* Data/non-entry code -> transl.*/;\
+  mov r2, r2, lsr #1                      /* Ignores LSB                   */;\
   restore_flags()                                                            ;\
-  bx r1                                                                      ;\
+  add pc, r1, r2, lsl #4                  /* Offset is 16 byte aligned     */;\
 .size arm_indirect_branch_##mode, .-arm_indirect_branch_##mode
 
 execute_pc_builder(arm, 0x3)

@@ -2440,8 +2440,27 @@ void translate_icache_sync() {
   block_data[block_data_position].flag_data = flag_status;                    \
 }                                                                             \
 
-u8 *ram_block_ptrs[1024 * 64];
-u32 ram_block_tag_top = 0x0101;
+// I/EWRAM memory tagging
+// Code emitted in the RAM cache has tags (16 bit values) in the mirror tag ram
+// that indicate that the address contains code. The following values are used:
+// 0x0000 : this is just data (never translated)
+// 0x00XX : not used (since first byte is zero)
+// 0x0101 : this is code that is not the start of a translated block
+// 0x0105 : first possible tag (we do not use 103 due to arm asm immediates)
+// 0xXXXX : this is the start of a translated block
+//
+// The tag value is a pointer to the ram cache where the translated block starts
+// The tag value must have both bytes set to non-zero, therefore the LSB is
+// always 1 and starts from 0x0101 value.
+// The 15 value is an index to 16 byte blocks in the RAM CACHE, therefore this
+// cache is limited to ~ 2^15 * 16byte ~= 512KB
+
+#define CODE_TAG_BLOCK16   0x0101
+#define CODE_TAG_BLOCK32   0x01010101
+#define INITIAL_TOP_TAG    0x0105
+#define TAG2ADDR(tag)      (&ram_translation_cache[((((tag) - INITIAL_TOP_TAG) >> 1) << 4)])
+#define ADDR2TAG(addr)     ((((((u8*)addr) - &ram_translation_cache[0]) >> 4) << 1) + INITIAL_TOP_TAG)
+#define VALIDTAG(tag)      (tag >= INITIAL_TOP_TAG)
 
 // This function will return a pointer to a translated block of code. If it
 // doesn't exist it will translate it, if it does it will pass it back.
@@ -2493,41 +2512,38 @@ u32 ram_block_tag_top = 0x0101;
      mem_type##_translation_region, smc_enable);                              \
   }                                                                           \
 
-// 0x0101 is the smallest tag that can be used. 0xFFFF is marked
-// in the middle of blocks and used for write guarding, it doesn't
-// indicate a valid block either (it's okay to compile a new block
-// that overlaps the earlier one, although this should be relatively
-// uncommon)
+#define fill_tag_arm(tag)                                                     \
+  location[0] = (tag);                                                        \
+  location[1] = CODE_TAG_BLOCK16
 
-#define fill_tag_arm(mem_type)                                                \
-  location[0] = mem_type##_block_tag_top;                                     \
-  location[1] = 0xFFFF                                                        \
+#define fill_tag_thumb(tag)                                                   \
+  *location = (tag)
 
-#define fill_tag_thumb(mem_type)                                              \
-  *location = mem_type##_block_tag_top                                        \
-
-#define fill_tag_dual(mem_type)                                               \
+#define fill_tag_dual(tag)                                                    \
   if(thumb)                                                                   \
-    fill_tag_thumb(mem_type);                                                 \
-  else                                                                        \
-    fill_tag_arm(mem_type)                                                    \
+    fill_tag_thumb(tag);                                                      \
+  else {                                                                      \
+    fill_tag_arm(tag);                                                        \
+  }                                                                           \
 
-#define block_lookup_translate(instruction_type, mem_type, smc_enable)        \
+#define block_lookup_translate_ram(instruction_type)                          \
   block_tag = *location;                                                      \
-  if((block_tag < 0x0101) || (block_tag == 0xFFFF))                           \
+  if(!VALIDTAG(block_tag))                                                    \
   {                                                                           \
     __label__ redo;                                                           \
     s32 translation_result;                                                   \
                                                                               \
     redo:                                                                     \
                                                                               \
-    translation_recursion_level++;                                            \
-    block_address = mem_type##_translation_ptr + block_prologue_size;         \
-    mem_type##_block_ptrs[mem_type##_block_tag_top] = block_address;          \
-    fill_tag_##instruction_type(mem_type);                                    \
-    mem_type##_block_tag_top++;                                               \
+    /* Pad the start of the block to 16 bytes, see "memory tagging" above */  \
+    while ((((uintptr_t)ram_translation_ptr) % 16) != block_prologue_size)    \
+      ram_translation_ptr++;                                                  \
                                                                               \
-    block_lookup_translate_##instruction_type(mem_type, smc_enable);          \
+    translation_recursion_level++;                                            \
+    block_address = ram_translation_ptr + block_prologue_size;                \
+    fill_tag_##instruction_type(ADDR2TAG(block_address));                     \
+                                                                              \
+    block_lookup_translate_##instruction_type(ram, 1);                        \
     translation_recursion_level--;                                            \
                                                                               \
     /* If the translation failed then pass that failure on if we're in        \
@@ -2545,7 +2561,7 @@ u32 ram_block_tag_top = 0x0101;
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    block_address = mem_type##_block_ptrs[block_tag];                         \
+    block_address = (u8*)TAG2ADDR(block_tag);                                 \
   }                                                                           \
 
 u32 translation_recursion_level = 0;
@@ -2569,12 +2585,12 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
   {                                                                           \
     case 0x2:                                                                 \
       location = (u16 *)(ewram + (pc & 0x3FFFF) + 0x40000);                   \
-      block_lookup_translate(type, ram, 1);                                   \
+      block_lookup_translate_ram(type);                                       \
       break;                                                                  \
                                                                               \
     case 0x3:                                                                 \
       location = (u16 *)(iwram + (pc & 0x7FFF));                              \
-      block_lookup_translate(type, ram, 1);                                   \
+      block_lookup_translate_ram(type);                                       \
       break;                                                                  \
                                                                               \
     case 0x0:                                                                 \
@@ -2879,7 +2895,7 @@ block_exit_type block_exits[MAX_EXITS];
   if(address32(pc_address_block, (block_end_pc & 0x7FFF) + offset) == 0)      \
   {                                                                           \
     address32(pc_address_block, (block_end_pc & 0x7FFF) + offset) =           \
-     0xFFFFFFFF;                                                              \
+      CODE_TAG_BLOCK32;                                                       \
   }                                                                           \
 }
 
@@ -2887,7 +2903,8 @@ block_exit_type block_exits[MAX_EXITS];
   int offset = (pc < 0x03000000) ? 0x40000 : -0x8000;                         \
   if(address16(pc_address_block, (block_end_pc & 0x7FFF) + offset) == 0)      \
   {                                                                           \
-    address16(pc_address_block, (block_end_pc & 0x7FFF) + offset) = 0xFFFF;   \
+    address16(pc_address_block, (block_end_pc & 0x7FFF) + offset) =           \
+      CODE_TAG_BLOCK16;                                                       \
   }                                                                           \
 }
 
@@ -3405,7 +3422,6 @@ void flush_translation_cache_ram(void)
 
   last_ram_translation_ptr = ram_translation_cache;
   ram_translation_ptr = ram_translation_cache;
-  ram_block_tag_top = 0x0101;
 
   // Proceed to clean the SMC area if needed
   // (also try to memset as little as possible for performance)
@@ -3446,8 +3462,6 @@ void init_caches(void)
   iwram_code_min = 0;
   iwram_code_max = 0x7FFF;
   flush_translation_cache_ram();
-  /* Ensure 0 and FFFF get zeroed out */
-  memset(ram_block_ptrs, 0, sizeof(ram_block_ptrs));
 }
 
 #define cache_dump_prefix ""

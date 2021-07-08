@@ -4,14 +4,17 @@
 
 /* Cache sizes and their config knobs */
 #if defined(PSP)
-  #define ROM_TRANSLATION_CACHE_SIZE (1024 * 512 * 4)
+  #define ROM_TRANSLATION_CACHE_SIZE (1024 * 1024 * 2)
   #define RAM_TRANSLATION_CACHE_SIZE (1024 * 384)
-  #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024)
+  #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 2)
 #else
-  #define ROM_TRANSLATION_CACHE_SIZE (1024 * 512 * 4 * 5)
-  #define RAM_TRANSLATION_CACHE_SIZE (1024 * 384 * 2)
-  #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 32)
+  #define ROM_TRANSLATION_CACHE_SIZE (1024 * 1024 * 10)
+  #define RAM_TRANSLATION_CACHE_SIZE (1024 * 512)
+  #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 8)
 #endif
+
+/* Please note that RAM_TRANSLATION_CACHE_SIZE is limited to 512KB
+   Check cpu_threaded.c for "memory tagging" for more info. */
 
 /* This is MIPS specific for now */
 #define STUB_ARENA_SIZE  (16*1024)
