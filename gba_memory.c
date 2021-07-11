@@ -153,22 +153,26 @@ static void gbc_trigger_sound(u32 value)
    {
       gbc_sound_master_volume_right = value & 0x07;
       gbc_sound_master_volume_left = (value >> 4) & 0x07;
-      gbc_sound_channel[channel].status = 
-         ((value >> (channel + 8)) & 0x01) | ((value >> (channel + 11)) & 0x03);
+      gbc_sound_channel[channel].status = (gbc_sound_status_type)
+        (((value >> (channel + 8)) & 0x1) | ((value >> (channel + 11)) & 0x3));
    }
    write_ioreg(REG_SOUNDCNT_L, value);
 }
 
 #define trigger_sound()                                                       \
 {                                                                             \
-  timer[0].direct_sound_channels = (((value >> 10) & 0x01) == 0) |            \
-   ((((value >> 14) & 0x01) == 0) << 1);                                      \
-  timer[1].direct_sound_channels = (((value >> 10) & 0x01) == 1) |            \
-   ((((value >> 14) & 0x01) == 1) << 1);                                      \
-  direct_sound_channel[0].volume = (value >> 2) & 0x01;                       \
-  direct_sound_channel[0].status = (value >> 8) & 0x03;                       \
-  direct_sound_channel[1].volume = (value >> 3) & 0x01;                       \
-  direct_sound_channel[1].status = (value >> 12) & 0x03;                      \
+  timer[0].direct_sound_channels = (timer_ds_channel_type)                    \
+      ((((value >> 10) & 0x01) == 0) | ((((value >> 14) & 0x01) == 0) << 1)); \
+  timer[1].direct_sound_channels = (timer_ds_channel_type)                    \
+      ((((value >> 10) & 0x01) == 1) | ((((value >> 14) & 0x01) == 1) << 1)); \
+  direct_sound_channel[0].volume = (direct_sound_volume_type)                 \
+                                   ((value >> 2) & 0x01);                     \
+  direct_sound_channel[0].status = (direct_sound_status_type)                 \
+                                   ((value >> 8) & 0x03);                     \
+  direct_sound_channel[1].volume = (direct_sound_volume_type)                 \
+                                   ((value >> 3) & 0x01);                     \
+  direct_sound_channel[1].status = (direct_sound_status_type)                 \
+                                   ((value >> 12) & 0x03);                    \
   gbc_sound_master_volume = value & 0x03;                                     \
                                                                               \
   if((value >> 11) & 0x01)                                                    \
@@ -236,7 +240,7 @@ static void trigger_timer(u32 timer_number, u32 value)
             timer[timer_number].status = TIMER_PRESCALE;
 
          timer[timer_number].prescale = prescale;
-         timer[timer_number].irq = (value >> 6) & 0x01;
+         timer[timer_number].irq = (timer_irq_type)((value >> 6) & 0x1);
 
          write_ioreg(REG_TM0D + (timer_number * 2), (u32)(-timer_reload));
 
@@ -414,7 +418,7 @@ eeprom_size_type eeprom_size = EEPROM_512_BYTE;
 eeprom_mode_type eeprom_mode = EEPROM_BASE_MODE;
 u32 eeprom_address_length;
 u32 eeprom_address = 0;
-s32 eeprom_counter = 0;
+u32 eeprom_counter = 0;
 u8 eeprom_buffer[8];
 
 void function_cc write_eeprom(u32 unused_address, u32 value)
@@ -659,7 +663,7 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
   {
     if(dma[dma_number].start_type == DMA_INACTIVE)
     {
-      u32 start_type = (value >> 12) & 0x03;
+      dma_start_type start_type = (dma_start_type)((value >> 12) & 0x03);
       u32 dest_address = readaddress32(io_registers, (dma_number * 12) + 0xB4) &
        0xFFFFFFF;
 
@@ -667,10 +671,10 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
       dma[dma_number].source_address =
        readaddress32(io_registers, (dma_number * 12) + 0xB0) & 0xFFFFFFF;
       dma[dma_number].dest_address = dest_address;
-      dma[dma_number].source_direction = (value >>  7) & 0x03;
-      dma[dma_number].repeat_type = (value >> 9) & 0x01;
+      dma[dma_number].source_direction = (dma_increment_type)((value >>  7) & 3);
+      dma[dma_number].repeat_type = (dma_repeat_type)((value >> 9) & 0x01);
       dma[dma_number].start_type = start_type;
-      dma[dma_number].irq = (value >> 14) & 0x01;
+      dma[dma_number].irq = (dma_irq_type)((value >> 14) & 0x1);
 
       /* If it is sound FIFO DMA make sure the settings are a certain way */
       if((dma_number >= 1) && (dma_number <= 2) &&
@@ -704,8 +708,8 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
         }
 
         dma[dma_number].length = length;
-        dma[dma_number].length_type = (value >> 10) & 0x01;
-        dma[dma_number].dest_direction = (value >> 5) & 0x03;
+        dma[dma_number].length_type = (dma_length_type)((value >> 10) & 0x01);
+        dma[dma_number].dest_direction = (dma_increment_type)((value >> 5) & 3);
       }
 
       write_ioreg(REG_DMA0CNT_H + (dma_number * 6), value);
@@ -1814,7 +1818,7 @@ void function_cc write_rtc(u32 address, u32 value)
                 {
                   rtc_bit_count++;
 
-                  if(rtc_bit_count == (rtc_data_bytes * 8))
+                  if(rtc_bit_count == (signed)(rtc_data_bytes * 8))
                   {
                     rtc_state = RTC_IDLE;
                     switch(rtc_write_mode)
@@ -1852,7 +1856,7 @@ void function_cc write_rtc(u32 address, u32 value)
                 {
                   rtc_bit_count++;
 
-                  if(rtc_bit_count == (rtc_data_bytes * 8))
+                  if(rtc_bit_count == (signed)(rtc_data_bytes * 8))
                   {
                     rtc_state = RTC_IDLE;
                     memset(rtc_registers, 0, sizeof(rtc_registers));
@@ -3160,26 +3164,26 @@ void init_gamepak_buffer(void)
   gamepak_rom = NULL;
 
   gamepak_ram_buffer_size = 32 * 1024 * 1024;
-  gamepak_rom = malloc(gamepak_ram_buffer_size);
+  gamepak_rom = (u8*)malloc(gamepak_ram_buffer_size);
 
   if(!gamepak_rom)
   {
     // Try 16MB, for PSP, then lower in 2MB increments
     gamepak_ram_buffer_size = 16 * 1024 * 1024;
-    gamepak_rom = malloc(gamepak_ram_buffer_size);
+    gamepak_rom = (u8*)malloc(gamepak_ram_buffer_size);
 
     while(!gamepak_rom)
     {
       gamepak_ram_buffer_size -= (2 * 1024 * 1024);
-      gamepak_rom = malloc(gamepak_ram_buffer_size);
+      gamepak_rom = (u8*)malloc(gamepak_ram_buffer_size);
     }
   }
 
   // Here's assuming we'll have enough memory left over for this,
   // and that the above succeeded (if not we're in trouble all around)
   gamepak_ram_pages = gamepak_ram_buffer_size / (32 * 1024);
-  gamepak_memory_map = malloc(sizeof(gamepak_swap_entry_type) *
-   gamepak_ram_pages);
+  gamepak_memory_map = (gamepak_swap_entry_type*)malloc(
+    sizeof(gamepak_swap_entry_type) * gamepak_ram_pages);
 }
 
 void init_memory(void)
@@ -3271,7 +3275,7 @@ void gba_load_state(const void* src)
    u32 i;
    u32 current_color;
 
-   state_mem_read_ptr = src;
+   state_mem_read_ptr = (u8*)src;
    savestate_block(read);
 
 #ifdef HAVE_DYNAREC
@@ -3300,7 +3304,7 @@ void gba_load_state(const void* src)
 
 void gba_save_state(void* dst)
 {
-  state_mem_write_ptr = dst;
+  state_mem_write_ptr = (u8*)dst;
   savestate_block(write);
 }
 

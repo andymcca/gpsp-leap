@@ -24,23 +24,22 @@
 
 // System mode and user mode are represented as the same here
 
-typedef enum
-{
-  MODE_USER,
-  MODE_IRQ,
-  MODE_FIQ,
-  MODE_SUPERVISOR,
-  MODE_ABORT,
-  MODE_UNDEFINED,
-  MODE_INVALID
-} cpu_mode_type;
+typedef u32 cpu_mode_type;
+
+#define MODE_USER         0x0
+#define MODE_IRQ          0x1
+#define MODE_FIQ          0x2
+#define MODE_SUPERVISOR   0x3
+#define MODE_ABORT        0x4
+#define MODE_UNDEFINED    0x5
+#define MODE_INVALID      0x6
 
 typedef enum
 {
-  CPU_ALERT_NONE,
-  CPU_ALERT_HALT,
-  CPU_ALERT_SMC,
-  CPU_ALERT_IRQ
+  CPU_ALERT_NONE = 0,
+  CPU_ALERT_HALT = 1,
+  CPU_ALERT_SMC  = 2,
+  CPU_ALERT_IRQ  = 3
 } cpu_alert_type;
 
 typedef enum
@@ -50,24 +49,23 @@ typedef enum
   CPU_STOP
 } cpu_halt_type;
 
-typedef enum
-{
-  IRQ_NONE     = 0x0000,
-  IRQ_VBLANK   = 0x0001,
-  IRQ_HBLANK   = 0x0002,
-  IRQ_VCOUNT   = 0x0004,
-  IRQ_TIMER0   = 0x0008,
-  IRQ_TIMER1   = 0x0010,
-  IRQ_TIMER2   = 0x0020,
-  IRQ_TIMER3   = 0x0040,
-  IRQ_SERIAL   = 0x0080,
-  IRQ_DMA0     = 0x0100,
-  IRQ_DMA1     = 0x0200,
-  IRQ_DMA2     = 0x0400,
-  IRQ_DMA3     = 0x0800,
-  IRQ_KEYPAD   = 0x1000,
-  IRQ_GAMEPAK  = 0x2000
-} irq_type;
+typedef u16 irq_type;
+
+#define IRQ_NONE     0x0000
+#define IRQ_VBLANK   0x0001
+#define IRQ_HBLANK   0x0002
+#define IRQ_VCOUNT   0x0004
+#define IRQ_TIMER0   0x0008
+#define IRQ_TIMER1   0x0010
+#define IRQ_TIMER2   0x0020
+#define IRQ_TIMER3   0x0040
+#define IRQ_SERIAL   0x0080
+#define IRQ_DMA0     0x0100
+#define IRQ_DMA1     0x0200
+#define IRQ_DMA2     0x0400
+#define IRQ_DMA3     0x0800
+#define IRQ_KEYPAD   0x1000
+#define IRQ_GAMEPAK  0x2000
 
 typedef enum
 {

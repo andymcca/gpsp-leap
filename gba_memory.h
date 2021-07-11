@@ -25,37 +25,37 @@ extern int use_libretro_save_method;
 
 typedef enum
 {
-  DMA_START_IMMEDIATELY,
-  DMA_START_VBLANK,
-  DMA_START_HBLANK,
-  DMA_START_SPECIAL,
-  DMA_INACTIVE
+  DMA_START_IMMEDIATELY = 0,
+  DMA_START_VBLANK      = 1,
+  DMA_START_HBLANK      = 2,
+  DMA_START_SPECIAL     = 3,
+  DMA_INACTIVE          = 4
 } dma_start_type;
 
 typedef enum
 {
-  DMA_16BIT,
-  DMA_32BIT
+  DMA_16BIT = 0,
+  DMA_32BIT = 1
 } dma_length_type;
 
 typedef enum
 {
-  DMA_NO_REPEAT,
-  DMA_REPEAT
+  DMA_NO_REPEAT = 0,
+  DMA_REPEAT    = 1
 } dma_repeat_type;
 
 typedef enum
 {
-  DMA_INCREMENT,
-  DMA_DECREMENT,
-  DMA_FIXED,
-  DMA_RELOAD
+  DMA_INCREMENT = 0,
+  DMA_DECREMENT = 1,
+  DMA_FIXED     = 2,
+  DMA_RELOAD    = 3
 } dma_increment_type;
 
 typedef enum
 {
-  DMA_NO_IRQ,
-  DMA_TRIGGER_IRQ
+  DMA_NO_IRQ      = 0,
+  DMA_TRIGGER_IRQ = 1
 } dma_irq_type;
 
 typedef enum
@@ -154,6 +154,7 @@ typedef enum
 
 typedef enum
 {
+  FLASH_DEVICE_UNDEFINED       = 0x00,
   FLASH_DEVICE_MACRONIX_64KB   = 0x1C,
   FLASH_DEVICE_AMTEL_64KB      = 0x3D,
   FLASH_DEVICE_SST_64K         = 0xD4,

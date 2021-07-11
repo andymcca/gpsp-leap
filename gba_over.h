@@ -5,7 +5,7 @@ static const ini_t gbaover[] = {
       "A7OE",                      /* gamepak_code         */
       "69",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -22,7 +22,7 @@ static const ini_t gbaover[] = {
       "AWRP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -39,7 +39,7 @@ static const ini_t gbaover[] = {
       "AWRE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -56,7 +56,7 @@ static const ini_t gbaover[] = {
       "AW2P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -73,7 +73,7 @@ static const ini_t gbaover[] = {
       "AW2E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -90,7 +90,7 @@ static const ini_t gbaover[] = {
       "BAXJ",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -107,7 +107,7 @@ static const ini_t gbaover[] = {
       "Home",                      /* gamepak_code         */
       "00",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -124,7 +124,7 @@ static const ini_t gbaover[] = {
       "BLXP",                      /* gamepak_code         */
       "70",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -141,7 +141,7 @@ static const ini_t gbaover[] = {
       "AREJ",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -158,7 +158,7 @@ static const ini_t gbaover[] = {
       "BLEJ",                      /* gamepak_code         */
       "6L",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -175,7 +175,7 @@ static const ini_t gbaover[] = {
       "BOMJ",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -192,7 +192,7 @@ static const ini_t gbaover[] = {
       "ABSE",                      /* gamepak_code         */
       "52",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -209,7 +209,7 @@ static const ini_t gbaover[] = {
       "BKWE",                      /* gamepak_code         */
       "5G",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -226,7 +226,7 @@ static const ini_t gbaover[] = {
       "ABJE",                      /* gamepak_code         */
       "6L",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -260,7 +260,7 @@ static const ini_t gbaover[] = {
       "AAMP",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -277,7 +277,7 @@ static const ini_t gbaover[] = {
       "AAME",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -294,7 +294,7 @@ static const ini_t gbaover[] = {
       "BCHJ",                      /* gamepak_code         */
       "G9",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -311,7 +311,7 @@ static const ini_t gbaover[] = {
       "ADHE",                      /* gamepak_code         */
       "5N",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -328,7 +328,7 @@ static const ini_t gbaover[] = {
       "A8SE",                      /* gamepak_code         */
       "B2",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -345,7 +345,7 @@ static const ini_t gbaover[] = {
       "BDSE",                      /* gamepak_code         */
       "B2",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -362,7 +362,7 @@ static const ini_t gbaover[] = {
       "AJ6J",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -379,7 +379,7 @@ static const ini_t gbaover[] = {
       "BADP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -396,7 +396,7 @@ static const ini_t gbaover[] = {
       "BADE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -413,7 +413,7 @@ static const ini_t gbaover[] = {
       "A9DE",                      /* gamepak_code         */
       "52",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -430,7 +430,7 @@ static const ini_t gbaover[] = {
       "ADKE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -447,7 +447,7 @@ static const ini_t gbaover[] = {
       "V49E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -464,7 +464,7 @@ static const ini_t gbaover[] = {
       "AFZJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -481,7 +481,7 @@ static const ini_t gbaover[] = {
       "AFZE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -515,7 +515,7 @@ static const ini_t gbaover[] = {
       "BZ4E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -532,7 +532,7 @@ static const ini_t gbaover[] = {
       "AFXE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -549,7 +549,7 @@ static const ini_t gbaover[] = {
       "AFFP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -566,7 +566,7 @@ static const ini_t gbaover[] = {
       "AFFE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -600,7 +600,7 @@ static const ini_t gbaover[] = {
       "AGSE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -618,7 +618,7 @@ static const ini_t gbaover[] = {
       "AGFE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -638,7 +638,7 @@ static const ini_t gbaover[] = {
       "AGAE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -655,7 +655,7 @@ static const ini_t gbaover[] = {
       "A7KJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -672,7 +672,7 @@ static const ini_t gbaover[] = {
       "AC2J",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -689,7 +689,7 @@ static const ini_t gbaover[] = {
       "BKME",                      /* gamepak_code         */
       "4Q",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -706,7 +706,7 @@ static const ini_t gbaover[] = {
       "BKMP",                      /* gamepak_code         */
       "4Q",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -723,7 +723,7 @@ static const ini_t gbaover[] = {
       "A7KP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -740,7 +740,7 @@ static const ini_t gbaover[] = {
       "A7KE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -757,7 +757,7 @@ static const ini_t gbaover[] = {
       "BISJ",                      /* gamepak_code         */
       "IQ",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -774,7 +774,7 @@ static const ini_t gbaover[] = {
       "AJOJ",                      /* gamepak_code         */
       "C8",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -791,7 +791,7 @@ static const ini_t gbaover[] = {
       "AQME",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -808,7 +808,7 @@ static const ini_t gbaover[] = {
       "BMQE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -825,7 +825,7 @@ static const ini_t gbaover[] = {
       "BMGE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -842,7 +842,7 @@ static const ini_t gbaover[] = {
       "BMGJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -859,7 +859,7 @@ static const ini_t gbaover[] = {
       "BMGP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -876,7 +876,7 @@ static const ini_t gbaover[] = {
       "BMGS",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -893,7 +893,7 @@ static const ini_t gbaover[] = {
       "BMGF",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -910,7 +910,7 @@ static const ini_t gbaover[] = {
       "BMGI",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -927,7 +927,7 @@ static const ini_t gbaover[] = {
       "BMGD",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -944,7 +944,7 @@ static const ini_t gbaover[] = {
       "BMGU",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -961,7 +961,7 @@ static const ini_t gbaover[] = {
       "BM5E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -978,7 +978,7 @@ static const ini_t gbaover[] = {
       "B8ME",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -995,7 +995,7 @@ static const ini_t gbaover[] = {
       "B8MJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1012,7 +1012,7 @@ static const ini_t gbaover[] = {
       "B8MP",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1029,7 +1029,7 @@ static const ini_t gbaover[] = {
       "BMHJ",                      /* gamepak_code         */
       "13",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1046,7 +1046,7 @@ static const ini_t gbaover[] = {
       "AREP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1063,7 +1063,7 @@ static const ini_t gbaover[] = {
       "AREE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1080,7 +1080,7 @@ static const ini_t gbaover[] = {
       "AE2E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1097,7 +1097,7 @@ static const ini_t gbaover[] = {
       "A6BE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1114,7 +1114,7 @@ static const ini_t gbaover[] = {
       "A3XE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1131,7 +1131,7 @@ static const ini_t gbaover[] = {
       "B4WE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1148,7 +1148,7 @@ static const ini_t gbaover[] = {
       "B4BE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1165,7 +1165,7 @@ static const ini_t gbaover[] = {
       "BRBE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1182,7 +1182,7 @@ static const ini_t gbaover[] = {
       "BRKE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1199,7 +1199,7 @@ static const ini_t gbaover[] = {
       "BR5E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1216,7 +1216,7 @@ static const ini_t gbaover[] = {
       "A89E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1233,7 +1233,7 @@ static const ini_t gbaover[] = {
       "AZCE",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1250,7 +1250,7 @@ static const ini_t gbaover[] = {
       "A62E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1267,7 +1267,7 @@ static const ini_t gbaover[] = {
       "BZ3E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1284,7 +1284,7 @@ static const ini_t gbaover[] = {
       "B4ZP",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1301,7 +1301,7 @@ static const ini_t gbaover[] = {
       "BSME",                      /* gamepak_code         */
       "B7",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1318,7 +1318,7 @@ static const ini_t gbaover[] = {
       "BM2J",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1335,7 +1335,7 @@ static const ini_t gbaover[] = {
       "AM8E",                      /* gamepak_code         */
       "7D",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1352,7 +1352,7 @@ static const ini_t gbaover[] = {
       "AMFE",                      /* gamepak_code         */
       "9B",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1369,7 +1369,7 @@ static const ini_t gbaover[] = {
       "A2QE",                      /* gamepak_code         */
       "9B",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1386,7 +1386,7 @@ static const ini_t gbaover[] = {
       "A9MP",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1403,7 +1403,7 @@ static const ini_t gbaover[] = {
       "ANXP",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1420,7 +1420,7 @@ static const ini_t gbaover[] = {
       "ANXE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1437,7 +1437,7 @@ static const ini_t gbaover[] = {
       "ASMJ",                      /* gamepak_code         */
       "AG",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1454,7 +1454,7 @@ static const ini_t gbaover[] = {
       "BOAE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1471,7 +1471,7 @@ static const ini_t gbaover[] = {
       "AORJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -1488,7 +1488,7 @@ static const ini_t gbaover[] = {
       "APLP",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2067,7 +2067,7 @@ static const ini_t gbaover[] = {
       "BPYE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2089,7 +2089,7 @@ static const ini_t gbaover[] = {
       "BRLE",                      /* gamepak_code         */
       "AF",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2106,7 +2106,7 @@ static const ini_t gbaover[] = {
       "BDTJ",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2123,7 +2123,7 @@ static const ini_t gbaover[] = {
       "BDTE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2140,7 +2140,7 @@ static const ini_t gbaover[] = {
       "BRIJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2157,7 +2157,7 @@ static const ini_t gbaover[] = {
       "ARZJ",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2174,7 +2174,8 @@ static const ini_t gbaover[] = {
       "ACVE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0 /* Flash 512K */,          /* flash_device_id      */
+      /* Has a 512K flash */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2191,7 +2192,8 @@ static const ini_t gbaover[] = {
       "ARPE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0 /* Flash 512K */,          /* flash_device_id      */
+      /* Has a 512K flash */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2208,7 +2210,7 @@ static const ini_t gbaover[] = {
       "ACVJ",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2225,7 +2227,7 @@ static const ini_t gbaover[] = {
       "ARPJ",                      /* gamepak_code         */
       "18",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2259,7 +2261,7 @@ static const ini_t gbaover[] = {
       "AHUJ",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2276,7 +2278,7 @@ static const ini_t gbaover[] = {
       "AHUE",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2293,7 +2295,7 @@ static const ini_t gbaover[] = {
       "AHUP",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2310,7 +2312,7 @@ static const ini_t gbaover[] = {
       "AU2J",                      /* gamepak_code         */
       "8P",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2327,7 +2329,7 @@ static const ini_t gbaover[] = {
       "AU2E",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2344,7 +2346,7 @@ static const ini_t gbaover[] = {
       "AU2P",                      /* gamepak_code         */
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2361,7 +2363,7 @@ static const ini_t gbaover[] = {
       "AMZE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2378,7 +2380,7 @@ static const ini_t gbaover[] = {
       "AMAE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2395,7 +2397,7 @@ static const ini_t gbaover[] = {
       "AA2P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2412,7 +2414,7 @@ static const ini_t gbaover[] = {
       "AA2E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2429,7 +2431,7 @@ static const ini_t gbaover[] = {
       "A3AJ",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2446,7 +2448,7 @@ static const ini_t gbaover[] = {
       "A3AE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2514,7 +2516,7 @@ static const ini_t gbaover[] = {
       "AZ8P",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2531,7 +2533,7 @@ static const ini_t gbaover[] = {
       "AZ8E",                      /* gamepak_code         */
       "08",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2548,7 +2550,7 @@ static const ini_t gbaover[] = {
       "AN8E",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2565,7 +2567,7 @@ static const ini_t gbaover[] = {
       "AN8J",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2582,7 +2584,7 @@ static const ini_t gbaover[] = {
       "AN8P",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2599,7 +2601,7 @@ static const ini_t gbaover[] = {
       "APDE",                      /* gamepak_code         */
       "78",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2616,7 +2618,7 @@ static const ini_t gbaover[] = {
       "A04E",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2633,7 +2635,7 @@ static const ini_t gbaover[] = {
       "BSLE",                      /* gamepak_code         */
       "41",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2650,7 +2652,7 @@ static const ini_t gbaover[] = {
       "B85A",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2667,7 +2669,7 @@ static const ini_t gbaover[] = {
       "BTJE",                      /* gamepak_code         */
       "42",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2684,7 +2686,7 @@ static const ini_t gbaover[] = {
       "BUHJ",                      /* gamepak_code         */
       "D9",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2701,7 +2703,7 @@ static const ini_t gbaover[] = {
       "AVRP",                      /* gamepak_code         */
       "70",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2718,7 +2720,7 @@ static const ini_t gbaover[] = {
       "AVKE",                      /* gamepak_code         */
       "60",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2735,7 +2737,7 @@ static const ini_t gbaover[] = {
       "AZWE",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2752,7 +2754,7 @@ static const ini_t gbaover[] = {
       "AYDE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2769,7 +2771,7 @@ static const ini_t gbaover[] = {
       "AY5E",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2786,7 +2788,7 @@ static const ini_t gbaover[] = {
       "AY7E",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2803,7 +2805,7 @@ static const ini_t gbaover[] = {
       "BYWE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2820,7 +2822,7 @@ static const ini_t gbaover[] = {
       "AYWE",                      /* gamepak_code         */
       "A4",                        /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */
@@ -2838,7 +2840,7 @@ static const ini_t gbaover[] = {
       "",                          /* gamepak_code         */
       "",                          /* gamepak_maker        */
       0,                           /* flash_size           */
-      0,                           /* flash_device_id      */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* mirroring_enabled    */

@@ -316,7 +316,3 @@ main_savestate_builder(read)
 main_savestate_builder(write)
 
 
-void printout(void *str, u32 val)
-{
-  printf(str, val);
-}

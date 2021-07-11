@@ -1544,17 +1544,6 @@ u32 reg_mode[7][7];
 // ARM/Thumb mode is stored in the flags directly, this is simpler than
 // shadowing it since it has a constant 1bit represenation.
 
-char *reg_names[16] =
-{
-  " r0", " r1", " r2", " r3", " r4", " r5", " r6", " r7",
-  " r8", " r9", "r10", " fp", " ip", " sp", " lr", " pc"
-};
-
-char *cpu_mode_names[] =
-{
-  "user", "irq", "fiq", "svsr", "abrt", "undf", "invd"
-};
-
 u32 instruction_count = 0;
 
 u32 output_field = 0;

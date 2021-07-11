@@ -3264,10 +3264,10 @@ static void render_scanline_obj_##alpha_op##_##map_space(u32 priority,        \
  u32 start, u32 end, render_scanline_dest_##alpha_op *scanline)               \
 {                                                                             \
   render_scanline_obj_extra_variables_##alpha_op(map_space);                  \
-  s32 obj_num, i;                                                             \
+  u32 obj_num, i;                                                             \
   s32 obj_x, obj_y;                                                           \
-  s32 obj_size;                                                               \
-  s32 obj_width, obj_height;                                                  \
+  u32 obj_size;                                                               \
+  u32 obj_width, obj_height;                                                  \
   u32 obj_attribute_0, obj_attribute_1, obj_attribute_2;                      \
   s32 vcount = read_ioreg(REG_VCOUNT);                                        \
   u32 tile_run;                                                               \
@@ -3328,7 +3328,7 @@ static void order_obj(u32 video_mode)
 {
   s32 obj_num, priority, row;
   s32 obj_x, obj_y;
-  s32 obj_size, obj_mode;
+  u32 obj_size, obj_mode;
   s32 obj_width, obj_height;
   u32 obj_priority;
   u32 obj_attribute_0, obj_attribute_1, obj_attribute_2;

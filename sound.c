@@ -78,7 +78,7 @@ void sound_timer_queue32(u32 channel, u32 value)
 
 void sound_timer(fixed8_24 frequency_step, u32 channel)
 {
-  unsigned sample_status = DIRECT_SOUND_INACTIVE;
+  direct_sound_status_type sample_status = DIRECT_SOUND_INACTIVE;
   direct_sound_struct *ds = direct_sound_channel + channel;
 
   fixed8_24 fifo_fractional = ds->fifo_fractional;
@@ -98,7 +98,6 @@ void sound_timer(fixed8_24 frequency_step, u32 channel)
     }
 
     sample_status = ds->status;
-
   }
 
   // Unqueue 1 sample from the base of the DS FIFO and place it on the audio
@@ -190,12 +189,12 @@ void sound_reset_fifo(u32 channel)
 
 // Square waves range from -8 (low) to 7 (high)
 
-s8 square_pattern_duty[4][8] =
+const s8 square_pattern_duty[4][8] =
 {
-  { 0xF8, 0xF8, 0xF8, 0xF8, 0x07, 0xF8, 0xF8, 0xF8 },
-  { 0xF8, 0xF8, 0xF8, 0xF8, 0x07, 0x07, 0xF8, 0xF8 },
-  { 0xF8, 0xF8, 0x07, 0x07, 0x07, 0x07, 0xF8, 0xF8 },
-  { 0x07, 0x07, 0x07, 0x07, 0xF8, 0xF8, 0x07, 0x07 },
+  { -8, -8, -8, -8,  7, -8, -8, -8 },
+  { -8, -8, -8, -8,  7,  7, -8, -8 },
+  { -8, -8,  7,  7,  7,  7, -8, -8 },
+  {  7,  7,  7,  7, -8, -8,  7,  7 },
 };
 
 s8 wave_samples[64];
@@ -438,7 +437,7 @@ void update_gbc_sound(u32 cpu_ticks)
   u32 envelope_volume;
   s32 current_sample;
   u16 sound_status = read_ioreg(REG_SOUNDCNT_X) & 0xFFF0;
-  s8 *sample_data;
+  const s8 *sample_data;
   s8 *wave_bank;
   u8 *wave_ram = ((u8 *)io_registers) + 0x90;
 

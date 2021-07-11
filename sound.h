@@ -29,16 +29,16 @@
 
 typedef enum
 {
-   DIRECT_SOUND_INACTIVE,
-   DIRECT_SOUND_RIGHT,
-   DIRECT_SOUND_LEFT,
-   DIRECT_SOUND_LEFTRIGHT
+   DIRECT_SOUND_INACTIVE  = 0,
+   DIRECT_SOUND_RIGHT     = 1,
+   DIRECT_SOUND_LEFT      = 2,
+   DIRECT_SOUND_LEFTRIGHT = 3
 } direct_sound_status_type;
 
 typedef enum
 {
-   DIRECT_SOUND_VOLUME_50,
-   DIRECT_SOUND_VOLUME_100
+   DIRECT_SOUND_VOLUME_50  = 0,
+   DIRECT_SOUND_VOLUME_100 = 1
 } direct_sound_volume_type;
 
 typedef struct
@@ -57,10 +57,10 @@ typedef struct
 
 typedef enum
 {
-   GBC_SOUND_INACTIVE,
-   GBC_SOUND_RIGHT,
-   GBC_SOUND_LEFT,
-   GBC_SOUND_LEFTRIGHT
+   GBC_SOUND_INACTIVE  = 0,
+   GBC_SOUND_RIGHT     = 1,
+   GBC_SOUND_LEFT      = 2,
+   GBC_SOUND_LEFTRIGHT = 3
 } gbc_sound_status_type;
 
 
@@ -92,12 +92,12 @@ typedef struct
    gbc_sound_status_type status;
    u32 active_flag;
    u32 master_enable;
-   s8* sample_data;
+   const s8* sample_data;
 } gbc_sound_struct;
 
+const extern s8 square_pattern_duty[4][8];
 extern direct_sound_struct direct_sound_channel[2];
 extern gbc_sound_struct gbc_sound_channel[4];
-extern s8 square_pattern_duty[4][8];
 extern u32 gbc_sound_master_volume_left;
 extern u32 gbc_sound_master_volume_right;
 extern u32 gbc_sound_master_volume;

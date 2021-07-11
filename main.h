@@ -31,8 +31,8 @@ typedef enum
 
 typedef enum
 {
-  TIMER_NO_IRQ,
-  TIMER_TRIGGER_IRQ
+  TIMER_NO_IRQ      = 0,
+  TIMER_TRIGGER_IRQ = 1
 } timer_irq_type;
 
 
