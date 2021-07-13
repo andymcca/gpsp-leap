@@ -2,6 +2,7 @@
 #include "../gpsp_config.h"
 
 #define defsymbl(symbol) \
+.align 2;                \
 .type symbol, %function ;\
 .global symbol ;         \
 .global _##symbol ;      \
@@ -148,82 +149,6 @@ _##symbol:
   bl function                                                                ;\
   ldmia sp!, { call_c_saved_regs }                                           ;\
 
-@ Jumps to PC (ARM or Thumb modes)
-@ This is really two functions/routines in one
-@ r0 contains the PC
-
-.align 2
-#define execute_pc_builder(mode, align)                                      ;\
-defsymbl(arm_indirect_branch_##mode)                                         ;\
-  save_flags()                                                               ;\
-execute_pc_##mode:                                                           ;\
-  bic r0, r0, #(align)                    /* Align PC                      */;\
-  mov r1, r0, lsr #24                     /* Get region                    */;\
-  ldr pc, [pc, r1, lsl #2]                                                   ;\
-  nop                                                                        ;\
-  .long 3f                                /* 0 BIOS (like ROM)             */;\
-  .long 3f                                /* 1 Bad region                  */;\
-  .long 1f                                /* 2 EWRAM                       */;\
-  .long 2f                                /* 3 IWRAM                       */;\
-  .long 3f                                /* 4 Not supported               */;\
-  .long 3f                                /* 5 Not supported               */;\
-  .long 3f                                /* 6 Not supported               */;\
-  .long 3f                                /* 7 Not supported               */;\
-  .long 3f                                /* 8 ROM                         */;\
-  .long 3f                                /* 9 ROM                         */;\
-  .long 3f                                /* A ROM                         */;\
-  .long 3f                                /* B ROM                         */;\
-  .long 3f                                /* C ROM                         */;\
-  .long 3f                                /* D ROM                         */;\
-  .long 3f                                /* E ROM                         */;\
-  .long 3f                                /* F Bad region                  */;\
-                                                                             ;\
-3:                                                                           ;\
-  /* r0 already contains the PC to jump to */                                ;\
-  call_c_function(block_lookup_address_##mode)                               ;\
-  restore_flags()                                                            ;\
-  bx r0                                                                      ;\
-1:                                                                           ;\
-  ldr r1, =(ewram+0x40000)                /* Load base addr                */;\
-  mov r2, r0, lsl #14                     /* addr &= 0x3ffff               */;\
-  mov r2, r2, lsr #14                                                        ;\
-  ldrh r2, [r1, r2]                       /* Load half word there          */;\
-  ldr r1, =(ram_translation_cache)                                           ;\
-  subs r2, #0x0104                        /* Check valid tag + rebase      */;\
-  ble 3b                                  /* Data/non-entry code -> transl.*/;\
-  mov r2, r2, lsr #1                      /* Ignores LSB                   */;\
-  restore_flags()                                                            ;\
-  add pc, r1, r2, lsl #4                  /* Offset is 16 byte aligned     */;\
-2:                                                                           ;\
-  ldr r1, =(iwram)                        /* Load base addr                */;\
-  mov r2, r0, lsl #17                     /* addr &= 0x7fff                */;\
-  mov r2, r2, lsr #17                                                        ;\
-  ldrh r2, [r1, r2]                       /* Load half word there          */;\
-  ldr r1, =(ram_translation_cache)                                           ;\
-  subs r2, #0x0104                        /* Check valid tag + rebase      */;\
-  ble 3b                                  /* Data/non-entry code -> transl.*/;\
-  mov r2, r2, lsr #1                      /* Ignores LSB                   */;\
-  restore_flags()                                                            ;\
-  add pc, r1, r2, lsl #4                  /* Offset is 16 byte aligned     */;\
-.size arm_indirect_branch_##mode, .-arm_indirect_branch_##mode
-
-execute_pc_builder(arm, 0x3)
-execute_pc_builder(thumb, 0x1)
-
-@ Resumes execution from saved PC, in any mode
-
-execute_pc:
-  ldr r0, [reg_base, #REG_PC]             @ load new PC
-  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
-  tst r1, #0x20                           @ see if Thumb bit is set
-  bne 2f
-
-  load_registers_arm()
-  b execute_pc_arm
-
-2:
-  load_registers_thumb()
-  b execute_pc_thumb
 
 @ Update the GBA hardware (video, sound, input, etc)
 
@@ -245,7 +170,6 @@ execute_pc:
 
 #define arm_update_gba_builder(name, mode, return_op)                        ;\
                                                                              ;\
-.align 2                                                                     ;\
 defsymbl(arm_update_gba_##name)                                              ;\
   load_pc_##return_op()                                                      ;\
   str r0, [reg_base, #REG_PC]             /* write out the PC              */;\
@@ -269,12 +193,28 @@ wait_halt_##name:                                                            ;\
                                                                              ;\
   ldr r0, [reg_base, #CHANGED_PC_STATUS]  /* load PC changed status        */;\
   cmp r0, #0                              /* see if PC has changed         */;\
-  bne execute_pc                          /* go jump/translate             */;\
+  bne 1f                                  /* go jump/translate             */;\
                                                                              ;\
   load_registers_##mode()                 /* reload registers              */;\
   restore_flags()                                                            ;\
   return_##return_op()                    /* continue, no PC change        */;\
-.size arm_update_gba_##mode, .-arm_update_gba_##mode
+                                                                             ;\
+1:                                                                           ;\
+  ldr r1, [reg_base, #REG_CPSR]           /* r1 = flags                    */;\
+  ldr r0, [reg_base, #REG_PC]             /* load new PC                   */;\
+  tst r1, #0x20                           /* see if Thumb bit is set       */;\
+  bne 2f                                  /* if so load Thumb PC           */;\
+                                                                             ;\
+  load_registers_arm()                    /* load ARM regs                 */;\
+  call_c_function(block_lookup_address_arm)                                  ;\
+  restore_flags()                                                            ;\
+  bx r0                                   /* jump to new ARM block         */;\
+2:                                                                           ;\
+  load_registers_thumb()                  /* load Thumb regs               */;\
+  call_c_function(block_lookup_address_thumb)                                ;\
+  restore_flags()                                                            ;\
+  bx r0                                   /* jump to new ARM block         */;\
+.size arm_update_gba_##name, .-arm_update_gba_##name
 
 arm_update_gba_builder(arm, arm, straight)
 arm_update_gba_builder(thumb, thumb, straight)
@@ -306,33 +246,52 @@ cheat_hook_builder(thumb)
 @ Input:
 @ r0: PC to branch to
 
-.align 2
+defsymbl(arm_indirect_branch_arm)
+  save_flags()
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0
+
+defsymbl(arm_indirect_branch_thumb)
+  save_flags()
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0
+
 defsymbl(arm_indirect_branch_dual_arm)
   save_flags()
   tst r0, #0x01                           @ check lower bit
-  beq execute_pc_arm                      @ Keep executing ARM code
-
-  bic r0, r0, #0x01                       @ Switch to Thumb mode
+  bne 1f                                  @ if set going to Thumb mode
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ keep executing arm code
+1:
   store_registers_arm()                   @ save out ARM registers
-  load_registers_thumb()                  @ load in Thumb registers
   ldr r1, [reg_base, #REG_CPSR]           @ load cpsr
+  load_registers_thumb()                  @ load in Thumb registers
   orr r1, r1, #0x20                       @ set Thumb mode
   str r1, [reg_base, #REG_CPSR]           @ store flags
-  b execute_pc_thumb                      @ Now execute Thumb
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0       
 .size arm_indirect_branch_dual_arm, .-arm_indirect_branch_dual_arm
 
-.align 2
 defsymbl(arm_indirect_branch_dual_thumb)
   save_flags()
   tst r0, #0x01                           @ check lower bit
-  bne execute_pc_thumb                    @ Keep executing Thumb mode
-
+  beq 1f                                  @ if set going to ARM mode
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0                                   @ keep executing thumb code
+1:
   store_registers_thumb()                 @ save out Thumb registers
-  load_registers_arm()                    @ load in ARM registers
   ldr r1, [reg_base, #REG_CPSR]           @ load cpsr
+  load_registers_arm()                    @ load in ARM registers
   bic r1, r1, #0x20                       @ clear Thumb mode
   str r1, [reg_base, #REG_CPSR]           @ store flags
-  b execute_pc_arm                        @ Now execute ARM
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0
 .size arm_indirect_branch_dual_thumb, .-arm_indirect_branch_dual_thumb
 
 @ Update the cpsr.
@@ -342,7 +301,6 @@ defsymbl(arm_indirect_branch_dual_thumb)
 @ r1: bitmask of which bits in cpsr to update
 @ r2: current PC
 
-.align 2
 defsymbl(execute_store_cpsr)
   save_flags()
   and reg_flags, r0, r1                   @ reg_flags = new_cpsr & store_mask
@@ -358,13 +316,15 @@ defsymbl(execute_store_cpsr)
   load_registers_arm()                    @ restore ARM registers
 
   cmp r0, #0                              @ check new PC
-  beq 1f                                  @ if it's zero, return
+  bne 1f                                  @ if it's zero, resume
 
-  b execute_pc_arm
-
-1:
   restore_flags()
   add pc, lr, #4                          @ return
+
+1:
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ return to PC ARM address
 .size execute_store_cpsr, .-execute_store_cpsr
 
 @ Update the current spsr.
@@ -373,7 +333,6 @@ defsymbl(execute_store_cpsr)
 @ r0: new cpsr value
 @ r1: bitmask of which bits in spsr to update
 
-.align 2
 defsymbl(execute_store_spsr)
   ldr r1, =spsr                           @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = CPU_MODE
@@ -386,7 +345,6 @@ defsymbl(execute_store_spsr)
 @ Output:
 @ r0: spsr
 
-.align 2
 defsymbl(execute_read_spsr)
   ldr r0, =spsr                           @ r0 = spsr
   ldr r1, [reg_base, #CPU_MODE]           @ r1 = CPU_MODE
@@ -399,7 +357,6 @@ defsymbl(execute_read_spsr)
 @ Input:
 @ r0: current pc
 
-.align 2
 defsymbl(execute_spsr_restore)
   save_flags()
   ldr r1, =spsr                           @ r1 = spsr
@@ -417,11 +374,15 @@ defsymbl(execute_spsr_restore)
   bne 2f                                  @ if so handle it
 
   load_registers_arm()                    @ restore ARM registers
-  b execute_pc_arm
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0
 
 2:
   load_registers_thumb()                  @ load Thumb registers
-  b execute_pc_thumb
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0
 
 
 @ Setup the mode transition work for calling an SWI.
@@ -431,7 +392,6 @@ defsymbl(execute_spsr_restore)
 
 #define execute_swi_builder(mode)                                            ;\
                                                                              ;\
-.align 2                                                                     ;\
 defsymbl(execute_swi_##mode)                                                 ;\
   save_flags()                                                               ;\
   ldr r1, =reg_mode                       /* r1 = reg_mode                 */;\
@@ -463,7 +423,6 @@ execute_swi_builder(thumb)
 
 #define execute_swi_function_builder(swi_function, mode)                     ;\
                                                                              ;\
-.align 2                                                                     ;\
 defsymbl(execute_swi_hle_##swi_function##_##mode)                            ;\
   save_flags()                                                               ;\
   store_registers_##mode()                                                   ;\
@@ -485,7 +444,6 @@ execute_swi_function_builder(div, thumb)
 
 @ Uses sp as reg_base; must hold consistently true.
 
-.align 2
 defsymbl(execute_arm_translate)
 
   @ save the registers to be able to return later
@@ -607,7 +565,6 @@ ext_store_ignore:
 
 #define execute_store_builder(store_type, store_op, store_op16, load_op, tn) ;\
                                                                              ;\
-.align 2                                                                     ;\
 defsymbl(execute_store_u##store_type)                                        ;\
   execute_store_body(store_type, tn)                                         ;\
                                                                              ;\
@@ -749,7 +706,21 @@ alert_loop:
   bne alert_loop                          @ Keep looping until it is
 
   mvn reg_cycles, r0                      @ load new cycle count
-  b execute_pc                            @ restart execution at PC
+  ldr r0, [reg_base, #REG_PC]             @ load new PC
+  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
+  tst r1, #0x20                           @ see if Thumb bit is set
+  bne 2f
+
+  load_registers_arm()
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ jump to new ARM block
+
+2:
+  load_registers_thumb()
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0                                   @ jump to new Thumb block
 
 4:
   restore_flags()
@@ -763,8 +734,17 @@ lookup_pc:
   ldr r0, [reg_base, #REG_PC]             @ r0 = new pc
   ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
   tst r1, #0x20                           @ see if Thumb bit is set
-  beq execute_pc_arm                      @ if not lookup ARM
-  b   execute_pc_thumb
+  beq lookup_pc_arm                       @ if not lookup ARM
+
+lookup_pc_thumb:
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0                                   @ jump to new Thumb block
+
+lookup_pc_arm:
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ jump to new ARM block
 
 
 #define sign_extend_u8(reg)
@@ -801,7 +781,6 @@ lookup_pc:
 
 #define execute_load_builder(load_type, load_function, load_op, mask)        ;\
                                                                              ;\
-.align 2                                                                     ;\
 defsymbl(execute_load_##load_type)                                           ;\
   save_flags()                                                               ;\
   tst r0, mask                            /* make sure address is in range */;\
