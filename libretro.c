@@ -510,8 +510,7 @@ void retro_init(void)
   #endif
 #endif
 
-   if (!gamepak_rom)
-      init_gamepak_buffer();
+   init_gamepak_buffer();
    init_sound(1);
 
    if(!gba_screen_pixels)
@@ -975,7 +974,6 @@ bool retro_load_game(const struct retro_game_info* info)
    }
 
    memset(gamepak_backup, -1, sizeof(gamepak_backup));
-   gamepak_filename[0] = 0;
    if (load_gamepak(info, info->path) != 0)
    {
       error_msg("Could not load the game file.");
@@ -1162,7 +1160,11 @@ void retro_run(void)
       execute_arm_translate(execute_cycles);
    else
    #endif
+   {
+      /* Sticky bits only used in interpreter */
+      clear_gamepak_stickybits();
       execute_arm(execute_cycles);
+   }
 
    render_audio();
    video_run();

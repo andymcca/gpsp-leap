@@ -319,23 +319,31 @@ u32 bios_read_protect;
 // Up to 128kb, store SRAM, flash ROM, or EEPROM here.
 u8 gamepak_backup[1024 * 128];
 
-// Keeps us knowing how much we have left.
-u8 *gamepak_rom;
-u32 gamepak_size;
-
 dma_transfer_type dma[4];
 
-typedef struct
-{
-  u32 page_timestamp;
-  u32 physical_index;
-} gamepak_swap_entry_type;
+// ROM memory is allocated in blocks of 1MB to better map the native block
+// mapping system. We will try to allocate 32 of them to allow loading
+// ROMs up to 32MB, but we might fail on memory constrained systems.
 
-u32 gamepak_ram_buffer_size;
-u32 gamepak_ram_pages;
+u8 *gamepak_buffers[32];    /* Pointers to malloc'ed blocks */
+u32 gamepak_buffer_count;   /* Value between 1 and 32 */
+u32 gamepak_size;           /* Size of the ROM in bytes */
 
-// Enough to map the gamepak RAM space.
-gamepak_swap_entry_type *gamepak_memory_map;
+// LRU queue with the loaded blocks and what they map to
+struct {
+  u16 next_lru;             /* Index in the struct to the next LRU entry */
+  s16 phy_rom;              /* ROM page number (-1 means not mapped) */
+} gamepak_blk_queue[1024];
+
+u16 gamepak_lru_head;
+u16 gamepak_lru_tail;
+
+// Stick page bit: prevents page eviction for a frame. This is used to prevent
+// unmapping code pages while being used (ie. in the interpreter).
+u32 gamepak_sticky_bit[1024/32];
+
+#define gamepak_sb_test(idx) \
+ (gamepak_sticky_bit[((unsigned)(idx)) >> 5] & (1 << (((unsigned)(idx)) & 31)))
 
 // This is global so that it can be kept open for large ROMs to swap
 // pages from, so there's no slowdown with opening and closing the file
@@ -1676,16 +1684,16 @@ static u32 encode_bcd(u8 value)
   return h * 16 + l;
 }
 
+// RTC writes need to reflect in the bytes [0xC4..0xC9] of the gamepak
 #define write_rtc_register(index, _value)                                     \
   update_address = 0x80000C4 + (index * 2);                                   \
   rtc_registers[index] = _value;                                              \
   rtc_page_index = update_address >> 15;                                      \
   map = memory_map_read[rtc_page_index];                                      \
                                                                               \
-  if(!map)                                                                    \
-    map = load_gamepak_page(rtc_page_index & 0x3FF);                          \
-                                                                              \
-  address16(map, update_address & 0x7FFF) = eswap16(_value)                   \
+  if(map) {                                                                   \
+    address16(map, update_address & 0x7FFF) = eswap16(_value);                \
+  }                                                                           \
 
 void function_cc write_rtc(u32 address, u32 value)
 {
@@ -2191,27 +2199,34 @@ typedef struct
    u32 translation_gate_target_3;
 } ini_t;
 
+typedef struct
+{
+   char gamepak_title[13];
+   char gamepak_code[5];
+   char gamepak_maker[3];
+} gamepak_info_t;
+
 #include "gba_over.h"
 
-static s32 load_game_config_over(char *gamepak_title, char *gamepak_code, char *gamepak_maker)
+static s32 load_game_config_over(gamepak_info_t *gpinfo)
 {
   unsigned i = 0;
 
   for (i = 0; i < sizeof(gbaover)/sizeof(gbaover[0]); i++)
   {
-     if (strcmp(gbaover[i].gamepak_code, gamepak_code))
+     if (strcmp(gbaover[i].gamepak_code, gpinfo->gamepak_code))
         continue;
 
-     if (strcmp(gbaover[i].gamepak_title, gamepak_title))
+     if (strcmp(gbaover[i].gamepak_title, gpinfo->gamepak_title))
         continue;
      
      printf("gamepak title: %s\n", gbaover[i].gamepak_title);
      printf("gamepak code : %s\n", gbaover[i].gamepak_code);
      printf("gamepak maker: %s\n", gbaover[i].gamepak_maker);
 
-     printf("INPUT gamepak title: %s\n", gamepak_title);
-     printf("INPUT gamepak code : %s\n", gamepak_code);
-     printf("INPUT gamepak maker: %s\n", gamepak_maker);
+     printf("INPUT gamepak title: %s\n", gpinfo->gamepak_title);
+     printf("INPUT gamepak code : %s\n", gpinfo->gamepak_code);
+     printf("INPUT gamepak maker: %s\n", gpinfo->gamepak_maker);
 
      if (gbaover[i].idle_loop_target_pc != 0)
         idle_loop_target_pc = gbaover[i].idle_loop_target_pc;
@@ -2248,7 +2263,7 @@ static s32 load_game_config_over(char *gamepak_title, char *gamepak_code, char *
   return -1;
 }
 
-static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_maker)
+static s32 load_game_config(gamepak_info_t *gpinfo)
 {
   char current_line[256];
   char current_variable[256];
@@ -2270,21 +2285,21 @@ static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamep
        != -1)
       {
         if(strcmp(current_variable, "game_name") ||
-         strcmp(current_value, gamepak_title))
+         strcmp(current_value, gpinfo->gamepak_title))
           continue;
 
         if(!fgets(current_line, 256, config_file) ||
          (parse_config_line(current_line, current_variable,
            current_value) == -1) ||
          strcmp(current_variable, "game_code") ||
-         strcmp(current_value, gamepak_code))
+         strcmp(current_value, gpinfo->gamepak_code))
           continue;
 
         if(!fgets(current_line, 256, config_file) ||
          (parse_config_line(current_line, current_variable,
            current_value) == -1) ||
          strcmp(current_variable, "vender_code") ||
-          strcmp(current_value, gamepak_maker))
+          strcmp(current_value, gpinfo->gamepak_maker))
           continue;
 
         while(fgets(current_line, 256, config_file))
@@ -2331,108 +2346,6 @@ static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamep
 
   printf("game config missing\n");
   return -1;
-}
-
-static s32 load_gamepak_raw(const char *name)
-{
-  FILE *fd = fopen(name, "rb");
-
-  if(fd)
-  {
-    u32 file_size = file_length(fd);
-
-    // First, close the last one if it was open, we won't
-    // be needing it anymore.
-    if(gamepak_file_large)
-      fclose(gamepak_file_large);
-
-    // If it's a big file size keep it, don't close it, we'll
-    // probably want to load from it more later.
-    if(file_size <= gamepak_ram_buffer_size)
-    {
-      fread(gamepak_rom, 1, file_size, fd);
-      fclose(fd);
-
-      gamepak_file_large = NULL;
-    }
-    else
-    {
-      // Read in just enough for the header
-      fread(gamepak_rom, 1, 0x100, fd);
-      gamepak_file_large = fd;
-    }
-
-    return file_size;
-  }
-
-  return -1;
-}
-
-char gamepak_title[13];
-char gamepak_code[5];
-char gamepak_maker[3];
-char gamepak_filename[512];
-
-u32 load_gamepak(const struct retro_game_info* info, const char *name)
-{
-   char *p;
-
-   s32 file_size = load_gamepak_raw(name);
-
-   if(file_size == -1)
-      return -1;
-
-   gamepak_size = (file_size + 0x7FFF) & ~0x7FFF;
-
-   strncpy(gamepak_filename, name, sizeof(gamepak_filename));
-   gamepak_filename[sizeof(gamepak_filename) - 1] = 0;
-
-   p = strrchr(gamepak_filename, PATH_SEPARATOR_CHAR);
-   if (p)
-      p++;
-   else
-      p = gamepak_filename;
-
-   snprintf(backup_filename, sizeof(backup_filename), "%s%c%s", save_path, PATH_SEPARATOR_CHAR, p);
-   p = strrchr(backup_filename, '.');
-   if (p)
-      strcpy(p, ".sav");
-
-   if (!use_libretro_save_method)
-     load_backup(backup_filename);
-
-   memcpy(gamepak_title, gamepak_rom + 0xA0, 12);
-   memcpy(gamepak_code, gamepak_rom + 0xAC, 4);
-   memcpy(gamepak_maker, gamepak_rom + 0xB0, 2);
-   gamepak_title[12] = 0;
-   gamepak_code[4] = 0;
-   gamepak_maker[2] = 0;
-
-   idle_loop_target_pc = 0xFFFFFFFF;
-   iwram_stack_optimize = 1;
-   translation_gate_targets = 0;
-   flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
-   flash_size = FLASH_SIZE_64KB;
-
-   if ((load_game_config_over(gamepak_title, gamepak_code, gamepak_maker)) == -1)
-      load_game_config(gamepak_title, gamepak_code, gamepak_maker);
-
-   return 0;
-}
-
-s32 load_bios(char *name)
-{
-  FILE *fd = fopen(name, "rb");
-
-  if(!fd)
-    return -1;
-
-  fread(bios_rom, 1, 0x4000, fd);
-
-  // This is a hack to get Zelda working, because emulating
-  // the proper memory read behavior here is much too expensive.
-  fclose(fd);
-  return 0;
 }
 
 // DMA memory regions can be one of the following:
@@ -3051,6 +2964,17 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
 
 // Be sure to do this after loading ROMs.
 
+#define map_rom_entry(type, idx, ptr, mirror_blocks) {                        \
+  unsigned mcount;                                                            \
+  for(mcount = 0; mcount < 1024; mcount += (mirror_blocks)) {                 \
+    memory_map_##type[(0x8000000 / (32 * 1024)) + (idx) + mcount] = (ptr);    \
+    memory_map_##type[(0xA000000 / (32 * 1024)) + (idx) + mcount] = (ptr);    \
+  }                                                                           \
+  for(mcount = 0; mcount <  512; mcount += (mirror_blocks)) {                 \
+    memory_map_##type[(0xC000000 / (32 * 1024)) + (idx) + mcount] = (ptr);    \
+  }                                                                           \
+}
+
 #define map_region(type, start, end, mirror_blocks, region)                   \
   for(map_offset = (start) / 0x8000; map_offset <                             \
    ((end) / 0x8000); map_offset++)                                            \
@@ -3059,10 +2983,12 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
      ((u8 *)region) + ((map_offset % mirror_blocks) * 0x8000);                \
   }                                                                           \
 
-#define map_null(type, start, end)                                            \
+#define map_null(type, start, end) {                                          \
+  u32 map_offset;                                                             \
   for(map_offset = start / 0x8000; map_offset < (end / 0x8000);               \
    map_offset++)                                                              \
     memory_map_##type[map_offset] = NULL;                                     \
+}
 
 #define map_vram(type)                                                        \
   for(map_offset = 0x6000000 / 0x8000; map_offset < (0x7000000 / 0x8000);     \
@@ -3075,115 +3001,85 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
   }                                                                           \
 
 
-// Picks a page to evict
-u32 page_time = 0;
-
 static u32 evict_gamepak_page(void)
 {
-  // Find the one with the smallest frame timestamp
-  u32 page_index = 0;
-  u32 physical_index;
-  u32 smallest = gamepak_memory_map[0].page_timestamp;
-  u32 i;
+  u32 ret;
+  s16 phyrom;
+  do {
+    // Return the index to the last used entry
+    u32 newhead = gamepak_blk_queue[gamepak_lru_head].next_lru;
+    phyrom = gamepak_blk_queue[gamepak_lru_head].phy_rom;
+    ret = gamepak_lru_head;
 
-  for(i = 1; i < gamepak_ram_pages; i++)
-  {
-    if(gamepak_memory_map[i].page_timestamp <= smallest)
-    {
-      smallest = gamepak_memory_map[i].page_timestamp;
-      page_index = i;
-    }
+    // Second elem becomes head now
+    gamepak_lru_head = newhead;
+
+    // The evicted element goes at the end of the queue
+    gamepak_blk_queue[gamepak_lru_tail].next_lru = ret;
+    gamepak_lru_tail = ret;
+    // If this page is marked as sticky, we keep going through the list
+  } while (phyrom >= 0 && gamepak_sb_test(phyrom));
+
+  // We unmap the ROM page if it was mapped, ensure we do not access it
+  // without triggering a "page fault"
+  if (phyrom >= 0) {
+    map_rom_entry(read, phyrom, NULL, gamepak_size >> 15);
   }
 
-  physical_index = gamepak_memory_map[page_index].physical_index;
-
-  memory_map_read[(0x8000000 / (32 * 1024)) + physical_index] = NULL;
-  memory_map_read[(0xA000000 / (32 * 1024)) + physical_index] = NULL;
-  memory_map_read[(0xC000000 / (32 * 1024)) + physical_index] = NULL;
-
-  return page_index;
+  return ret;
 }
 
 u8 *load_gamepak_page(u32 physical_index)
 {
   if(physical_index >= (gamepak_size >> 15))
-    return gamepak_rom;
+    return &gamepak_buffers[0][0];
 
-  u32 page_index = evict_gamepak_page();
-  u32 page_offset = page_index * (32 * 1024);
-  u8 *swap_location = gamepak_rom + page_offset;
+  u32 entry = evict_gamepak_page();
+  u32 block_idx = entry / 32;
+  u32 block_off = entry % 32;
+  u8 *swap_location = &gamepak_buffers[block_idx][32 * 1024 * block_off];
 
-  gamepak_memory_map[page_index].page_timestamp = page_time;
-  gamepak_memory_map[page_index].physical_index = physical_index;
-  page_time++;
+  // Fill in the entry
+  gamepak_blk_queue[entry].phy_rom = physical_index;
 
   fseek(gamepak_file_large, physical_index * (32 * 1024), SEEK_SET);
   fread(swap_location, 1, (32 * 1024), gamepak_file_large);
-  memory_map_read[(0x8000000 / (32 * 1024)) + physical_index] = swap_location;
-  memory_map_read[(0xA000000 / (32 * 1024)) + physical_index] = swap_location;
-  memory_map_read[(0xC000000 / (32 * 1024)) + physical_index] = swap_location;
+
+  // Map it to the read handlers now
+  map_rom_entry(read, physical_index, swap_location, gamepak_size >> 15);
 
   // If RTC is active page the RTC register bytes so they can be read
-  if((rtc_state != RTC_DISABLED) && (physical_index == 0))
-    memcpy(swap_location + 0xC4, rtc_registers, sizeof(rtc_registers));
+  if ((rtc_state != RTC_DISABLED) && (physical_index == 0)) {
+    address16(swap_location, 0xC4) = eswap16(rtc_registers[0]);
+    address16(swap_location, 0xC6) = eswap16(rtc_registers[1]);
+    address16(swap_location, 0xC8) = eswap16(rtc_registers[2]);
+  }
 
   return swap_location;
 }
 
-static void init_memory_gamepak(void)
-{
-  u32 map_offset = 0;
-
-  if(gamepak_size > gamepak_ram_buffer_size)
-  {
-    // Large ROMs get special treatment because they
-    // can't fit into the 16MB ROM buffer.
-    u32 i;
-    for(i = 0; i < gamepak_ram_pages; i++)
-    {
-      gamepak_memory_map[i].page_timestamp = 0;
-      gamepak_memory_map[i].physical_index = 0;
-    }
-
-    map_null(read, 0x8000000, 0xD000000);
-  }
-  else
-  {
-    /* Map the ROM using mirroring, not many games use it */
-    unsigned numblocks = gamepak_size >> 15;
-    map_region(read, 0x8000000, 0xA000000, numblocks, gamepak_rom);
-    map_region(read, 0xA000000, 0xC000000, numblocks, gamepak_rom);
-    map_region(read, 0xC000000, 0xD000000, numblocks, gamepak_rom);
-    /* Do not map D-E regions since they are also used for FLASH */
-  }
-}
-
 void init_gamepak_buffer(void)
 {
-  // Try to initialize 32MB (this is mainly for non-PSP platforms)
-  gamepak_rom = NULL;
-
-  gamepak_ram_buffer_size = 32 * 1024 * 1024;
-  gamepak_rom = (u8*)malloc(gamepak_ram_buffer_size);
-
-  if(!gamepak_rom)
+  unsigned i;
+  // Try to allocate up to 32 blocks of 1MB each
+  gamepak_buffer_count = 0;
+  while (gamepak_buffer_count < ROM_BUFFER_SIZE)
   {
-    // Try 16MB, for PSP, then lower in 2MB increments
-    gamepak_ram_buffer_size = 16 * 1024 * 1024;
-    gamepak_rom = (u8*)malloc(gamepak_ram_buffer_size);
-
-    while(!gamepak_rom)
-    {
-      gamepak_ram_buffer_size -= (2 * 1024 * 1024);
-      gamepak_rom = (u8*)malloc(gamepak_ram_buffer_size);
-    }
+    void *ptr = malloc(1024*1024);
+    if (!ptr)
+      break;
+    gamepak_buffers[gamepak_buffer_count++] = (u8*)ptr;
   }
 
-  // Here's assuming we'll have enough memory left over for this,
-  // and that the above succeeded (if not we're in trouble all around)
-  gamepak_ram_pages = gamepak_ram_buffer_size / (32 * 1024);
-  gamepak_memory_map = (gamepak_swap_entry_type*)malloc(
-    sizeof(gamepak_swap_entry_type) * gamepak_ram_pages);
+  // Initialize the memory map structure
+  for (i = 0; i < 1024; i++)
+  {
+    gamepak_blk_queue[i].next_lru = (u16)(i + 1);
+    gamepak_blk_queue[i].phy_rom = -1;
+  }
+
+  gamepak_lru_head = 0;
+  gamepak_lru_tail = 32 * gamepak_buffer_count - 1;
 }
 
 void init_memory(void)
@@ -3200,7 +3096,6 @@ void init_memory(void)
   map_null(read, 0x6000000, 0x7000000);
   map_vram(read);
   map_null(read, 0x7000000, 0x8000000);
-  init_memory_gamepak();
   map_null(read, 0xE000000, 0x10000000);
 
   memset(io_registers, 0, sizeof(io_registers));
@@ -3245,16 +3140,9 @@ void memory_term(void)
     gamepak_file_large = NULL;
   }
 
-  if (gamepak_memory_map)
+  while (gamepak_buffer_count)
   {
-    free(gamepak_memory_map);
-    gamepak_memory_map = NULL;
-  }
-
-  if (gamepak_rom)
-  {
-    free(gamepak_rom);
-    gamepak_rom = NULL;
+    free(gamepak_buffers[--gamepak_buffer_count]);
   }
 }
 
@@ -3351,4 +3239,103 @@ void memory_##type##_savestate(void)                           \
 
 memory_savestate_builder(read)
 memory_savestate_builder(write)
+
+
+static s32 load_gamepak_raw(const char *name)
+{
+  unsigned i, j;
+  gamepak_file_large = fopen(name, "rb");
+  if(gamepak_file_large)
+  {
+    // Round size to 32KB pages
+    gamepak_size = file_length(gamepak_file_large);
+    gamepak_size = (gamepak_size + 0x7FFF) & ~0x7FFF;
+
+    // Load stuff in 1MB chunks
+    u32 buf_blocks = (gamepak_size + 1024*1024-1) / (1024*1024);
+    u32 rom_blocks = gamepak_size >> 15;
+    u32 ldblks = buf_blocks < gamepak_buffer_count ?
+                    buf_blocks : gamepak_buffer_count;
+
+    // Unmap the ROM space since we will re-map it now
+    map_null(read, 0x8000000, 0xD000000);
+
+    // Proceed to read the whole ROM or as much as possible.
+    for (i = 0; i < ldblks; i++)
+    {
+      // Load 1MB chunk and map it
+      fread(gamepak_buffers[i], 1, 1024*1024, gamepak_file_large);
+      for (j = 0; j < 32 && i*32 + j < rom_blocks; j++)
+      {
+        u32 phyn = i*32 + j;
+        u8* blkptr = &gamepak_buffers[i][32 * 1024 * j];
+        u32 entry = evict_gamepak_page();
+        gamepak_blk_queue[entry].phy_rom = phyn;
+        // Map it to the read handlers now
+        map_rom_entry(read, phyn, blkptr, rom_blocks);
+      }
+    } 
+
+    return 0;
+  }
+
+  return -1;
+}
+
+u32 load_gamepak(const struct retro_game_info* info, const char *name)
+{
+   char *p;
+   char gamepak_filename[512];
+   gamepak_info_t gpinfo;
+
+   if (load_gamepak_raw(name))
+      return -1;
+
+   strncpy(gamepak_filename, name, sizeof(gamepak_filename));
+   gamepak_filename[sizeof(gamepak_filename) - 1] = 0;
+
+   p = strrchr(gamepak_filename, PATH_SEPARATOR_CHAR);
+   if (p)
+      p++;
+   else
+      p = gamepak_filename;
+
+   snprintf(backup_filename, sizeof(backup_filename), "%s%c%s", save_path, PATH_SEPARATOR_CHAR, p);
+   p = strrchr(backup_filename, '.');
+   if (p)
+      strcpy(p, ".sav");
+
+   if (!use_libretro_save_method)
+     load_backup(backup_filename);
+
+   // Buffer 0 always has the first 1MB chunk of the ROM
+   memset(&gpinfo, 0, sizeof(gpinfo));
+   memcpy(gpinfo.gamepak_title, &gamepak_buffers[0][0xA0], 12);
+   memcpy(gpinfo.gamepak_code,  &gamepak_buffers[0][0xAC],  4);
+   memcpy(gpinfo.gamepak_maker, &gamepak_buffers[0][0xB0],  2);
+
+   idle_loop_target_pc = 0xFFFFFFFF;
+   iwram_stack_optimize = 1;
+   translation_gate_targets = 0;
+   flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
+   flash_size = FLASH_SIZE_64KB;
+
+   if ((load_game_config_over(&gpinfo)) < 0)
+      load_game_config(&gpinfo);
+
+   return 0;
+}
+
+s32 load_bios(char *name)
+{
+  FILE *fd = fopen(name, "rb");
+
+  if(!fd)
+    return -1;
+
+  fread(bios_rom, 1, 0x4000, fd);
+  fclose(fd);
+  return 0;
+}
+
 

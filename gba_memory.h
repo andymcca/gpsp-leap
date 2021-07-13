@@ -205,8 +205,6 @@ void init_gamepak_buffer(void);
 void memory_term(void);
 u8 *load_gamepak_page(u32 physical_index);
 
-extern u8 *gamepak_rom;
-extern u32 gamepak_ram_buffer_size;
 extern u32 oam_update;
 extern u32 gbc_sound_update;
 extern u32 gbc_sound_wave_update;
@@ -293,6 +291,21 @@ static inline void state_mem_write(const void* src, size_t size)
 {
   memcpy(state_mem_write_ptr, src, size);
   state_mem_write_ptr += size;
+}
+
+// Page sticky bit routines
+extern u32 gamepak_sticky_bit[1024/32];
+static inline void touch_gamepak_page(u32 physical_index)
+{
+  u32 idx = (physical_index >> 5) & 31;
+  u32 bof = physical_index & 31;
+
+  gamepak_sticky_bit[idx] |= (1 << bof);
+}
+
+static inline void clear_gamepak_stickybits(void)
+{
+  memset(gamepak_sticky_bit, 0, sizeof(gamepak_sticky_bit));
 }
 
 /* this is an upper limit, ToDo : calculate the exact state size */

@@ -690,6 +690,7 @@ void print_register_usage(void)
   {                                                                           \
     pc_region = new_pc_region;                                                \
     pc_address_block = memory_map_read[new_pc_region];                        \
+    touch_gamepak_page(pc_region);                                            \
                                                                               \
     if(!pc_address_block)                                                     \
       pc_address_block = load_gamepak_page(pc_region & 0x3FF);                \
@@ -1635,6 +1636,7 @@ void execute_arm(u32 cycles)
 
   if(!pc_address_block)
     pc_address_block = load_gamepak_page(pc_region & 0x3FF);
+  touch_gamepak_page(pc_region);
 
   cycles_remaining = cycles;
   while(1)
