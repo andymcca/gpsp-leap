@@ -747,72 +747,124 @@ lookup_pc_arm:
   bx r0                                   @ jump to new ARM block
 
 
-#define sign_extend_u8(reg)
-#define sign_extend_u16(reg)
-#define sign_extend_u32(reg)
+#define exec_ld_op_s8(mirrorbits)                                            ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrsb r0, [r2, r0]
 
-#define sign_extend_s8(reg)                                                  ;\
-  sxtb reg, reg
+#define exec_ld_op_u8(mirrorbits)                                            ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrb r0, [r2, r0]
 
-#define sign_extend_s16(reg)                                                 ;\
-  sxth reg, reg
+#define exec_ld_op_s16(mirrorbits)                                           ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrsh r0, [r2, r0]
 
-#define execute_load_op_u8(load_op)                                          ;\
-  mov r0, r0, lsl #17                                                        ;\
-  load_op r0, [r2, r0, lsr #17]                                              ;\
+#define exec_ld_op_u16(mirrorbits)                                           ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrh r0, [r2, r0]
 
-#define execute_load_op_s8(load_op)                                          ;\
-  mov r0, r0, lsl #17                                                        ;\
-  mov r0, r0, lsr #17                                                        ;\
-  load_op r0, [r2, r0]                                                       ;\
-
-#define execute_load_op_u16(load_op)                                         ;\
-  execute_load_op_s8(load_op)                                                ;\
-
-#define execute_load_op_s16(load_op)                                         ;\
-  execute_load_op_s8(load_op)                                                ;\
-
-#define execute_load_op_u16(load_op)                                         ;\
-  execute_load_op_s8(load_op)                                                ;\
-
-#define execute_load_op_u32(load_op)                                         ;\
-  execute_load_op_u8(load_op)                                                ;\
+#define exec_ld_op_u32(mirrorbits)                                           ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  ldr r0, [r2, r0, lsr #(32 - mirrorbits)]                                   ;\
 
 
-#define execute_load_builder(load_type, load_function, load_op, mask)        ;\
+#define execute_load_builder(load_type, albits, load_function)               ;\
                                                                              ;\
 defsymbl(execute_load_##load_type)                                           ;\
-  save_flags()                                                               ;\
-  tst r0, mask                            /* make sure address is in range */;\
-  bne ext_load_##load_type                /* if not do ext load            */;\
+.if albits >= 1                                                              ;\
+  ror r1, r0, #(albits)                   /* move alignment bits to MSB    */;\
+  usat r1, #4, r1, asr #(24-albits)       /* r1 contains [0-15]            */;\
+.else                                                                        ;\
+  usat r1, #4, r0, asr #24                /* r1 contains [0-15]            */;\
+.endif                                                                       ;\
+  ldr pc, [pc, r1, lsl #2]                /* use jump table below          */;\
+  nop                                                                        ;\
                                                                              ;\
+  .long ld_bios_##load_type               /* 0 BIOS                        */;\
+  .long ld_slow_##load_type               /* 1 Bad region                  */;\
+  .long ld_ewram_##load_type              /* 2 EWRAM                       */;\
+  .long ld_iwram_##load_type              /* 3 IWRAM                       */;\
+  .long ld_ioram_##load_type              /* 4 I/O                         */;\
+  .long ld_palram_##load_type             /* 5 Palette RAM, via map        */;\
+  .long ld_rdmap_##load_type              /* 6 VRAM area                   */;\
+  .long ld_oamram_##load_type             /* 7 OAM RAM                     */;\
+  .long ld_rdmap_##load_type              /* 8 ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* 9 ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* A ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* B ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* C ROM, via map                */;\
+  .long ld_slow_##load_type               /* D ROM or EEPROM/FLASH         */;\
+  .long ld_slow_##load_type               /* E EEPROM/FLASH                */;\
+  .long ld_slow_##load_type               /* F Bad region                  */;\
+                                                                             ;\
+ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
+  save_flags()                                                               ;\
+  ldr r1, [lr]                            /* r1 = PC                       */;\
+  mov r2, r1, lsr #15                     /* r2 = High addr bits from PC   */;\
+  cmp r2, #0                                                                 ;\
+  bne 10f                                 /* Jump to slow handler          */;\
+  ldr  r2, =bios_rom                                                         ;\
+  exec_ld_op_##load_type(15)              /* Clear upper bits (15 LSB)     */;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_ewram_##load_type:                     /* EWRAM area                    */;\
+  ldr  r2, =(ewram)                                                          ;\
+  exec_ld_op_##load_type(18)              /* Clear upper bits (18 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_iwram_##load_type:                     /* IWRAM area                    */;\
+  ldr  r2, =(iwram+0x8000)                                                   ;\
+  exec_ld_op_##load_type(15)              /* Clear upper bits (15 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_ioram_##load_type:                     /* I/O RAM area                  */;\
+  ldr  r2, =io_registers                                                     ;\
+  exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_palram_##load_type:                    /* Palette RAM area              */;\
+  ldr  r2, =palette_ram                                                      ;\
+  exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_oamram_##load_type:                    /* OAM RAM area                  */;\
+  ldr  r2, =oam_ram                                                          ;\
+  exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+/* ROM area (or VRAM): uses generic memory handlers */                       ;\
+ld_rdmap_##load_type:                                                        ;\
   ldr r2, =memory_map_read                /* r2 = memory_map_read          */;\
   mov r1, r0, lsr #15                     /* r1 = page index of address    */;\
-  ldr r2, [r2, r1, lsl #2]                /* r2 = memory page              */;\
+  ldr r2, [r2, r1, lsl #2]                /* r2 = base addr                */;\
                                                                              ;\
-  cmp r2, #0                              /* see if map is ext             */;\
-  beq ext_load_##load_type                /* if so do ext load             */;\
+  exec_ld_op_##load_type(15)              /* Pages are 32KB big            */;\
+  add pc, lr, #4                                                             ;\
                                                                              ;\
-  execute_load_op_##load_type(load_op)                                       ;\
-  restore_flags()                                                            ;\
-  add pc, lr, #4                          /* return                        */;\
-                                                                             ;\
-ext_load_##load_type:                                                        ;\
+/* Slow load path, for open/unmapped loads                                 */;\
+ld_slow_##load_type:                                                         ;\
+  save_flags()                                                               ;\
   ldr r1, [lr]                            /* r1 = PC                       */;\
+10:                                                                          ;\
   str r1, [reg_base, #REG_PC]             /* update PC                     */;\
-  call_c_function(read_memory##load_function)                                ;\
-  sign_extend_##load_type(r0)             /* sign extend result            */;\
+  call_c_function(load_function)                                             ;\
   restore_flags()                                                            ;\
   add pc, lr, #4                          /* return                        */;\
+                                                                             ;\
 .size execute_load_##load_type, .-execute_load_##load_type
 
 .pool
 
-execute_load_builder(u8, 8, ldrb, #0xF0000000)
-execute_load_builder(s8, 8, ldrsb, #0xF0000000)
-execute_load_builder(u16, 16, ldrh, #0xF0000001)
-execute_load_builder(s16, 16_signed, ldrsh, #0xF0000001)
-execute_load_builder(u32, 32, ldr, #0xF0000003)
+execute_load_builder(u8,  0, read_memory8)
+execute_load_builder(s8,  0, read_memory8s)
+execute_load_builder(u16, 1, read_memory16)
+execute_load_builder(s16, 1, read_memory16s)
+execute_load_builder(u32, 2, read_memory32)
 
 .data
 
