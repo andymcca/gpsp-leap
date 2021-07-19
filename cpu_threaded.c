@@ -2536,7 +2536,8 @@ void translate_icache_sync() {
     redo:                                                                     \
                                                                               \
     /* Pad the start of the block to 16 bytes, see "memory tagging" above */  \
-    while ((((uintptr_t)ram_translation_ptr) % 16) != block_prologue_size)    \
+    while (((uintptr_t)(&ram_translation_ptr[block_prologue_size]             \
+                                          - ram_translation_cache)) % 16)     \
       ram_translation_ptr++;                                                  \
                                                                               \
     translation_recursion_level++;                                            \
