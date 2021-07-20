@@ -2,11 +2,13 @@
 #ifndef GPSP_CONFIG_H
 #define GPSP_CONFIG_H
 
-/* ROM buffer size in megabytes (this is a maximum value!) */
+/* Default ROM buffer size in megabytes (this is a maximum value!) */
+#ifndef ROM_BUFFER_SIZE
 #define ROM_BUFFER_SIZE 32
+#endif
 
 /* Cache sizes and their config knobs */
-#if defined(PSP)
+#if defined(PSP) || defined(PS2)
   #define ROM_TRANSLATION_CACHE_SIZE (1024 * 1024 * 2)
   #define RAM_TRANSLATION_CACHE_SIZE (1024 * 384)
   #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 2)
