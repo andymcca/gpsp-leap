@@ -2907,7 +2907,7 @@ static void emit_pmemst_stub(
 #elif defined(USE_XBGR1555_FORMAT)
   /* PS2's native format */
   #define palette_convert()                       \
-    mips_emit_andi(reg_temp, reg_temp, 0x7FFF);
+    mips_emit_andi(reg_temp, reg_a1, 0x7FFF);
 #else
   /* 0BGR to RGB565 (clobbers a0) */
   #ifdef MIPS_HAS_R2_INSTS
