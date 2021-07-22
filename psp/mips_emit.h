@@ -3205,13 +3205,15 @@ static void emit_phand(
   mips_emit_lw(reg_temp, reg_temp, tbloff2);    // Get opcode from 2nd table
   mips_emit_sw(reg_temp, mips_reg_ra, -8);      // Patch instruction!
 
-  #ifdef PSP
+  #if defined(PSP)
     mips_emit_cache(0x1A, mips_reg_ra, -8);
     mips_emit_jr(reg_rv);                       // Jump directly to target for speed
     mips_emit_cache(0x08, mips_reg_ra, -8);
   #else
     mips_emit_jr(reg_rv);
-    mips_emit_synci(mips_reg_ra, -8);
+    #ifdef MIPS_HAS_R2_INSTS
+      mips_emit_synci(mips_reg_ra, -8);
+    #endif
   #endif
 
   // Round up handlers to 16 instructions for easy addressing

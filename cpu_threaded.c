@@ -25,6 +25,8 @@
 #if defined(VITA)
 #include <psp2/kernel/sysmem.h>
 #include <stdio.h>
+#elif defined(PS2)
+#include <kernel.h>
 #endif
 
 u8 *last_rom_translation_ptr = NULL;
@@ -211,6 +213,11 @@ extern u8 bit_count[256];
   void platform_cache_sync(void *baseaddr, void *endptr) {
     sceKernelDcacheWritebackRange(baseaddr, ((char*)endptr) - ((char*)baseaddr));
     sceKernelIcacheInvalidateRange(baseaddr, ((char*)endptr) - ((char*)baseaddr));
+  }
+#elif defined(PS2)
+  void platform_cache_sync(void *baseaddr, void *endptr) {
+    FlushCache(0);   // Dcache flush
+    FlushCache(2);   // Icache invalidate
   }
 #elif defined(VITA)
   void platform_cache_sync(void *baseaddr, void *endptr) {
