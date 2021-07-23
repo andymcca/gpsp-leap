@@ -8,7 +8,7 @@
 #endif
 
 /* Cache sizes and their config knobs */
-#if defined(PSP) || defined(PS2)
+#if defined(SMALL_TRANSLATION_CACHE)
   #define ROM_TRANSLATION_CACHE_SIZE (1024 * 1024 * 2)
   #define RAM_TRANSLATION_CACHE_SIZE (1024 * 384)
   #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 2)
