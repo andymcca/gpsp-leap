@@ -435,7 +435,7 @@ else ifeq ($(platform), rs90)
 	SHARED := -shared -nostdlib -Wl,--version-script=link.T
 	fpic := -fPIC -DPIC
 	CFLAGS += -fomit-frame-pointer -ffast-math -march=mips32 -mtune=mips32
-	CFLAGS += -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=8
+	CFLAGS += -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=4
 	HAVE_DYNAREC := 1
 	CPU_ARCH := mips
 
