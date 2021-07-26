@@ -147,6 +147,12 @@ android-arm64-v8a:
     - .libretro-android-jni-arm64-v8a
     - .core-defs
 
+# Android 32-bit x86
+android-x86:
+  extends:
+    - .libretro-android-jni-x86
+    - .core-defs
+
 # Android 64-bit x86
 android-x86_64:
   extends:

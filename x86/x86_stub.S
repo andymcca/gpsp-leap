@@ -31,9 +31,6 @@ _##symbol:
 #define _iwram iwram
 #define _ewram ewram
 #define _vram vram
-#define _oam_ram oam_ram
-#define _bios_rom bios_rom
-#define _io_registers io_registers
 
 #define _update_gba update_gba
 #define _block_lookup_address_arm block_lookup_address_arm
@@ -52,9 +49,6 @@ _##symbol:
 .global _iwram
 .global _ewram
 .global _vram
-.global _oam_ram
-.global _bios_rom
-.global _io_registers
 
 .extern _spsr
 

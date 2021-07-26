@@ -470,10 +470,12 @@ typedef enum
   x86_emit_jmp_offset(x86_relative_offset(translation_ptr,                    \
    x86_indirect_branch_##type, 4))                                            \
 
-#define generate_block_prologue()                                             \
+#define block_prologue_size 0
+#define generate_block_prologue()
+#define generate_block_extra_vars_arm()
+#define generate_block_extra_vars_thumb()
 
-#define generate_block_extra_vars_arm()                                       \
-  void generate_indirect_branch_arm(void)                                     \
+#define generate_indirect_branch_arm()                                        \
   {                                                                           \
     if(condition == 0x0E)                                                     \
     {                                                                         \
@@ -484,8 +486,8 @@ typedef enum
       generate_indirect_branch_no_cycle_update(arm);                          \
     }                                                                         \
   }                                                                           \
-                                                                              \
-  void generate_indirect_branch_dual()                                        \
+
+#define generate_indirect_branch_dual()                                       \
   {                                                                           \
     if(condition == 0x0E)                                                     \
     {                                                                         \
@@ -496,10 +498,6 @@ typedef enum
       generate_indirect_branch_no_cycle_update(dual);                         \
     }                                                                         \
   }                                                                           \
-
-#define generate_block_extra_vars_thumb()                                     \
-
-#define block_prologue_size 0
 
 #define calculate_z_flag(dest)                                                \
   reg[REG_Z_FLAG] = (dest == 0)                                               \
