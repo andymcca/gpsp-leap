@@ -23,14 +23,12 @@
 #include "arm_codegen.h"
 
 void generate_indirect_branch_arm(void);
-u32 prepare_load_reg_pc(u32 scratch_reg, u32 reg_index, u32 pc_offset);
-void generate_store_reg(u32 ireg, u32 reg_index);
-void complete_store_reg_pc_flags(u32 scratch_reg, u32 reg_index);
-u32 prepare_load_reg(u32 scratch_reg, u32 reg_index);
-u32 prepare_store_reg(u32 scratch_reg, u32 reg_index);
-void generate_load_reg(u32 ireg, u32 reg_index);
-void complete_store_reg(u32 scratch_reg, u32 reg_index);
-void complete_store_reg_pc_no_flags(u32 scratch_reg, u32 reg_index);
+u32 arm_prepare_load_reg(u8 **tptr, u32 scratch_reg, u32 reg_index);
+u32 arm_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_offset);
+u32 arm_prepare_store_reg(u32 scratch_reg, u32 reg_index);
+u32 thumb_prepare_load_reg(u8 **tptr, u32 scratch_reg, u32 reg_index);
+u32 thumb_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_offset);
+u32 thumb_prepare_store_reg(u32 scratch_reg, u32 reg_index);
 void thumb_cheat_hook(void);
 void arm_cheat_hook(void);
 
@@ -458,10 +456,7 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
   generate_cycle_update();                                                    \
   generate_indirect_branch_no_cycle_update(type)                              \
 
-#define generate_block_prologue()                                             \
-
-#define generate_block_extra_vars_arm()                                       \
-  void generate_indirect_branch_arm(void)                                     \
+#define generate_indirect_branch_arm()                                        \
   {                                                                           \
     if(condition == 0x0E)                                                     \
     {                                                                         \
@@ -469,8 +464,8 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
     }                                                                         \
     generate_indirect_branch_no_cycle_update(arm);                            \
   }                                                                           \
-                                                                              \
-  void generate_indirect_branch_dual()                                        \
+
+#define generate_indirect_branch_dual()                                       \
   {                                                                           \
     if(condition == 0x0E)                                                     \
     {                                                                         \
@@ -478,168 +473,193 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
     }                                                                         \
     generate_indirect_branch_no_cycle_update(dual_arm);                       \
   }                                                                           \
-                                                                              \
-  u32 prepare_load_reg(u32 scratch_reg, u32 reg_index)                        \
+
+#define arm_generate_store_reg(ireg, reg_index)                               \
+{                                                                             \
+  u32 store_dest = arm_register_allocation[reg_index];                        \
+  if(store_dest != mem_reg)                                                   \
   {                                                                           \
-    u32 reg_use = arm_register_allocation[reg_index];                         \
-    if(reg_use == mem_reg)                                                    \
-    {                                                                         \
-      ARM_LDR_IMM(0, scratch_reg, reg_base, (reg_index * 4));                 \
-      return scratch_reg;                                                     \
-    }                                                                         \
-                                                                              \
-    return reg_use;                                                           \
+    ARM_MOV_REG_REG(0, store_dest, ireg);                                     \
   }                                                                           \
-                                                                              \
-  u32 prepare_load_reg_pc(u32 scratch_reg, u32 reg_index, u32 pc_offset)      \
+  else                                                                        \
   {                                                                           \
-    if(reg_index == 15)                                                       \
-    {                                                                         \
-      generate_load_pc(scratch_reg, pc + pc_offset);                          \
-      return scratch_reg;                                                     \
-    }                                                                         \
-    return prepare_load_reg(scratch_reg, reg_index);                          \
+    ARM_STR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
   }                                                                           \
-                                                                              \
-  u32 prepare_store_reg(u32 scratch_reg, u32 reg_index)                       \
+}                                                                             \
+
+#define thumb_generate_store_reg(ireg, reg_index)                             \
+{                                                                             \
+  u32 store_dest = thumb_register_allocation[reg_index];                      \
+  if(store_dest != mem_reg)                                                   \
   {                                                                           \
-    u32 reg_use = arm_register_allocation[reg_index];                         \
-    if(reg_use == mem_reg)                                                    \
-      return scratch_reg;                                                     \
-                                                                              \
-    return reg_use;                                                           \
+    ARM_MOV_REG_REG(0, store_dest, ireg);                                     \
   }                                                                           \
-                                                                              \
-  void complete_store_reg(u32 scratch_reg, u32 reg_index)                     \
+  else                                                                        \
   {                                                                           \
-    if(arm_register_allocation[reg_index] == mem_reg)                         \
-    {                                                                         \
-      ARM_STR_IMM(0, scratch_reg, reg_base, (reg_index * 4));                 \
-    }                                                                         \
+    ARM_STR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
   }                                                                           \
-                                                                              \
-  void complete_store_reg_pc_no_flags(u32 scratch_reg, u32 reg_index)         \
+}                                                                             \
+
+#define arm_generate_load_reg(ireg, reg_index)                                \
+{                                                                             \
+  u32 load_src = arm_register_allocation[reg_index];                          \
+  if(load_src != mem_reg)                                                     \
   {                                                                           \
-    if(reg_index == 15)                                                       \
-    {                                                                         \
-      generate_indirect_branch_arm();                                         \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      complete_store_reg(scratch_reg, reg_index);                             \
-    }                                                                         \
+    ARM_MOV_REG_REG(0, ireg, load_src);                                       \
   }                                                                           \
-                                                                              \
-  void complete_store_reg_pc_flags(u32 scratch_reg, u32 reg_index)            \
+  else                                                                        \
   {                                                                           \
-    if(reg_index == 15)                                                       \
-    {                                                                         \
-      if(condition == 0x0E)                                                   \
-      {                                                                       \
-        generate_cycle_update();                                              \
-      }                                                                       \
-      generate_function_call(execute_spsr_restore);                           \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      complete_store_reg(scratch_reg, reg_index);                             \
-    }                                                                         \
+    ARM_LDR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
   }                                                                           \
-                                                                              \
-  void generate_load_reg(u32 ireg, u32 reg_index)                             \
+}                                                                             \
+
+#define thumb_generate_load_reg(ireg, reg_index)                              \
+{                                                                             \
+  u32 load_src = thumb_register_allocation[reg_index];                        \
+  if(load_src != mem_reg)                                                     \
   {                                                                           \
-    u32 load_src = arm_register_allocation[reg_index];                        \
-    if(load_src != mem_reg)                                                   \
-    {                                                                         \
-      ARM_MOV_REG_REG(0, ireg, load_src);                                     \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      ARM_LDR_IMM(0, ireg, reg_base, (reg_index * 4));                        \
-    }                                                                         \
+    ARM_MOV_REG_REG(0, ireg, load_src);                                       \
   }                                                                           \
-                                                                              \
-  void generate_store_reg(u32 ireg, u32 reg_index)                            \
+  else                                                                        \
   {                                                                           \
-    u32 store_dest = arm_register_allocation[reg_index];                      \
-    if(store_dest != mem_reg)                                                 \
-    {                                                                         \
-      ARM_MOV_REG_REG(0, store_dest, ireg);                                   \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      ARM_STR_IMM(0, ireg, reg_base, (reg_index * 4));                        \
-    }                                                                         \
+    ARM_LDR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
+  }                                                                           \
+}                                                                             \
+
+#define arm_generate_load_reg_pc(ireg, reg_index, pc_offset)                  \
+  if(reg_index == 15)                                                         \
+  {                                                                           \
+    generate_load_pc(ireg, pc + pc_offset);                                   \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    arm_generate_load_reg(ireg, reg_index);                                   \
   }                                                                           \
 
+#define thumb_generate_load_reg_pc(ireg, reg_index, pc_offset)                \
+  if(reg_index == 15)                                                         \
+  {                                                                           \
+    generate_load_pc(ireg, pc + pc_offset);                                   \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    thumb_generate_load_reg(ireg, reg_index);                                 \
+  }                                                                           \
 
-#define generate_block_extra_vars_thumb()                                     \
-  u32 prepare_load_reg(u32 scratch_reg, u32 reg_index)                        \
+u32 arm_prepare_store_reg(u32 scratch_reg, u32 reg_index)
+{
+  u32 reg_use = arm_register_allocation[reg_index];
+  if(reg_use == mem_reg)
+    return scratch_reg;
+
+  return reg_use;
+}
+
+u32 thumb_prepare_store_reg(u32 scratch_reg, u32 reg_index)
+{
+  u32 reg_use = thumb_register_allocation[reg_index];
+  if(reg_use == mem_reg)
+    return scratch_reg;
+
+  return reg_use;
+}
+
+u32 arm_prepare_load_reg(u8 **tptr, u32 scratch_reg, u32 reg_index)
+{
+  u32 reg_use = arm_register_allocation[reg_index];
+  if(reg_use != mem_reg)
+    return reg_use;
+
+  u8 *translation_ptr = *tptr;
+  ARM_LDR_IMM(0, scratch_reg, reg_base, (reg_index * 4));
+  *tptr = translation_ptr;
+  return scratch_reg;
+}
+
+u32 arm_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_value)
+{
+  if(reg_index == 15)
+  {
+    u8 *translation_ptr = *tptr;
+    generate_load_pc(scratch_reg, pc_value);
+    *tptr = translation_ptr;
+    return scratch_reg;
+  }
+  return arm_prepare_load_reg(tptr, scratch_reg, reg_index);
+}
+
+u32 thumb_prepare_load_reg(u8 **tptr, u32 scratch_reg, u32 reg_index)
+{
+  u32 reg_use = thumb_register_allocation[reg_index];
+  if(reg_use != mem_reg)
+    return reg_use;
+
+  u8 *translation_ptr = *tptr;
+  ARM_LDR_IMM(0, scratch_reg, reg_base, (reg_index * 4));
+  *tptr = translation_ptr;
+  return scratch_reg;
+}
+
+u32 thumb_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_value)
+{
+  if(reg_index == 15)
+  {
+    u8 *translation_ptr = *tptr;
+    generate_load_pc(scratch_reg, pc_value);
+    *tptr = translation_ptr;
+    return scratch_reg;
+  }
+  return thumb_prepare_load_reg(tptr, scratch_reg, reg_index);
+}
+
+#define arm_complete_store_reg(scratch_reg, reg_index)                        \
+{                                                                             \
+  if(arm_register_allocation[reg_index] == mem_reg)                           \
   {                                                                           \
-    u32 reg_use = thumb_register_allocation[reg_index];                       \
-    if(reg_use == mem_reg)                                                    \
-    {                                                                         \
-      ARM_LDR_IMM(0, scratch_reg, reg_base, (reg_index * 4));                 \
-      return scratch_reg;                                                     \
-    }                                                                         \
-                                                                              \
-    return reg_use;                                                           \
+    ARM_STR_IMM(0, scratch_reg, reg_base, (reg_index * 4));                   \
   }                                                                           \
-                                                                              \
-  u32 prepare_load_reg_pc(u32 scratch_reg, u32 reg_index, u32 pc_offset)      \
+}
+
+#define thumb_complete_store_reg(scratch_reg, reg_index)                      \
+{                                                                             \
+  if(thumb_register_allocation[reg_index] == mem_reg)                         \
   {                                                                           \
-    if(reg_index == 15)                                                       \
-    {                                                                         \
-      generate_load_pc(scratch_reg, pc + pc_offset);                          \
-      return scratch_reg;                                                     \
-    }                                                                         \
-    return prepare_load_reg(scratch_reg, reg_index);                          \
+    ARM_STR_IMM(0, scratch_reg, reg_base, (reg_index * 4));                   \
   }                                                                           \
-                                                                              \
-  u32 prepare_store_reg(u32 scratch_reg, u32 reg_index)                       \
-  {                                                                           \
-    u32 reg_use = thumb_register_allocation[reg_index];                       \
-    if(reg_use == mem_reg)                                                    \
-      return scratch_reg;                                                     \
-                                                                              \
-    return reg_use;                                                           \
-  }                                                                           \
-                                                                              \
-  void complete_store_reg(u32 scratch_reg, u32 reg_index)                     \
-  {                                                                           \
-    if(thumb_register_allocation[reg_index] == mem_reg)                       \
-    {                                                                         \
-      ARM_STR_IMM(0, scratch_reg, reg_base, (reg_index * 4));                 \
-    }                                                                         \
-  }                                                                           \
-                                                                              \
-  void generate_load_reg(u32 ireg, u32 reg_index)                             \
-  {                                                                           \
-    u32 load_src = thumb_register_allocation[reg_index];                      \
-    if(load_src != mem_reg)                                                   \
-    {                                                                         \
-      ARM_MOV_REG_REG(0, ireg, load_src);                                     \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      ARM_LDR_IMM(0, ireg, reg_base, (reg_index * 4));                        \
-    }                                                                         \
-  }                                                                           \
-                                                                              \
-  void generate_store_reg(u32 ireg, u32 reg_index)                            \
-  {                                                                           \
-    u32 store_dest = thumb_register_allocation[reg_index];                    \
-    if(store_dest != mem_reg)                                                 \
-    {                                                                         \
-      ARM_MOV_REG_REG(0, store_dest, ireg);                                   \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      ARM_STR_IMM(0, ireg, reg_base, (reg_index * 4));                        \
-    }                                                                         \
-  }                                                                           \
+}
 
 #define block_prologue_size 0
+#define generate_block_prologue()
+#define generate_block_extra_vars_arm()
+#define generate_block_extra_vars_thumb()
+
+#define arm_complete_store_reg_pc_no_flags(scratch_reg, reg_index)            \
+{                                                                             \
+  if(reg_index == 15)                                                         \
+  {                                                                           \
+    generate_indirect_branch_arm();                                           \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    arm_complete_store_reg(scratch_reg, reg_index);                           \
+  }                                                                           \
+}                                                                             \
+
+#define arm_complete_store_reg_pc_flags(scratch_reg, reg_index)               \
+{                                                                             \
+  if(reg_index == 15)                                                         \
+  {                                                                           \
+    if(condition == 0x0E)                                                     \
+    {                                                                         \
+      generate_cycle_update();                                                \
+    }                                                                         \
+    generate_function_call(execute_spsr_restore);                             \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    arm_complete_store_reg(scratch_reg, reg_index);                           \
+  }                                                                           \
+}                                                                             \
 
 /* It should be okay to still generate result flags, spsr will overwrite them.
  * This is pretty infrequent (returning from interrupt handlers, et al) so
@@ -657,18 +677,8 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
     set_cpu_mode(MODE_IRQ);                                                   \
   }                                                                           \
 
-#define generate_load_reg_pc(ireg, reg_index, pc_offset)                      \
-  if(reg_index == 15)                                                         \
-  {                                                                           \
-    generate_load_pc(ireg, pc + pc_offset);                                   \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    generate_load_reg(ireg, reg_index);                                       \
-  }                                                                           \
-
-#define generate_store_reg_pc_no_flags(ireg, reg_index)                       \
-  generate_store_reg(ireg, reg_index);                                        \
+#define arm_generate_store_reg_pc_no_flags(ireg, reg_index)                   \
+  arm_generate_store_reg(ireg, reg_index);                                    \
   if(reg_index == 15)                                                         \
   {                                                                           \
     generate_indirect_branch_arm();                                           \
@@ -682,18 +692,6 @@ u32 execute_spsr_restore_body(u32 pc)
 
   return pc;
 }
-
-
-#define generate_store_reg_pc_flags(ireg, reg_index)                          \
-  generate_store_reg(ireg, reg_index);                                        \
-  if(reg_index == 15)                                                         \
-  {                                                                           \
-    if(condition == 0x0E)                                                     \
-    {                                                                         \
-      generate_cycle_update();                                                \
-    }                                                                         \
-    generate_function_call(execute_spsr_restore);                             \
-  }                                                                           \
 
 
 #define generate_load_flags()                                                 \
@@ -1057,41 +1055,41 @@ u32 execute_spsr_restore_body(u32 pc)
   generate_op_imm_tflags(TEQ, _rn)                                            \
 
 
-#define prepare_load_rn_yes()                                                 \
-  u32 _rn = prepare_load_reg_pc(reg_rn, rn, 8)                                \
+#define arm_prepare_load_rn_yes()                                             \
+  u32 _rn = arm_prepare_load_reg_pc(&translation_ptr, reg_rn, rn, pc + 8)     \
 
-#define prepare_load_rn_no()                                                  \
+#define arm_prepare_load_rn_no()                                              \
 
-#define prepare_store_rd_yes()                                                \
-  u32 _rd = prepare_store_reg(reg_rd, rd)                                     \
+#define arm_prepare_store_rd_yes()                                            \
+  u32 _rd = arm_prepare_store_reg(reg_rd, rd)                                 \
 
-#define prepare_store_rd_no()                                                 \
+#define arm_prepare_store_rd_no()                                             \
 
-#define complete_store_rd_yes(flags_op)                                       \
-  complete_store_reg_pc_##flags_op(_rd, rd)                                   \
+#define arm_complete_store_rd_yes(flags_op)                                   \
+  arm_complete_store_reg_pc_##flags_op(_rd, rd)                               \
 
-#define complete_store_rd_no(flags_op)                                        \
+#define arm_complete_store_rd_no(flags_op)                                    \
 
 #define arm_generate_op_reg(name, load_op, store_op, flags_op)                \
   u32 shift_type = (opcode >> 5) & 0x03;                                      \
   arm_decode_data_proc_reg(opcode);                                           \
-  prepare_load_rn_##load_op();                                                \
-  prepare_store_rd_##store_op();                                              \
+  arm_prepare_load_rn_##load_op();                                            \
+  arm_prepare_store_rd_##store_op();                                          \
                                                                               \
   if((opcode >> 4) & 0x01)                                                    \
   {                                                                           \
     u32 rs = ((opcode >> 8) & 0x0F);                                          \
-    u32 _rs = prepare_load_reg(reg_rs, rs);                                   \
-    u32 _rm = prepare_load_reg_pc(reg_rm, rm, 12);                            \
+    u32 _rs = arm_prepare_load_reg(&translation_ptr, reg_rs, rs);             \
+    u32 _rm = arm_prepare_load_reg_pc(&translation_ptr, reg_rm, rm, pc + 12); \
     generate_op_##name##_reg_regshift(_rd, _rn, _rm, shift_type, _rs);        \
   }                                                                           \
   else                                                                        \
   {                                                                           \
     u32 shift_imm = ((opcode >> 7) & 0x1F);                                   \
-    u32 _rm = prepare_load_reg_pc(reg_rm, rm, 8);                             \
+    u32 _rm = arm_prepare_load_reg_pc(&translation_ptr, reg_rm, rm, pc + 8);  \
     generate_op_##name##_reg_immshift(_rd, _rn, _rm, shift_type, shift_imm);  \
   }                                                                           \
-  complete_store_rd_##store_op(flags_op)                                      \
+  arm_complete_store_rd_##store_op(flags_op)                                  \
 
 #define arm_generate_op_reg_flags(name, load_op, store_op, flags_op)          \
   arm_generate_op_reg(name, load_op, store_op, flags_op)                      \
@@ -1100,10 +1098,10 @@ u32 execute_spsr_restore_body(u32 pc)
 
 #define arm_generate_op_imm(name, load_op, store_op, flags_op)                \
   arm_decode_data_proc_imm(opcode);                                           \
-  prepare_load_rn_##load_op();                                                \
-  prepare_store_rd_##store_op();                                              \
+  arm_prepare_load_rn_##load_op();                                            \
+  arm_prepare_store_rd_##store_op();                                          \
   generate_op_##name##_imm(_rd, _rn);                                         \
-  complete_store_rd_##store_op(flags_op)                                      \
+  arm_complete_store_rd_##store_op(flags_op)                                  \
 
 #define arm_generate_op_imm_flags(name, load_op, store_op, flags_op)          \
   arm_generate_op_imm(name, load_op, store_op, flags_op)                      \
@@ -1128,7 +1126,7 @@ u32 execute_spsr_restore_body(u32 pc)
   ARM_MUL(0, _rd, _rm, _rs)                                                   \
 
 #define arm_multiply_add_yes_flags_no()                                       \
-  u32 _rn = prepare_load_reg(reg_a2, rn);                                     \
+  u32 _rn = arm_prepare_load_reg(&translation_ptr, reg_a2, rn);               \
   ARM_MLA(0, _rd, _rm, _rs, _rn)                                              \
 
 #define arm_multiply_add_no_flags_yes()                                       \
@@ -1137,7 +1135,7 @@ u32 execute_spsr_restore_body(u32 pc)
   generate_store_flags()                                                      \
 
 #define arm_multiply_add_yes_flags_yes()                                      \
-  u32 _rn = prepare_load_reg(reg_a2, rn);                                     \
+  u32 _rn = arm_prepare_load_reg(&translation_ptr, reg_a2, rn);               \
   generate_load_flags();                                                      \
   ARM_MLAS(0, _rd, _rm, _rs, _rn);                                            \
   generate_store_flags()
@@ -1146,11 +1144,11 @@ u32 execute_spsr_restore_body(u32 pc)
 #define arm_multiply(add_op, flags)                                           \
 {                                                                             \
   arm_decode_multiply();                                                      \
-  u32 _rm = prepare_load_reg(reg_a0, rm);                                     \
-  u32 _rs = prepare_load_reg(reg_a1, rs);                                     \
-  u32 _rd = prepare_store_reg(reg_a0, rd);                                    \
+  u32 _rm = arm_prepare_load_reg(&translation_ptr, reg_a0, rm);               \
+  u32 _rs = arm_prepare_load_reg(&translation_ptr, reg_a1, rs);               \
+  u32 _rd = arm_prepare_store_reg(reg_a0, rd);                                \
   arm_multiply_add_##add_op##_flags_##flags();                                \
-  complete_store_reg(_rd, rd);                                                \
+  arm_complete_store_reg(_rd, rd);                                            \
 }                                                                             \
 
 
@@ -1172,8 +1170,8 @@ u32 execute_spsr_restore_body(u32 pc)
 #define arm_multiply_long_add_no(name)                                        \
 
 #define arm_multiply_long_add_yes(name)                                       \
-  prepare_load_reg(reg_a0, rdlo);                                             \
-  prepare_load_reg(reg_a1, rdhi)                                              \
+  arm_prepare_load_reg(&translation_ptr, reg_a0, rdlo);                       \
+  arm_prepare_load_reg(&translation_ptr, reg_a1, rdhi)                        \
 
 
 #define arm_multiply_long_op(flags, name)                                     \
@@ -1182,27 +1180,27 @@ u32 execute_spsr_restore_body(u32 pc)
 #define arm_multiply_long(name, add_op, flags)                                \
 {                                                                             \
   arm_decode_multiply_long();                                                 \
-  u32 _rm = prepare_load_reg(reg_a2, rm);                                     \
-  u32 _rs = prepare_load_reg(reg_rs, rs);                                     \
-  u32 _rdlo = prepare_store_reg(reg_a0, rdlo);                                \
-  u32 _rdhi = prepare_store_reg(reg_a1, rdhi);                                \
+  u32 _rm = arm_prepare_load_reg(&translation_ptr, reg_a2, rm);               \
+  u32 _rs = arm_prepare_load_reg(&translation_ptr, reg_rs, rs);               \
+  u32 _rdlo = arm_prepare_store_reg(reg_a0, rdlo);                            \
+  u32 _rdhi = arm_prepare_store_reg(reg_a1, rdhi);                            \
   arm_multiply_long_add_##add_op(name);                                       \
   arm_multiply_long_op(flags, arm_multiply_long_name_##name);                 \
-  complete_store_reg(_rdlo, rdlo);                                            \
-  complete_store_reg(_rdhi, rdhi);                                            \
+  arm_complete_store_reg(_rdlo, rdlo);                                        \
+  arm_complete_store_reg(_rdhi, rdhi);                                        \
 }                                                                             \
 
 #define arm_psr_read_cpsr()                                                   \
-  u32 _rd = prepare_store_reg(reg_a0, rd);                                    \
-  generate_load_reg(_rd, REG_CPSR);                                           \
+  u32 _rd = arm_prepare_store_reg(reg_a0, rd);                                \
+  arm_generate_load_reg(_rd, REG_CPSR);                                       \
   ARM_BIC_REG_IMM(0, _rd, _rd, 0xF0, arm_imm_lsl_to_rot(24));                 \
   ARM_AND_REG_IMM(0, reg_flags, reg_flags, 0xF0, arm_imm_lsl_to_rot(24));     \
   ARM_ORR_REG_REG(0, _rd, _rd, reg_flags);                                    \
-  complete_store_reg(_rd, rd)                                                 \
+  arm_complete_store_reg(_rd, rd)                                             \
 
 #define arm_psr_read_spsr()                                                   \
   generate_function_call(execute_read_spsr)                                   \
-  generate_store_reg(reg_a0, rd)                                              \
+  arm_generate_store_reg(reg_a0, rd)                                          \
 
 #define arm_psr_read(op_type, psr_reg)                                        \
   arm_psr_read_##psr_reg()                                                    \
@@ -1254,7 +1252,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #endif
 
 #define arm_psr_load_new_reg()                                                \
-  generate_load_reg(reg_a0, rm)                                               \
+  arm_generate_load_reg(reg_a0, rm)                                           \
 
 #define arm_psr_load_new_imm()                                                \
   generate_load_imm(reg_a0, imm, imm_ror)                                     \
@@ -1287,11 +1285,11 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   cycle_count += 2;                                                           \
   generate_function_call(execute_load_##mem_type);                            \
   write32((pc + 8));                                                          \
-  generate_store_reg_pc_no_flags(reg_rv, rd)                                  \
+  arm_generate_store_reg_pc_no_flags(reg_rv, rd)                              \
 
 #define arm_access_memory_store(mem_type)                                     \
   cycle_count++;                                                              \
-  generate_load_reg_pc(reg_a1, rd, 12);                                       \
+  arm_generate_load_reg_pc(reg_a1, rd, 12);                                   \
   generate_function_call(execute_store_##mem_type);                           \
   write32((pc + 4))                                                           \
 
@@ -1340,39 +1338,39 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_access_memory_pre_wb(type, direction)                             \
   arm_access_memory_adjust_##type##_##direction(reg_a0);                      \
-  generate_store_reg(reg_a0, rn)                                              \
+  arm_generate_store_reg(reg_a0, rn)                                          \
 
 #define arm_access_memory_post(type, direction)                               \
-  u32 _rn_dest = prepare_store_reg(reg_a1, rn);                               \
+  u32 _rn_dest = arm_prepare_store_reg(reg_a1, rn);                           \
   if(_rn != reg_a0)                                                           \
   {                                                                           \
-    generate_load_reg(reg_a0, rn);                                            \
+    arm_generate_load_reg(reg_a0, rn);                                        \
   }                                                                           \
   arm_access_memory_adjust_##type##_##direction(_rn_dest);                    \
-  complete_store_reg(_rn_dest, rn)                                            \
+  arm_complete_store_reg(_rn_dest, rn)                                        \
 
 
 #define arm_data_trans_reg(adjust_op, direction)                              \
   arm_decode_data_trans_reg();                                                \
-  u32 _rn = prepare_load_reg_pc(reg_a0, rn, 8);                               \
-  u32 _rm = prepare_load_reg(reg_a1, rm);                                     \
+  u32 _rn = arm_prepare_load_reg_pc(&translation_ptr, reg_a0, rn, pc + 8);    \
+  u32 _rm = arm_prepare_load_reg(&translation_ptr, reg_a1, rm);               \
   arm_access_memory_##adjust_op(reg_sh, direction)                            \
 
 #define arm_data_trans_imm(adjust_op, direction)                              \
   arm_decode_data_trans_imm();                                                \
-  u32 _rn = prepare_load_reg_pc(reg_a0, rn, 8);                               \
+  u32 _rn = arm_prepare_load_reg_pc(&translation_ptr, reg_a0, rn, pc + 8);    \
   arm_access_memory_##adjust_op(imm, direction)                               \
 
 
 #define arm_data_trans_half_reg(adjust_op, direction)                         \
   arm_decode_half_trans_r();                                                  \
-  u32 _rn = prepare_load_reg_pc(reg_a0, rn, 8);                               \
-  u32 _rm = prepare_load_reg(reg_a1, rm);                                     \
+  u32 _rn = arm_prepare_load_reg_pc(&translation_ptr, reg_a0, rn, pc + 8);    \
+  u32 _rm = arm_prepare_load_reg(&translation_ptr, reg_a1, rm);               \
   arm_access_memory_##adjust_op(reg, direction)                               \
 
 #define arm_data_trans_half_imm(adjust_op, direction)                         \
   arm_decode_half_trans_of();                                                 \
-  u32 _rn = prepare_load_reg_pc(reg_a0, rn, 8);                               \
+  u32 _rn = arm_prepare_load_reg_pc(&translation_ptr, reg_a0, rn, pc + 8);    \
   arm_access_memory_##adjust_op(imm, direction)                               \
 
 
@@ -1398,17 +1396,17 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define arm_block_memory_load()                                               \
   generate_function_call(execute_load_u32);                                   \
   write32((pc + 8));                                                          \
-  generate_store_reg(reg_rv, i)                                               \
+  arm_generate_store_reg(reg_rv, i)                                           \
 
 #define arm_block_memory_store()                                              \
-  generate_load_reg_pc(reg_a1, i, 8);                                         \
+  arm_generate_load_reg_pc(reg_a1, i, 8);                                     \
   generate_function_call(execute_store_u32_safe)                              \
 
 #define arm_block_memory_final_load()                                         \
   arm_block_memory_load()                                                     \
 
 #define arm_block_memory_final_store()                                        \
-  generate_load_reg_pc(reg_a1, i, 12);                                        \
+  arm_generate_load_reg_pc(reg_a1, i, 12);                                    \
   generate_function_call(execute_store_u32);                                  \
   write32((pc + 4))                                                           \
 
@@ -1432,14 +1430,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_add_imm(reg_s0, 4, 0)                                              \
 
 #define arm_block_memory_writeback_down()                                     \
-  generate_load_reg(reg_a0, rn);                                              \
+  arm_generate_load_reg(reg_a0, rn);                                          \
   generate_sub_imm(reg_a0, (word_bit_count(reg_list) * 4), 0);                \
-  generate_store_reg(reg_a0, rn)                                              \
+  arm_generate_store_reg(reg_a0, rn)                                          \
 
 #define arm_block_memory_writeback_up()                                       \
-  generate_load_reg(reg_a0, rn);                                              \
+  arm_generate_load_reg(reg_a0, rn);                                          \
   generate_add_imm(reg_a0, (word_bit_count(reg_list) * 4), 0);                \
-  generate_store_reg(reg_a0, rn)                                              \
+  arm_generate_store_reg(reg_a0, rn)                                          \
 
 #define arm_block_memory_writeback_no()
 
@@ -1460,18 +1458,18 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   u32 offset = 0;                                                             \
   u32 i;                                                                      \
                                                                               \
-  generate_load_reg(reg_s0, rn);                                              \
+  arm_generate_load_reg(reg_s0, rn);                                          \
   arm_block_memory_offset_##offset_type();                                    \
   arm_block_memory_writeback_##access_type(writeback_type);                   \
   ARM_BIC_REG_IMM(0, reg_s0, reg_s0, 0x03, 0);                                \
-  generate_store_reg(reg_s0, save1_reg);                                      \
+  arm_generate_store_reg(reg_s0, save1_reg);                                  \
                                                                               \
   for(i = 0; i < 16; i++)                                                     \
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
     {                                                                         \
       cycle_count++;                                                          \
-      generate_load_reg(reg_s0, save1_reg);                                   \
+      arm_generate_load_reg(reg_s0, save1_reg);                               \
       generate_add_reg_reg_imm(reg_a0, reg_s0, offset, 0);                    \
       if(reg_list & ~((2 << i) - 1))                                          \
       {                                                                       \
@@ -1493,20 +1491,20 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 {                                                                             \
   arm_decode_swap();                                                          \
   cycle_count += 3;                                                           \
-  generate_load_reg(reg_a0, rn);                                              \
+  arm_generate_load_reg(reg_a0, rn);                                          \
   generate_function_call(execute_load_##type);                                \
   write32((pc + 8));                                                          \
   generate_mov(reg_a2, reg_rv);                                               \
-  generate_load_reg(reg_a0, rn);                                              \
-  generate_load_reg(reg_a1, rm);                                              \
-  generate_store_reg(reg_a2, rd);                                             \
+  arm_generate_load_reg(reg_a0, rn);                                          \
+  arm_generate_load_reg(reg_a1, rm);                                          \
+  arm_generate_store_reg(reg_a2, rd);                                         \
   generate_function_call(execute_store_##type);                               \
   write32((pc + 4));                                                          \
 }                                                                             \
 
 
 #define thumb_generate_op_reg(name, _rd, _rs, _rn)                            \
-  u32 __rm = prepare_load_reg(reg_rm, _rn);                                   \
+  u32 __rm = thumb_prepare_load_reg(&translation_ptr, reg_rm, _rn);           \
   generate_op_##name##_reg_immshift(__rd, __rn, __rm, ARMSHIFT_LSL, 0)        \
 
 #define thumb_generate_op_imm(name, _rd, _rs, imm_)                           \
@@ -1519,25 +1517,25 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_data_proc(type, name, op_type, _rd, _rs, _rn)                   \
 {                                                                             \
   thumb_decode_##type();                                                      \
-  u32 __rn = prepare_load_reg(reg_rn, _rs);                                   \
-  u32 __rd = prepare_store_reg(reg_rd, _rd);                                  \
+  u32 __rn = thumb_prepare_load_reg(&translation_ptr, reg_rn, _rs);           \
+  u32 __rd = thumb_prepare_store_reg(reg_rd, _rd);                            \
   thumb_generate_op_##op_type(name, _rd, _rs, _rn);                           \
-  complete_store_reg(__rd, _rd);                                              \
+  thumb_complete_store_reg(__rd, _rd);                                        \
 }                                                                             \
 
 #define thumb_data_proc_test(type, name, op_type, _rd, _rs)                   \
 {                                                                             \
   thumb_decode_##type();                                                      \
-  u32 __rn = prepare_load_reg(reg_rn, _rd);                                   \
+  u32 __rn = thumb_prepare_load_reg(&translation_ptr, reg_rn, _rd);           \
   thumb_generate_op_##op_type(name, 0, _rd, _rs);                             \
 }                                                                             \
 
 #define thumb_data_proc_unary(type, name, op_type, _rd, _rs)                  \
 {                                                                             \
   thumb_decode_##type();                                                      \
-  u32 __rd = prepare_store_reg(reg_rd, _rd);                                  \
+  u32 __rd = thumb_prepare_store_reg(reg_rd, _rd);                            \
   thumb_generate_op_##op_type(name, _rd, 0, _rs);                             \
-  complete_store_reg(__rd, _rd);                                              \
+  thumb_complete_store_reg(__rd, _rd);                                        \
 }                                                                             \
 
 
@@ -1548,14 +1546,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    complete_store_reg(_rd, rd);                                              \
+    thumb_complete_store_reg(_rd, rd);                                        \
   }                                                                           \
 
 #define thumb_data_proc_hi(name)                                              \
 {                                                                             \
   thumb_decode_hireg_op();                                                    \
-  u32 _rd = prepare_load_reg_pc(reg_rd, rd, 4);                               \
-  u32 _rs = prepare_load_reg_pc(reg_rn, rs, 4);                               \
+  u32 _rd = thumb_prepare_load_reg_pc(&translation_ptr, reg_rd, rd, pc + 4);  \
+  u32 _rs = thumb_prepare_load_reg_pc(&translation_ptr, reg_rn, rs, pc + 4);  \
   generate_op_##name##_reg_immshift(_rd, _rd, _rs, ARMSHIFT_LSL, 0);          \
   complete_store_reg_pc_thumb();                                              \
 }                                                                             \
@@ -1563,16 +1561,16 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_data_proc_test_hi(name)                                         \
 {                                                                             \
   thumb_decode_hireg_op();                                                    \
-  u32 _rd = prepare_load_reg_pc(reg_rd, rd, 4);                               \
-  u32 _rs = prepare_load_reg_pc(reg_rn, rs, 4);                               \
+  u32 _rd = thumb_prepare_load_reg_pc(&translation_ptr, reg_rd, rd, pc + 4);  \
+  u32 _rs = thumb_prepare_load_reg_pc(&translation_ptr, reg_rn, rs, pc + 4);  \
   generate_op_##name##_reg_immshift(0, _rd, _rs, ARMSHIFT_LSL, 0);            \
 }                                                                             \
 
 #define thumb_data_proc_mov_hi()                                              \
 {                                                                             \
   thumb_decode_hireg_op();                                                    \
-  u32 _rs = prepare_load_reg_pc(reg_rn, rs, 4);                               \
-  u32 _rd = prepare_store_reg(reg_rd, rd);                                    \
+  u32 _rs = thumb_prepare_load_reg_pc(&translation_ptr, reg_rn, rs, pc + 4);  \
+  u32 _rd = thumb_prepare_store_reg(reg_rd, rd);                              \
   ARM_MOV_REG_REG(0, _rd, _rs);                                               \
   complete_store_reg_pc_thumb();                                              \
 }                                                                             \
@@ -1582,18 +1580,18 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_load_pc(_rd)                                                    \
 {                                                                             \
   thumb_decode_imm();                                                         \
-  u32 __rd = prepare_store_reg(reg_rd, _rd);                                  \
+  u32 __rd = thumb_prepare_store_reg(reg_rd, _rd);                            \
   generate_load_pc(__rd, (((pc & ~2) + 4) + (imm * 4)));                      \
-  complete_store_reg(__rd, _rd);                                              \
+  thumb_complete_store_reg(__rd, _rd);                                        \
 }                                                                             \
 
 #define thumb_load_sp(_rd)                                                    \
 {                                                                             \
   thumb_decode_imm();                                                         \
-  u32 __sp = prepare_load_reg(reg_a0, REG_SP);                                \
-  u32 __rd = prepare_store_reg(reg_a0, _rd);                                  \
+  u32 __sp = thumb_prepare_load_reg(&translation_ptr, reg_a0, REG_SP);        \
+  u32 __rd = thumb_prepare_store_reg(reg_a0, _rd);                            \
   ARM_ADD_REG_IMM(0, __rd, __sp, imm, arm_imm_lsl_to_rot(2));                 \
-  complete_store_reg(__rd, _rd);                                              \
+  thumb_complete_store_reg(__rd, _rd);                                        \
 }                                                                             \
 
 #define thumb_adjust_sp_up()                                                  \
@@ -1605,9 +1603,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_adjust_sp(direction)                                            \
 {                                                                             \
   thumb_decode_add_sp();                                                      \
-  u32 _sp = prepare_load_reg(reg_a0, REG_SP);                                 \
+  u32 _sp = thumb_prepare_load_reg(&translation_ptr, reg_a0, REG_SP);         \
   thumb_adjust_sp_##direction();                                              \
-  complete_store_reg(_sp, REG_SP);                                            \
+  thumb_complete_store_reg(_sp, REG_SP);                                      \
 }                                                                             \
 
 #define generate_op_lsl_reg(_rd, _rm, _rs)                                    \
@@ -1636,40 +1634,40 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_op_movs_reg_immshift(_rd, 0, _rm, ARMSHIFT_ROR, imm)               \
 
 
-#define generate_shift_reg(op_type)                                           \
-  u32 __rm = prepare_load_reg(reg_rd, rd);                                    \
-  u32 __rs = prepare_load_reg(reg_rs, rs);                                    \
+#define thumb_generate_shift_reg(op_type)                                     \
+  u32 __rm = thumb_prepare_load_reg(&translation_ptr, reg_rd, rd);            \
+  u32 __rs = thumb_prepare_load_reg(&translation_ptr, reg_rs, rs);            \
   generate_op_##op_type##_reg(__rd, __rm, __rs)                               \
 
-#define generate_shift_imm(op_type)                                           \
-  u32 __rs = prepare_load_reg(reg_rs, rs);                                    \
+#define thumb_generate_shift_imm(op_type)                                     \
+  u32 __rs = thumb_prepare_load_reg(&translation_ptr, reg_rs, rs);            \
   generate_op_##op_type##_imm(__rd, __rs)                                     \
 
 
 #define thumb_shift(decode_type, op_type, value_type)                         \
 {                                                                             \
   thumb_decode_##decode_type();                                               \
-  u32 __rd = prepare_store_reg(reg_rd, rd);                                   \
-  generate_shift_##value_type(op_type);                                       \
-  complete_store_reg(__rd, rd);                                               \
+  u32 __rd = thumb_prepare_store_reg(reg_rd, rd);                             \
+  thumb_generate_shift_##value_type(op_type);                                 \
+  thumb_complete_store_reg(__rd, rd);                                         \
 }                                                                             \
 
 /* Operation types: imm, mem_reg, mem_imm */
 
 #define thumb_load_pc_pool_const(reg_rd, value)                               \
-  u32 rgdst = prepare_store_reg(reg_a0, reg_rd);                              \
+  u32 rgdst = thumb_prepare_store_reg(reg_a0, reg_rd);                        \
   generate_load_pc(rgdst, (value));                                           \
-  complete_store_reg(rgdst, reg_rd)
+  thumb_complete_store_reg(rgdst, reg_rd)
 
 #define thumb_access_memory_load(mem_type, _rd)                               \
   cycle_count += 2;                                                           \
   generate_function_call(execute_load_##mem_type);                            \
   write32((pc + 4));                                                          \
-  generate_store_reg(reg_rv, _rd)                                             \
+  thumb_generate_store_reg(reg_rv, _rd)                                       \
 
 #define thumb_access_memory_store(mem_type, _rd)                              \
   cycle_count++;                                                              \
-  generate_load_reg(reg_a1, _rd);                                             \
+  thumb_generate_load_reg(reg_a1, _rd);                                       \
   generate_function_call(execute_store_##mem_type);                           \
   write32((pc + 2))                                                           \
 
@@ -1677,16 +1675,16 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_load_pc(reg_a0, (offset))                                          \
 
 #define thumb_access_memory_generate_address_reg_imm(offset, _rb, _ro)        \
-  u32 __rb = prepare_load_reg(reg_a0, _rb);                                   \
+  u32 __rb = thumb_prepare_load_reg(&translation_ptr, reg_a0, _rb);           \
   ARM_ADD_REG_IMM(0, reg_a0, __rb, offset, 0)                                 \
 
 #define thumb_access_memory_generate_address_reg_imm_sp(offset, _rb, _ro)     \
-  u32 __rb = prepare_load_reg(reg_a0, _rb);                                   \
+  u32 __rb = thumb_prepare_load_reg(&translation_ptr, reg_a0, _rb);           \
   ARM_ADD_REG_IMM(0, reg_a0, __rb, offset, arm_imm_lsl_to_rot(2))             \
 
 #define thumb_access_memory_generate_address_reg_reg(offset, _rb, _ro)        \
-  u32 __rb = prepare_load_reg(reg_a0, _rb);                                   \
-  u32 __ro = prepare_load_reg(reg_a1, _ro);                                   \
+  u32 __rb = thumb_prepare_load_reg(&translation_ptr, reg_a0, _rb);           \
+  u32 __ro = thumb_prepare_load_reg(&translation_ptr, reg_a1, _ro);           \
   ARM_ADD_REG_REG(0, reg_a0, __rb, __ro)                                      \
 
 #define thumb_access_memory(access_type, op_type, _rd, _rb, _ro,              \
@@ -1711,24 +1709,24 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_block_address_preadjust_no()                                    \
 
 #define thumb_block_address_postadjust_no(base_reg)                           \
-  generate_store_reg(reg_s0, base_reg)                                        \
+  thumb_generate_store_reg(reg_s0, base_reg)                                  \
 
 #define thumb_block_address_postadjust_up(base_reg)                           \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
-  generate_store_reg(reg_a0, base_reg)                                        \
+  thumb_generate_store_reg(reg_a0, base_reg)                                  \
 
 #define thumb_block_address_postadjust_down(base_reg)                         \
   generate_mov(reg_a0, reg_s0);                                               \
   generate_sub_imm(reg_a0, (bit_count[reg_list] * 4), 0);                     \
-  generate_store_reg(reg_a0, base_reg)                                        \
+  thumb_generate_store_reg(reg_a0, base_reg)                                  \
 
 #define thumb_block_address_postadjust_pop_pc(base_reg)                       \
   generate_add_reg_reg_imm(reg_a0, reg_s0,                                    \
    ((bit_count[reg_list] + 1) * 4), 0);                                       \
-  generate_store_reg(reg_a0, base_reg)                                        \
+  thumb_generate_store_reg(reg_a0, base_reg)                                  \
 
 #define thumb_block_address_postadjust_push_lr(base_reg)                      \
-  generate_store_reg(reg_s0, base_reg)                                        \
+  thumb_generate_store_reg(reg_s0, base_reg)                                  \
 
 #define thumb_block_memory_extra_no()                                         \
 
@@ -1737,32 +1735,32 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_block_memory_extra_down()                                       \
 
 #define thumb_block_memory_extra_pop_pc()                                     \
-  generate_load_reg(reg_s0, save1_reg);                                       \
+  thumb_generate_load_reg(reg_s0, save1_reg);                                 \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
   generate_function_call(execute_load_u32);                                   \
   write32((pc + 4));                                                          \
   generate_indirect_branch_cycle_update(thumb)                                \
 
 #define thumb_block_memory_extra_push_lr(base_reg)                            \
-  generate_load_reg(reg_s0, save1_reg);                                       \
+  thumb_generate_load_reg(reg_s0, save1_reg);                                 \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
-  generate_load_reg(reg_a1, REG_LR);                                          \
+  thumb_generate_load_reg(reg_a1, REG_LR);                                    \
   generate_function_call(execute_store_u32_safe)                              \
 
 #define thumb_block_memory_load()                                             \
   generate_function_call(execute_load_u32);                                   \
   write32((pc + 4));                                                          \
-  generate_store_reg(reg_rv, i)                                               \
+  thumb_generate_store_reg(reg_rv, i)                                         \
 
 #define thumb_block_memory_store()                                            \
-  generate_load_reg(reg_a1, i);                                               \
+  thumb_generate_load_reg(reg_a1, i);                                         \
   generate_function_call(execute_store_u32_safe)                              \
 
 #define thumb_block_memory_final_load()                                       \
   thumb_block_memory_load()                                                   \
 
 #define thumb_block_memory_final_store()                                      \
-  generate_load_reg(reg_a1, i);                                               \
+  thumb_generate_load_reg(reg_a1, i);                                         \
   generate_function_call(execute_store_u32);                                  \
   write32((pc + 2))                                                           \
 
@@ -1787,18 +1785,18 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   u32 i;                                                                      \
   u32 offset = 0;                                                             \
                                                                               \
-  generate_load_reg(reg_s0, base_reg);                                        \
+  thumb_generate_load_reg(reg_s0, base_reg);                                  \
   ARM_BIC_REG_IMM(0, reg_s0, reg_s0, 0x03, 0);                                \
   thumb_block_address_preadjust_##pre_op();                                   \
   thumb_block_address_postadjust_##post_op(base_reg);                         \
-  generate_store_reg(reg_s0, save1_reg);                                      \
+  thumb_generate_store_reg(reg_s0, save1_reg);                                \
                                                                               \
   for(i = 0; i < 8; i++)                                                      \
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
     {                                                                         \
       cycle_count++;                                                          \
-      generate_load_reg(reg_s0, save1_reg);                                   \
+      thumb_generate_load_reg(reg_s0, save1_reg);                             \
       generate_add_reg_reg_imm(reg_a0, reg_s0, offset, 0);                    \
       if(reg_list & ~((2 << i) - 1))                                          \
       {                                                                       \
@@ -1841,12 +1839,12 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_bl()                                                              \
   generate_update_pc((pc + 4));                                               \
-  generate_store_reg(reg_a0, REG_LR);                                         \
+  arm_generate_store_reg(reg_a0, REG_LR);                                     \
   generate_branch(arm)                                                        \
 
 #define arm_bx()                                                              \
   arm_decode_branchx(opcode);                                                 \
-  generate_load_reg(reg_a0, rn);                                              \
+  arm_generate_load_reg(reg_a0, rn);                                          \
   generate_indirect_branch_dual();                                            \
 
 #define arm_swi()                                                             \
@@ -1860,15 +1858,15 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define thumb_bl()                                                            \
   generate_update_pc(((pc + 2) | 0x01));                                      \
-  generate_store_reg(reg_a0, REG_LR);                                         \
+  thumb_generate_store_reg(reg_a0, REG_LR);                                   \
   generate_branch(thumb)                                                      \
 
 #define thumb_blh()                                                           \
 {                                                                             \
   thumb_decode_branch();                                                      \
   generate_update_pc(((pc + 2) | 0x01));                                      \
-  generate_load_reg(reg_a1, REG_LR);                                          \
-  generate_store_reg(reg_a0, REG_LR);                                         \
+  thumb_generate_load_reg(reg_a1, REG_LR);                                    \
+  thumb_generate_store_reg(reg_a0, REG_LR);                                   \
   generate_mov(reg_a0, reg_a1);                                               \
   generate_add_imm(reg_a0, (offset * 2), 0);                                  \
   generate_indirect_branch_cycle_update(thumb);                               \
@@ -1877,7 +1875,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_bx()                                                            \
 {                                                                             \
   thumb_decode_hireg_op();                                                    \
-  generate_load_reg_pc(reg_a0, rs, 4);                                        \
+  thumb_generate_load_reg_pc(reg_a0, rs, 4);                                  \
   generate_indirect_branch_cycle_update(dual_thumb);                          \
 }                                                                             \
 
