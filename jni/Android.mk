@@ -20,7 +20,6 @@ endif
 
 ifeq ($(HAVE_DYNAREC),1)
   COREFLAGS += -DHAVE_DYNAREC
-  CORE_LDLIBS += -Wl,--no-warn-shared-textrel
 endif
 
 include $(CORE_DIR)/Makefile.common
@@ -31,6 +30,7 @@ ifneq ($(GIT_VERSION)," unknown")
 endif
 
 include $(CLEAR_VARS)
+LOCAL_DISABLE_FATAL_LINKER_WARNINGS := true
 LOCAL_MODULE    := retro
 LOCAL_SRC_FILES := $(SOURCES_C) $(SOURCES_ASM)
 LOCAL_CFLAGS    := $(COREFLAGS) $(INCFLAGS)
