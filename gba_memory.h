@@ -313,6 +313,10 @@ static inline void clear_gamepak_stickybits(void)
 
 #define state_mem_write_array(array)          state_mem_write(array,     sizeof(array))
 #define state_mem_write_variable(variable)    state_mem_write(&variable, sizeof(variable))
+#define state_mem_write_pointer(ptr, base) { \
+  u32 offset = ((u8*)ptr) - ((u8*)base);     \
+  state_mem_write(&offset, sizeof(offset));  \
+}
 
 static inline void state_mem_read(void* dst, size_t size)
 {
@@ -322,6 +326,11 @@ static inline void state_mem_read(void* dst, size_t size)
 
 #define state_mem_read_array(array)           state_mem_read(array,     sizeof(array))
 #define state_mem_read_variable(variable)     state_mem_read(&variable, sizeof(variable))
+#define state_mem_read_pointer(ptr, base) {  \
+  u32 offset;                                \
+  state_mem_read(&offset, sizeof(offset));   \
+  ptr = (typeof(ptr))(((u8*)base) + offset); \
+}
 
 void memory_write_savestate(void);
 void memory_read_savestate(void);

@@ -3204,7 +3204,7 @@ void memory_##type##_savestate(void)                           \
   state_mem_##type##_variable(sram_size);                      \
   state_mem_##type##_variable(flash_mode);                     \
   state_mem_##type##_variable(flash_command_position);         \
-  state_mem_##type##_variable(flash_bank_ptr);                 \
+  state_mem_##type##_pointer(flash_bank_ptr, gamepak_backup);  \
   state_mem_##type##_variable(flash_device_id);                \
   state_mem_##type##_variable(flash_manufacturer_id);          \
   state_mem_##type##_variable(flash_size);                     \
@@ -3231,9 +3231,9 @@ void memory_##type##_savestate(void)                           \
   state_mem_##type(palette_ram, 0x400);                        \
   state_mem_##type(io_registers, 0x8000);                      \
                                                                \
-  /* This is a hack, for now. */                               \
+  /* This should not happen anymore :P */                      \
   if((flash_bank_ptr < gamepak_backup) ||                      \
-   (flash_bank_ptr > (gamepak_backup + (1024 * 64))))          \
+  (flash_bank_ptr > (&gamepak_backup[sizeof(gamepak_backup)])))\
     flash_bank_ptr = gamepak_backup;                           \
 }
 
