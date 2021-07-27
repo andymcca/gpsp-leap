@@ -456,7 +456,7 @@ void update_gbc_sound(u32 cpu_ticks)
     if(gs->active_flag)
     {
       sound_status |= 0x01;
-      sample_data = gs->sample_data;
+      sample_data = &square_pattern_duty[gs->sample_table_idx][0];
       envelope_volume = gs->envelope_volume;
       gbc_sound_render_channel(samples, 8, envelope, sweep);
     }
@@ -465,7 +465,7 @@ void update_gbc_sound(u32 cpu_ticks)
     if(gs->active_flag)
     {
       sound_status |= 0x02;
-      sample_data = gs->sample_data;
+      sample_data = &square_pattern_duty[gs->sample_table_idx][0];
       envelope_volume = gs->envelope_volume;
       gbc_sound_render_channel(samples, 8, envelope, nosweep);
     }
@@ -594,7 +594,7 @@ void reset_sound(void)
   for(i = 0; i < 4; i++, gs++)
   {
     gs->status = GBC_SOUND_INACTIVE;
-    gs->sample_data = square_pattern_duty[2];
+    gs->sample_table_idx = 2;
     gs->active_flag = 0;
   }
 }

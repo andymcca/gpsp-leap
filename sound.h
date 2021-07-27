@@ -92,7 +92,7 @@ typedef struct
    gbc_sound_status_type status;
    u32 active_flag;
    u32 master_enable;
-   const s8* sample_data;
+   u32 sample_table_idx;
 } gbc_sound_struct;
 
 const extern s8 square_pattern_duty[4][8];

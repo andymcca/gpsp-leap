@@ -25,8 +25,7 @@
   u32 initial_volume = (value >> 12) & 0x0F;                                  \
   u32 envelope_ticks = ((value >> 8) & 0x07) * 4;                             \
   gbc_sound_channel[channel].length_ticks = 64 - (value & 0x3F);              \
-  gbc_sound_channel[channel].sample_data =                                    \
-   square_pattern_duty[(value >> 6) & 0x03];                                  \
+  gbc_sound_channel[channel].sample_table_idx = ((value >> 6) & 0x03);        \
   gbc_sound_channel[channel].envelope_direction = (value >> 11) & 0x01;       \
   gbc_sound_channel[channel].envelope_initial_volume = initial_volume;        \
   gbc_sound_channel[channel].envelope_volume = initial_volume;                \
@@ -3183,7 +3182,7 @@ void gba_load_state(const void* src)
 
    // Oops, these contain raw pointers
    for(i = 0; i < 4; i++)
-      gbc_sound_channel[i].sample_data = square_pattern_duty[2];
+      gbc_sound_channel[i].sample_table_idx = 2;
 
    instruction_count = 0;
 
