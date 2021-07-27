@@ -619,7 +619,7 @@ u32 function_cc read_eeprom(void)
     case 0x06:                                                                \
       /* VRAM */                                                              \
       address &= 0x1FFFF;                                                     \
-      if(address > 0x18000)                                                   \
+      if(address >= 0x18000)                                                  \
         address -= 0x8000;                                                    \
                                                                               \
       value = readaddress##type(vram, address);                               \
@@ -2456,8 +2456,11 @@ dma_region_type dma_region_map[16] =
 #define dma_read_iwram(type, transfer_size)                                   \
   read_value = readaddress##transfer_size(iwram + 0x8000, type##_ptr & 0x7FFF)\
 
-#define dma_read_vram(type, transfer_size)                                    \
-  read_value = readaddress##transfer_size(vram, type##_ptr & 0x1FFFF)         \
+#define dma_read_vram(type, transfer_size) {                                  \
+  u32 rdaddr = type##_ptr & 0x1FFFF;                                          \
+  if (rdaddr >= 0x18000) rdaddr -= 0x8000;                                    \
+  read_value = readaddress##transfer_size(vram, rdaddr);                      \
+}
 
 #define dma_read_io(type, transfer_size)                                      \
   read_value = readaddress##transfer_size(io_registers, type##_ptr & 0x7FFF)  \
@@ -2489,9 +2492,11 @@ dma_region_type dma_region_map[16] =
                                           eswap##transfer_size(read_value);   \
   smc_trigger |= address##transfer_size(iwram, type##_ptr & 0x7FFF)           \
 
-#define dma_write_vram(type, transfer_size)                                   \
-  address##transfer_size(vram, type##_ptr & 0x1FFFF) =                        \
-                                 eswap##transfer_size(read_value)             \
+#define dma_write_vram(type, transfer_size) {                                 \
+  u32 wraddr = type##_ptr & 0x1FFFF;                                          \
+  if (wraddr >= 0x18000) wraddr -= 0x8000;                                    \
+  address##transfer_size(vram, wraddr) = eswap##transfer_size(read_value);    \
+}
 
 #define dma_write_io(type, transfer_size)                                     \
   write_io_register##transfer_size(type##_ptr & 0x3FF, read_value)            \
