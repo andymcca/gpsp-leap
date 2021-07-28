@@ -609,6 +609,15 @@ defsymbl(execute_arm_translate_internal)
   jr $2                           # jump to return
   nop
 
+.bss
+.align 6
+
+defsymbl(iwram)
+  .space 0x10000
+defsymbl(vram)
+  .space 0x18000
+defsymbl(ewram)
+  .space 0x80000
 
 .data
 .align 6

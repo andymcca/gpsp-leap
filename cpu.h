@@ -161,7 +161,7 @@ void init_emitter(void);
 extern u32 reg_mode[7][7];
 extern u32 spsr[6];
 
-extern u32 cpu_modes[32];
+extern const u32 cpu_modes[32];
 extern const u32 psr_masks[16];
 
 extern u32 memory_region_access_read_u8[16];

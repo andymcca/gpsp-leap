@@ -850,8 +850,14 @@ execute_load_builder(u16, 1, read_memory16)
 execute_load_builder(s16, 1, read_memory16s)
 execute_load_builder(u32, 2, read_memory32)
 
-.data
+.bss
 
+defsymbl(iwram)
+  .space 0x10000
+defsymbl(vram)
+  .space 0x18000
+defsymbl(ewram)
+  .space 0x80000
 defsymbl(memory_map_read)
   .space 0x8000
 defsymbl(palette_ram)
@@ -866,7 +872,7 @@ defsymbl(reg_mode)
 defsymbl(oam_ram)
   .space 0x400
 defsymbl(reg)
-  .space 0x100, 0
+  .space 0x100
 
 @ Vita and 3DS (and of course mmap) map their own cache sections through some
 @ platform-speficic mechanisms.

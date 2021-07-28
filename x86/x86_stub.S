@@ -28,10 +28,6 @@ _##symbol:
 
 #ifndef _WIN32
 # External symbols (data + functions)
-#define _iwram iwram
-#define _ewram ewram
-#define _vram vram
-
 #define _update_gba update_gba
 #define _block_lookup_address_arm block_lookup_address_arm
 #define _block_lookup_address_thumb block_lookup_address_thumb
@@ -45,10 +41,6 @@ _##symbol:
 #define _write_rtc write_rtc
 #define _execute_store_cpsr_body execute_store_cpsr_body
 #endif
-
-.global _iwram
-.global _ewram
-.global _vram
 
 .extern _spsr
 
@@ -68,6 +60,16 @@ _##symbol:
 .equ CHANGED_PC_STATUS, (31 * 4)
 .equ COMPLETED_FRAME,   (32 * 4)
 .equ OAM_UPDATED,       (33 * 4)
+
+.equ ESTORE_U32_TBL,   -(16 * 4)
+.equ ESTORE_U16_TBL,   -(32 * 4)
+.equ ESTORE_U8_TBL,    -(48 * 4)
+.equ PALETTE_RAM_OFF,     0x0100
+.equ PALETTE_RAM_CNV_OFF, 0x0500
+.equ OAM_RAM_OFF,         0x0900
+.equ IWRAM_OFF,           0x0D00
+.equ VRAM_OFF,           0x10D00
+.equ EWRAM_OFF,          0x28D00
 
 # destroys ecx and edx
 
@@ -199,16 +201,16 @@ ext_store_eeprom:
 # 8bit ext memory routines
 
 ext_store_iwram8:
-  and $0x7FFF, %eax                 # wrap around address
-  mov %dl, (_iwram+0x8000)(%eax)    # perform store
-  cmpb $0, _iwram(%eax)             # Check SMC mirror
+  and $0x7FFF, %eax                  # wrap around address
+  mov %dl, (IWRAM_OFF+0x8000)(%ebx, %eax)  # perform store
+  cmpb $0, IWRAM_OFF(%ebx, %eax)     # Check SMC mirror
   jne smc_write
   ret
 
 ext_store_ewram8:
   and $0x3FFFF, %eax                # wrap around address
-  mov %dl, _ewram(%eax)             # perform store
-  cmpb $0, (_ewram+0x40000)(%eax)   # Check SMC mirror
+  mov %dl, EWRAM_OFF(%ebx, %eax)    # perform store
+  cmpb $0, (EWRAM_OFF+0x40000)(%ebx, %eax)   # Check SMC mirror
   jne smc_write
   ret
 
@@ -230,37 +232,20 @@ ext_store_vram8:
   sub $0x8000, %eax           # if so wrap down
 
 ext_store_vram8b:
-  mov %dx, _vram(%eax)        # perform 16bit store
+  mov %dx, VRAM_OFF(%ebx, %eax)  # perform 16bit store
   ret
 
 ext_store_oam8:
   movl $1, OAM_UPDATED(%ebx)  # flag OAM update
   and $0x3FE, %eax            # wrap around address and align to 16bits
   mov %dl, %dh                # copy lower 8bits of value into full 16bits
-  mov %dx, _oam_ram(%eax)     # perform 16bit store
+  mov %dx, OAM_RAM_OFF(%ebx, %eax)  # perform 16bit store
   ret
 
 ext_store_backup:
   and $0xFF, %edx             # make value 8bit
   and $0xFFFF, %eax           # mask address
   jmp _write_backup           # perform backup write
-
-ext_store_u8_jtable:
-  .long ext_store_ignore      # 0x00 BIOS, ignore
-  .long ext_store_ignore      # 0x01 invalid, ignore
-  .long ext_store_ewram8      # 0x02 EWRAM
-  .long ext_store_iwram8      # 0x03 IWRAM
-  .long ext_store_io8         # 0x04 I/O registers
-  .long ext_store_palette8    # 0x05 Palette RAM
-  .long ext_store_vram8       # 0x06 VRAM
-  .long ext_store_oam8        # 0x07 OAM RAM
-  .long ext_store_ignore      # 0x08 gamepak (no RTC accepted in 8bit)
-  .long ext_store_ignore      # 0x09 gamepak, ignore
-  .long ext_store_ignore      # 0x0A gamepak, ignore
-  .long ext_store_ignore      # 0x0B gamepak, ignore
-  .long ext_store_ignore      # 0x0C gamepak, ignore
-  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
-  .long ext_store_backup      # 0x0E Flash ROM/SRAM
 
 # eax: address to write to
 # edx: value to write
@@ -273,22 +258,23 @@ defsymbl(execute_store_u8)
   cmp $15, %ecx
   ja ext_store_ignore
   # ecx = ext_store_u8_jtable[address >> 24]
-  mov ext_store_u8_jtable(, %ecx, 4), %ecx
+  mov ESTORE_U8_TBL(%ebx, %ecx, 4), %ecx
   jmp *%ecx                   # jump to table index
 
 # 16bit ext memory routines
 
 ext_store_iwram16:
   and $0x7FFF, %eax                 # wrap around address
-  mov %dx, (_iwram+0x8000)(%eax)    # perform store
-  cmpw $0, _iwram(%eax)             # Check SMC mirror
+  mov %dx, (IWRAM_OFF+0x8000)(%ebx, %eax)  # perform store
+  cmpw $0, IWRAM_OFF(%ebx, %eax)     # Check SMC mirror
+
   jne smc_write
   ret
 
 ext_store_ewram16:
   and $0x3FFFF, %eax                # wrap around address
-  mov %dx, _ewram(%eax)             # perform store
-  cmpw $0, (_ewram+0x40000)(%eax)   # Check SMC mirror
+  mov %dx, EWRAM_OFF(%ebx, %eax)    # perform store
+  cmpw $0, (EWRAM_OFF+0x40000)(%ebx, %eax)  # Check SMC mirror
   jne smc_write
   ret
 
@@ -302,7 +288,7 @@ ext_store_palette16:
   and $0x3FF, %eax            # wrap around address
 
 ext_store_palette16b:         # entry point for 8bit write
-  mov %dx, _palette_ram(%eax) # write out palette value
+  mov %dx, PALETTE_RAM_OFF(%ebx, %eax) # write out palette value
   mov %edx, %ecx              # cx = dx
   shl $11, %ecx               # cx <<= 11 (red component is in high bits)
   mov %dh, %cl                # bottom bits of cx = top bits of dx
@@ -311,7 +297,7 @@ ext_store_palette16b:         # entry point for 8bit write
   shl $1, %dx                 # make green component 6bits
   or %edx, %ecx               # combine green component into ecx
   # write out the freshly converted palette value
-  mov %cx, _palette_ram_converted(%eax)
+  mov %cx, PALETTE_RAM_CNV_OFF(%ebx, %eax)
   ret                         # done
 
 ext_store_vram16:
@@ -321,36 +307,19 @@ ext_store_vram16:
   sub $0x8000, %eax           # if so wrap down
 
 ext_store_vram16b:
-  mov %dx, _vram(%eax)        # perform 16bit store
+  mov %dx, VRAM_OFF(%ebx, %eax)  # perform 16bit store
   ret
 
 ext_store_oam16:
   movl $1, OAM_UPDATED(%ebx)  # flag OAM update
   and $0x3FF, %eax            # wrap around address
-  mov %dx, _oam_ram(%eax)     # perform 16bit store
+  mov %dx, OAM_RAM_OFF(%ebx, %eax)  # perform 16bit store
   ret
 
 ext_store_rtc:
   and $0xFFFF, %edx           # make value 16bit
   and $0xFF, %eax             # mask address
   jmp _write_rtc              # write out RTC register
-
-ext_store_u16_jtable:
-  .long ext_store_ignore      # 0x00 BIOS, ignore
-  .long ext_store_ignore      # 0x01 invalid, ignore
-  .long ext_store_ewram16     # 0x02 EWRAM
-  .long ext_store_iwram16     # 0x03 IWRAM
-  .long ext_store_io16        # 0x04 I/O registers
-  .long ext_store_palette16   # 0x05 Palette RAM
-  .long ext_store_vram16      # 0x06 VRAM
-  .long ext_store_oam16       # 0x07 OAM RAM
-  .long ext_store_rtc         # 0x08 gamepak or RTC
-  .long ext_store_ignore      # 0x09 gamepak, ignore
-  .long ext_store_ignore      # 0x0A gamepak, ignore
-  .long ext_store_ignore      # 0x0B gamepak, ignore
-  .long ext_store_ignore      # 0x0C gamepak, ignore
-  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
-  .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
 
 defsymbl(execute_store_u16)
   mov %ecx, REG_PC(%ebx)      # write out the PC
@@ -360,23 +329,23 @@ defsymbl(execute_store_u16)
   cmp $15, %ecx
   ja ext_store_ignore
   # ecx = ext_store_u16_jtable[address >> 24]
-  mov ext_store_u16_jtable(, %ecx, 4), %ecx
+  mov ESTORE_U16_TBL(%ebx, %ecx, 4), %ecx
   jmp *%ecx                   # jump to table index
 
 # 32bit ext memory routines
 
 ext_store_iwram32:
   and $0x7FFF, %eax                 # wrap around address
-  mov %edx, (_iwram+0x8000)(%eax)   # perform store
-  cmpl $0, _iwram(%eax)             # Check SMC mirror
+  mov %edx, (IWRAM_OFF+0x8000)(%ebx, %eax)  # perform store
+  cmpl $0, IWRAM_OFF(%ebx, %eax)     # Check SMC mirror
 
   jne smc_write
   ret
 
 ext_store_ewram32:
   and $0x3FFFF, %eax                # wrap around address
-  mov %edx, _ewram(%eax)            # perform store
-  cmpl $0, (_ewram+0x40000)(%eax)   # Check SMC mirror
+  mov %edx, EWRAM_OFF(%ebx, %eax)   # perform store
+  cmpl $0, (EWRAM_OFF+0x40000)(%ebx, %eax)  # Check SMC mirror
   jne smc_write
   ret
 
@@ -399,32 +368,14 @@ ext_store_vram32:
   sub $0x8000, %eax           # if so wrap down
 
 ext_store_vram32b:
-  mov %edx, _vram(%eax)       # perform 32bit store
+  mov %edx, VRAM_OFF(%ebx, %eax)  # perform 32bit store
   ret
 
 ext_store_oam32:
   movl $1, OAM_UPDATED(%ebx)  # flag OAM update
   and $0x3FF, %eax            # wrap around address
-  mov %edx, _oam_ram(%eax)    # perform 32bit store
+  mov %edx, OAM_RAM_OFF(%ebx, %eax)  # perform 32bit store
   ret
-
-ext_store_u32_jtable:
-  .long ext_store_ignore      # 0x00 BIOS, ignore
-  .long ext_store_ignore      # 0x01 invalid, ignore
-  .long ext_store_ewram32     # 0x02 EWRAM
-  .long ext_store_iwram32     # 0x03 IWRAM
-  .long ext_store_io32        # 0x04 I/O registers
-  .long ext_store_palette32   # 0x05 Palette RAM
-  .long ext_store_vram32      # 0x06 VRAM
-  .long ext_store_oam32       # 0x07 OAM RAM
-  .long ext_store_ignore      # 0x08 gamepak, ignore (no RTC in 32bit)
-  .long ext_store_ignore      # 0x09 gamepak, ignore
-  .long ext_store_ignore      # 0x0A gamepak, ignore
-  .long ext_store_ignore      # 0x0B gamepak, ignore
-  .long ext_store_ignore      # 0x0C gamepak, ignore
-  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
-  .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
-
 
 defsymbl(execute_store_u32)
   mov %ecx, REG_PC(%ebx)      # write out the PC
@@ -434,7 +385,7 @@ defsymbl(execute_store_u32)
   cmp $15, %ecx
   ja ext_store_ignore
   # ecx = ext_store_u32_jtable[address >> 24]
-  mov ext_store_u32_jtable(, %ecx, 4), %ecx
+  movl ESTORE_U32_TBL(%ebx, %ecx, 4), %ecx
   jmp *%ecx
 
 # %eax = new_cpsr
@@ -485,16 +436,16 @@ lookup_pc_arm:
 
 # eax: cycle counter
 
-defsymbl(execute_arm_translate)
+defsymbl(execute_arm_translate_internal)
   # Save main context, since we need to return gracefully
   pushl %ebx
   pushl %esi
   pushl %edi
   pushl %ebp
 
-  movl $_reg, %ebx            # load base register
+  movl %edx, %ebx             # load base register (arg1)
   extract_flags               # load flag variables
-  movl %eax, %edi             # load edi cycle counter
+  movl %eax, %edi             # load edi cycle counter (arg0)
 
   movl REG_PC(%ebx), %eax     # load PC
 
@@ -524,21 +475,87 @@ return_to_main:
   ret
 
 .data
+
+defsymbl(x86_table_data)
+ext_store_u8_jtable:
+  .long ext_store_ignore      # 0x00 BIOS, ignore
+  .long ext_store_ignore      # 0x01 invalid, ignore
+  .long ext_store_ewram8      # 0x02 EWRAM
+  .long ext_store_iwram8      # 0x03 IWRAM
+  .long ext_store_io8         # 0x04 I/O registers
+  .long ext_store_palette8    # 0x05 Palette RAM
+  .long ext_store_vram8       # 0x06 VRAM
+  .long ext_store_oam8        # 0x07 OAM RAM
+  .long ext_store_ignore      # 0x08 gamepak (no RTC accepted in 8bit)
+  .long ext_store_ignore      # 0x09 gamepak, ignore
+  .long ext_store_ignore      # 0x0A gamepak, ignore
+  .long ext_store_ignore      # 0x0B gamepak, ignore
+  .long ext_store_ignore      # 0x0C gamepak, ignore
+  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
+  .long ext_store_backup      # 0x0E Flash ROM/SRAM
+  .long ext_store_ignore      # 0x0F ignore
+
+ext_store_u16_jtable:
+  .long ext_store_ignore      # 0x00 BIOS, ignore
+  .long ext_store_ignore      # 0x01 invalid, ignore
+  .long ext_store_ewram16     # 0x02 EWRAM
+  .long ext_store_iwram16     # 0x03 IWRAM
+  .long ext_store_io16        # 0x04 I/O registers
+  .long ext_store_palette16   # 0x05 Palette RAM
+  .long ext_store_vram16      # 0x06 VRAM
+  .long ext_store_oam16       # 0x07 OAM RAM
+  .long ext_store_rtc         # 0x08 gamepak or RTC
+  .long ext_store_ignore      # 0x09 gamepak, ignore
+  .long ext_store_ignore      # 0x0A gamepak, ignore
+  .long ext_store_ignore      # 0x0B gamepak, ignore
+  .long ext_store_ignore      # 0x0C gamepak, ignore
+  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
+  .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
+  .long ext_store_ignore      # 0x0F ignore
+
+ext_store_u32_jtable:
+  .long ext_store_ignore      # 0x00 BIOS, ignore
+  .long ext_store_ignore      # 0x01 invalid, ignore
+  .long ext_store_ewram32     # 0x02 EWRAM
+  .long ext_store_iwram32     # 0x03 IWRAM
+  .long ext_store_io32        # 0x04 I/O registers
+  .long ext_store_palette32   # 0x05 Palette RAM
+  .long ext_store_vram32      # 0x06 VRAM
+  .long ext_store_oam32       # 0x07 OAM RAM
+  .long ext_store_ignore      # 0x08 gamepak, ignore (no RTC in 32bit)
+  .long ext_store_ignore      # 0x09 gamepak, ignore
+  .long ext_store_ignore      # 0x0A gamepak, ignore
+  .long ext_store_ignore      # 0x0B gamepak, ignore
+  .long ext_store_ignore      # 0x0C gamepak, ignore
+  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
+  .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
+  .long ext_store_ignore      # 0x0F ignore
+
+
+.bss
 .align 64
 
+defsymbl(x86_table_info)
+  .space 3*4*16
 defsymbl(reg)
-  .space 0x100, 0
+  .space 0x100
 defsymbl(palette_ram)
   .space 0x400
 defsymbl(palette_ram_converted)
   .space 0x400
 defsymbl(oam_ram)
   .space 0x400
+defsymbl(iwram)
+  .space 0x10000
+defsymbl(vram)
+  .space 0x18000
+defsymbl(ewram)
+  .space 0x80000
+
 defsymbl(spsr)
   .space 24
 defsymbl(reg_mode)
   .space 196
-
 defsymbl(memory_map_read)
   .space 0x8000
 

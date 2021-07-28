@@ -2326,6 +2326,17 @@ void function_cc swi_hle_div(void)
   generate_update_pc(pc);                                                     \
   generate_indirect_branch_no_cycle_update(type)                              \
 
-void init_emitter(void) {}
+extern u32 x86_table_data[3][16];
+extern u32 x86_table_info[3][16];
+
+void init_emitter(void) {
+  memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));
+}
+
+u32 function_cc execute_arm_translate_internal(u32 cycles, void *regptr);
+
+u32 function_cc execute_arm_translate(u32 cycles) {
+  return execute_arm_translate_internal(cycles, &reg[0]);
+}
 
 #endif

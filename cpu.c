@@ -1520,7 +1520,7 @@ const u32 psr_masks[16] =
 // reg_mode[new_mode][6]. When swapping to/from FIQ retire/load reg[8]
 // through reg[14] to/from reg_mode[MODE_FIQ][0] through reg_mode[MODE_FIQ][6].
 
-u32 cpu_modes[32] =
+const u32 cpu_modes[32] =
 {
   MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID,
   MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID,
@@ -1530,17 +1530,6 @@ u32 cpu_modes[32] =
   MODE_INVALID, MODE_INVALID, MODE_UNDEFINED, MODE_INVALID, MODE_INVALID,
   MODE_USER
 };
-
-u32 cpu_modes_cpsr[7] = { 0x10, 0x11, 0x12, 0x13, 0x17, 0x1B, 0x1F };
-
-// When switching modes set spsr[new_mode] to cpsr. Modifying PC as the
-// target of a data proc instruction will set cpsr to spsr[cpu_mode].
-
-#ifndef HAVE_DYNAREC
-u32 reg[64];
-u32 spsr[6];
-u32 reg_mode[7][7];
-#endif
 
 // ARM/Thumb mode is stored in the flags directly, this is simpler than
 // shadowing it since it has a constant 1bit represenation.
@@ -1611,10 +1600,20 @@ void raise_interrupt(irq_type irq_raised)
 }
 
 #ifndef HAVE_DYNAREC
+
+// When switching modes set spsr[new_mode] to cpsr. Modifying PC as the
+// target of a data proc instruction will set cpsr to spsr[cpu_mode].
+u32 reg[64];
+u32 spsr[6];
+u32 reg_mode[7][7];
+
 u8 *memory_map_read [8 * 1024];
 u16 oam_ram[512];
 u16 palette_ram[512];
 u16 palette_ram_converted[512];
+u8 ewram[1024 * 256 * 2];
+u8 iwram[1024 * 32 * 2];
+u8 vram[1024 * 96];
 #endif
 
 void execute_arm(u32 cycles)
@@ -3752,10 +3751,10 @@ thumb_loop:
 
 void init_cpu(void)
 {
-  u32 i;
-
-  for(i = 0; i < 16; i++)
-    reg[i] = 0;
+  // Initialize CPU registers
+  memset(reg, 0, sizeof(reg));
+  memset(reg_mode, 0, sizeof(reg_mode));
+  memset(spsr, 0, sizeof(spsr));
 
   reg[CPU_HALT_STATE] = CPU_ACTIVE;
   reg[CHANGED_PC_STATUS] = 0;
