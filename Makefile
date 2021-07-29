@@ -426,6 +426,18 @@ else ifeq ($(platform), gcw0)
 	HAVE_DYNAREC := 1
 	CPU_ARCH := mips
 
+# RETROFW
+else ifeq ($(platform), retrofw)
+	TARGET := $(TARGET_NAME)_libretro.so
+	CC = /opt/retrofw-toolchain/usr/bin/mipsel-linux-gcc
+	CXX = /opt/retrofw-toolchain/usr/bin/mipsel-linux-g++
+	AR = /opt/retrofw-toolchain/usr/bin/mipsel-linux-ar
+	SHARED := -shared -nostdlib -Wl,--version-script=link.T
+	fpic := -fPIC -DPIC
+	CFLAGS += -fomit-frame-pointer -ffast-math -march=mips32  -mhard-float
+	HAVE_DYNAREC := 1
+	CPU_ARCH := mips
+
 # RS90
 else ifeq ($(platform), rs90)
 	TARGET := $(TARGET_NAME)_libretro.so
