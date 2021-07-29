@@ -20,7 +20,7 @@
 #include "common.h"
 
 /* Sound */
-#define gbc_sound_tone_control_low(channel, address)                          \
+#define gbc_sound_tone_control_low(channel, regn)                             \
 {                                                                             \
   u32 initial_volume = (value >> 12) & 0x0F;                                  \
   u32 envelope_ticks = ((value >> 8) & 0x07) * 4;                             \
@@ -34,10 +34,10 @@
   gbc_sound_channel[channel].envelope_status = (envelope_ticks != 0);         \
   gbc_sound_channel[channel].envelope_volume = initial_volume;                \
   gbc_sound_update = 1;                                                       \
-  address16(io_registers, address) = eswap16(value);                          \
+  write_ioreg(regn, value);                                                   \
 }                                                                             \
 
-#define gbc_sound_tone_control_high(channel, address)                         \
+#define gbc_sound_tone_control_high(channel, regn)                            \
 {                                                                             \
   u32 rate = value & 0x7FF;                                                   \
   gbc_sound_channel[channel].rate = rate;                                     \
@@ -55,7 +55,7 @@
   }                                                                           \
                                                                               \
   gbc_sound_update = 1;                                                       \
-  address16(io_registers, address) = eswap16(value);                          \
+  write_ioreg(regn, value);                                                   \
 }                                                                             \
 
 #define gbc_sound_tone_control_sweep()                                        \
@@ -196,8 +196,8 @@ static void sound_control_x(u32 value)
       sound_on = 0;
    }
 
-   address16(io_registers, 0x84) = eswap16(
-      (readaddress16(io_registers, 0x84) & 0x000F) | (value & 0xFFF0));
+   value = (value & 0xFFF0) | (read_ioreg(REG_SOUNDCNT_X) & 0x000F);
+   write_ioreg(REG_SOUNDCNT_X, value);
 }
 
 #define sound_update_frequency_step(timer_number)                             \
@@ -308,7 +308,7 @@ u32 gamepak_waitstate_sequential[2][3][3] =
   }
 };
 
-u16 io_registers[1024 * 16];
+u16 io_registers[512];
 u8 bios_rom[1024 * 16];
 u32 bios_read_protect;
 
@@ -901,45 +901,45 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
     // Sound 1 control duty/length/envelope
     case 0x62:
       access_register8_low(0x62);
-      gbc_sound_tone_control_low(0, 0x62);
+      gbc_sound_tone_control_low(0, REG_SOUND1CNT_H);
       break;
 
     case 0x63:
       access_register8_high(0x62);
-      gbc_sound_tone_control_low(0, 0x62);
+      gbc_sound_tone_control_low(0, REG_SOUND1CNT_H);
       break;
 
     // Sound 1 control frequency
     case 0x64:
       access_register8_low(0x64);
-      gbc_sound_tone_control_high(0, 0x64);
+      gbc_sound_tone_control_high(0, REG_SOUND1CNT_X);
       break;
 
     case 0x65:
       access_register8_high(0x64);
-      gbc_sound_tone_control_high(0, 0x64);
+      gbc_sound_tone_control_high(0, REG_SOUND1CNT_X);
       break;
 
     // Sound 2 control duty/length/envelope
     case 0x68:
       access_register8_low(0x68);
-      gbc_sound_tone_control_low(1, 0x68);
+      gbc_sound_tone_control_low(1, REG_SOUND2CNT_L);
       break;
 
     case 0x69:
       access_register8_high(0x68);
-      gbc_sound_tone_control_low(1, 0x68);
+      gbc_sound_tone_control_low(1, REG_SOUND2CNT_L);
       break;
 
     // Sound 2 control frequency
     case 0x6C:
       access_register8_low(0x6C);
-      gbc_sound_tone_control_high(1, 0x6C);
+      gbc_sound_tone_control_high(1, REG_SOUND2CNT_H);
       break;
 
     case 0x6D:
       access_register8_high(0x6C);
-      gbc_sound_tone_control_high(1, 0x6C);
+      gbc_sound_tone_control_high(1, REG_SOUND2CNT_H);
       break;
 
     // Sound 3 control wave
@@ -978,12 +978,12 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
     // Sound 4 control length/envelope
     case 0x78:
       access_register8_low(0x78);
-      gbc_sound_tone_control_low(3, 0x78);
+      gbc_sound_tone_control_low(3, REG_SOUND4CNT_L);
       break;
 
     case 0x79:
       access_register8_high(0x78);
-      gbc_sound_tone_control_low(3, 0x78);
+      gbc_sound_tone_control_low(3, REG_SOUND4CNT_L);
       break;
 
     // Sound 4 control frequency
@@ -1025,22 +1025,7 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
       break;
 
     // Sound wave RAM
-    case 0x90:
-    case 0x91:
-    case 0x92:
-    case 0x93:
-    case 0x94:
-    case 0x95:
-    case 0x96:
-    case 0x97:
-    case 0x98:
-    case 0x99:
-    case 0x9A:
-    case 0x9B:
-    case 0x9C:
-    case 0x9D:
-    case 0x9E:
-    case 0x9F:
+    case 0x90 ... 0x9F:
       gbc_sound_wave_update = 1;
       address8(io_registers, address) = value;
       break;
@@ -1245,22 +1230,22 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
 
     // Sound 1 control duty/length/envelope
     case 0x62:
-      gbc_sound_tone_control_low(0, 0x62);
+      gbc_sound_tone_control_low(0, REG_SOUND1CNT_H);
       break;
 
     // Sound 1 control frequency
     case 0x64:
-      gbc_sound_tone_control_high(0, 0x64);
+      gbc_sound_tone_control_high(0, REG_SOUND1CNT_X);
       break;
 
     // Sound 2 control duty/length/envelope
     case 0x68:
-      gbc_sound_tone_control_low(1, 0x68);
+      gbc_sound_tone_control_low(1, REG_SOUND2CNT_L);
       break;
 
     // Sound 2 control frequency
     case 0x6C:
-      gbc_sound_tone_control_high(1, 0x6C);
+      gbc_sound_tone_control_high(1, REG_SOUND2CNT_H);
       break;
 
     // Sound 3 control wave
@@ -1280,7 +1265,7 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
 
     // Sound 4 control length/envelope
     case 0x78:
-      gbc_sound_tone_control_low(3, 0x78);
+      gbc_sound_tone_control_low(3, REG_SOUND4CNT_L);
       break;
 
     // Sound 4 control frequency
@@ -1304,21 +1289,7 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
       break;
 
     // Sound wave RAM
-    case 0x90:
-    case 0x91:
-    case 0x92:
-    case 0x93:
-    case 0x94:
-    case 0x95:
-    case 0x96:
-    case 0x97:
-    case 0x98:
-    case 0x99:
-    case 0x9A:
-    case 0x9B:
-    case 0x9C:
-    case 0x9D:
-    case 0x9E:
+    case 0x90 ... 0x9E:
       gbc_sound_wave_update = 1;
       address16(io_registers, address) = eswap16(value);
       break;
@@ -2460,7 +2431,7 @@ dma_region_type dma_region_map[16] =
 }
 
 #define dma_read_io(type, transfer_size)                                      \
-  read_value = readaddress##transfer_size(io_registers, type##_ptr & 0x7FFF)  \
+  read_value = readaddress##transfer_size(io_registers, type##_ptr & 0x3FF)   \
 
 #define dma_read_oam_ram(type, transfer_size)                                 \
   read_value = readaddress##transfer_size(oam_ram, type##_ptr & 0x3FF)        \
@@ -3230,7 +3201,7 @@ void memory_##type##_savestate(void)                           \
   state_mem_##type(vram, 0x18000);                             \
   state_mem_##type(oam_ram, 0x400);                            \
   state_mem_##type(palette_ram, 0x400);                        \
-  state_mem_##type(io_registers, 0x8000);                      \
+  state_mem_##type(io_registers, 0x400);                       \
                                                                \
   /* This should not happen anymore :P */                      \
   if((flash_bank_ptr < gamepak_backup) ||                      \

@@ -122,11 +122,16 @@ typedef enum
   REG_BLDCNT = 0x28,
   REG_BLDALPHA = 0x29,
   REG_BLDY = 0x2A,
+  // Sound control registers
   REG_SOUND1CNT_L = 0x30,
   REG_SOUND1CNT_H = 0x31,
+  REG_SOUND1CNT_X = 0x32,
+  REG_SOUND2CNT_L = 0x34,
+  REG_SOUND2CNT_H = 0x36,
   REG_SOUND3CNT_L = 0x38,
   REG_SOUND3CNT_H = 0x39,
   REG_SOUND3CNT_X = 0x3A,
+  REG_SOUND4CNT_L = 0x3C,
   REG_SOUND4CNT_H = 0x3E,
   REG_SOUNDCNT_L = 0x40,
   REG_SOUNDCNT_H = 0x41,
@@ -215,7 +220,7 @@ extern u32 bios_read_protect;
 extern u16 palette_ram[512];
 extern u16 oam_ram[512];
 extern u16 palette_ram_converted[512];
-extern u16 io_registers[1024 * 16];
+extern u16 io_registers[512];
 extern u8 vram[1024 * 96];
 extern u8 bios_rom[1024 * 16];
 // Double buffer used for SMC detection
