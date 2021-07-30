@@ -66,6 +66,16 @@ _##symbol:
 
 #define MODE_SUPERVISOR   3
 
+@ Memory offsets from reg_base to the different buffers
+#define IWRAM_OFF      -0xA8000
+#define VRAM_OFF       -0x98000
+#define EWRAM_OFF      -0x80000
+#define SPSR_RAM_OFF      0x100
+#define REGMODE_RAM_OFF   0x118
+#define OAM_RAM_OFF       0x200
+#define PAL_RAM_OFF       0x600
+#define STORE_TBL_OFF     0xA00
+#define RDMAP_OFF         0xC40
 
 #define extract_u16(rd, rs) \
   uxth rd, rs
@@ -333,7 +343,7 @@ defsymbl(execute_store_cpsr)
 @ r1: bitmask of which bits in spsr to update
 
 defsymbl(execute_store_spsr)
-  ldr r1, =spsr                           @ r1 = spsr
+  add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = CPU_MODE
   str r0, [r1, r2, lsl #2]                @ spsr[CPU_MODE] = new_spsr
   bx lr
@@ -345,7 +355,7 @@ defsymbl(execute_store_spsr)
 @ r0: spsr
 
 defsymbl(execute_read_spsr)
-  ldr r0, =spsr                           @ r0 = spsr
+  add r0, reg_base, #SPSR_RAM_OFF         @ r0 = spsr
   ldr r1, [reg_base, #CPU_MODE]           @ r1 = CPU_MODE
   ldr r0, [r0, r1, lsl #2]                @ r0 = spsr[CPU_MODE]
   bx lr                                   @ return
@@ -358,7 +368,7 @@ defsymbl(execute_read_spsr)
 
 defsymbl(execute_spsr_restore)
   save_flags()
-  ldr r1, =spsr                           @ r1 = spsr
+  add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = cpu_mode
   ldr r1, [r1, r2, lsl #2]                @ r1 = spsr[cpu_mode] (new cpsr)
   str r1, [reg_base, #REG_CPSR]           @ update cpsr
@@ -393,12 +403,12 @@ defsymbl(execute_spsr_restore)
                                                                              ;\
 defsymbl(execute_swi_##mode)                                                 ;\
   save_flags()                                                               ;\
-  ldr r1, =reg_mode                       /* r1 = reg_mode                 */;\
+  add r1, reg_base, #REGMODE_RAM_OFF      /* r1 = reg_mode                 */;\
   /* reg_mode[MODE_SUPERVISOR][6] = pc                                     */;\
   ldr r0, [lr]                            /* load PC                       */;\
   str r0, [r1, #((MODE_SUPERVISOR * (7 * 4)) + (6 * 4))]                     ;\
   collapse_flags_no_update(r0)            /* r0 = cpsr                     */;\
-  ldr r1, =spsr                           /* r1 = spsr                     */;\
+  add r1, reg_base, #SPSR_RAM_OFF         /* r1 = spsr                     */;\
   str r0, [r1, #(MODE_SUPERVISOR * 4)]    /* spsr[MODE_SUPERVISOR] = cpsr  */;\
   bic r0, r0, #0x3F                       /* clear mode flag in r0         */;\
   orr r0, r0, #0x13                       /* set to supervisor mode        */;\
@@ -524,13 +534,13 @@ return_to_main:
 @ The instruction at LR is not an inst but a u32 data that contains the PC
 @ Used for SMC. That's why return is essentially `pc = lr + 4`
 
-#define execute_store_builder(store_type, store_op, store_op16, load_op)     ;\
+#define execute_store_builder(store_type, str_op, str_op16, load_op, tnum)   ;\
                                                                              ;\
 defsymbl(execute_store_u##store_type)                                        ;\
   usat r2, #4, r0, asr #24                /* r2 contains [0-15]            */;\
-  ldr pc, [pc, r2, lsl #2]                /* load handler addr             */;\
+  add r2, r2, #((STORE_TBL_OFF + 16*4*tnum) >> 2)    /* add table offset   */;\
+  ldr pc, [reg_base, r2, lsl #2]          /* load handler addr             */;\
   nop                                                                        ;\
-  store_lookup_table(store_type)                                             ;\
                                                                              ;\
 ext_store_u##store_type:                                                     ;\
   save_flags()                                                               ;\
@@ -543,8 +553,8 @@ ext_store_u##store_type:                                                     ;\
 ext_store_iwram_u##store_type:                                               ;\
   save_flags()                                                               ;\
   mask_addr_##store_type(15)              /* Mask to mirror memory (+align)*/;\
-  ldr r2, =(iwram+0x8000)                 /* r2 = iwram base               */;\
-  store_op r1, [r0, r2]                   /* store data                    */;\
+  add r2, reg_base, #(IWRAM_OFF+0x8000)   /* r2 = iwram base               */;\
+  str_op r1, [r0, r2]                     /* store data                    */;\
   sub r2, r2, #0x8000                     /* r2 = iwram smc base           */;\
   load_op r1, [r0, r2]                    /* r1 = SMC sentinel             */;\
   cmp r1, #0                              /* Check value, should be zero   */;\
@@ -555,8 +565,8 @@ ext_store_iwram_u##store_type:                                               ;\
 ext_store_ewram_u##store_type:                                               ;\
   save_flags()                                                               ;\
   mask_addr_##store_type(18)              /* Mask to mirror memory (+align)*/;\
-  ldr r2, =(ewram)                        /* r2 = ewram base               */;\
-  store_op r1, [r0, r2]                   /* store data                    */;\
+  add r2, reg_base, #EWRAM_OFF            /* r2 = ewram base               */;\
+  str_op r1, [r0, r2]                     /* store data                    */;\
   add r2, r2, #0x40000                    /* r2 = ewram smc base           */;\
   load_op r1, [r0, r2]                    /* r1 = SMC sentinel             */;\
   cmp r1, #0                              /* Check value, should be zero   */;\
@@ -569,15 +579,15 @@ ext_store_vram_u##store_type:                                                ;\
   mask_addr_bus16_##store_type(17)        /* Mask to mirror memory (+align)*/;\
   cmp r0, #0x18000                        /* Check if exceeds 96KB         */;\
   subcs r0, r0, #0x8000                   /* Mirror to the last bank       */;\
-  ldr r2, =(vram)                         /* r2 = vram base                */;\
+  add r2, reg_base, #VRAM_OFF             /* r2 = vram base                */;\
   restore_flags()                                                            ;\
-  store_op16 r1, [r0, r2]                 /* store data                    */;\
+  str_op16 r1, [r0, r2]                   /* store data                    */;\
   add pc, lr, #4                          /* return                        */;\
                                                                              ;\
 ext_store_oam_ram_u##store_type:                                             ;\
   mask_addr_bus16_##store_type(10)        /* Mask to mirror memory (+align)*/;\
-  sub r2, reg_base, #0x400                /* r2 = oam ram base             */;\
-  store_op16 r1, [r0, r2]                 /* store data                    */;\
+  add r2, reg_base, #OAM_RAM_OFF          /* r2 = oam ram base             */;\
+  str_op16 r1, [r0, r2]                   /* store data                    */;\
   str r2, [reg_base, #OAM_UPDATED]        /* write non zero to signal      */;\
   add pc, lr, #4                          /* return                        */;\
                                                                              ;\
@@ -609,17 +619,17 @@ ext_store_ignore:
   .word ext_store_u##store_type           /* 0x0E: backup                  */;\
   .word ext_store_ignore                  /* 0x0F: ignore                  */;\
 
-execute_store_builder(8,  strb, strh, ldrb)
-execute_store_builder(16, strh, strh, ldrh)
-execute_store_builder(32, str,  str,  ldr)
+execute_store_builder(8,  strb, strh, ldrb, 0)
+execute_store_builder(16, strh, strh, ldrh, 1)
+execute_store_builder(32, str,  str,  ldr,  2)
 
 @ This is a store that is executed in a strm case (so no SMC checks in-between)
 
 defsymbl(execute_store_u32_safe)
   usat r2, #4, r0, asr #24
-  ldr pc, [pc, r2, lsl #2]
+  add r2, r2, #((STORE_TBL_OFF + 16*4*3) >> 2)
+  ldr pc, [reg_base, r2, lsl #2]
   nop
-  store_lookup_table(32_safe)
 
 ext_store_u32_safe:
   str lr, [reg_base, #REG_SAVE3]          @ Restore lr
@@ -630,20 +640,20 @@ ext_store_u32_safe:
 
 ext_store_iwram_u32_safe:
   mask_addr_8(15)                         @ Mask to mirror memory (no need to align!)
-  ldr r2, =(iwram+0x8000)                 @ r2 = iwram base
+  add r2, reg_base, #(IWRAM_OFF+0x8000)   @ r2 = iwram base
   str r1, [r0, r2]                        @ store data
   bx lr                                   @ Return
 
 ext_store_ewram_u32_safe:
   mask_addr_8(18)                         @ Mask to mirror memory (no need to align!)
-  ldr r2, =(ewram)                        @ r2 = ewram base
+  add r2, reg_base, #EWRAM_OFF            @ r2 = ewram base
   str r1, [r0, r2]                        @ store data
   bx lr                                   @ Return
 
 ext_store_vram_u32_safe:
   mask_addr_8(17)                         @ Mask to mirror memory (no need to align!)
   save_flags()
-  ldr r2, =(vram)                         @ r2 = vram base
+  add r2, reg_base, #VRAM_OFF             @ r2 = vram base
   cmp r0, #0x18000                        @ Check if exceeds 96KB
   subcs r0, r0, #0x8000                   @ Mirror to the last bank
   str r1, [r0, r2]                        @ store data
@@ -652,7 +662,7 @@ ext_store_vram_u32_safe:
 
 ext_store_oam_ram_u32_safe:
   mask_addr_8(10)                         @ Mask to mirror memory (no need to align!)
-  sub r2, reg_base, #0x400                @ r2 = oam ram base
+  add r2, reg_base, #OAM_RAM_OFF          @ r2 = oam ram base
   str r1, [r0, r2]                        @ store data
   str r2, [reg_base, #OAM_UPDATED]        @ store anything non zero here
   bx lr                                   @ Return
@@ -756,7 +766,7 @@ lookup_pc_arm:
   ldr r0, [r2, r0, lsr #(32 - mirrorbits)]                                   ;\
 
 
-#define execute_load_builder(load_type, albits, load_function)               ;\
+#define execute_load_builder(load_type, albits, load_function, tnum)         ;\
                                                                              ;\
 defsymbl(execute_load_##load_type)                                           ;\
 .if albits >= 1                                                              ;\
@@ -765,25 +775,9 @@ defsymbl(execute_load_##load_type)                                           ;\
 .else                                                                        ;\
   usat r1, #4, r0, asr #24                /* r1 contains [0-15]            */;\
 .endif                                                                       ;\
-  ldr pc, [pc, r1, lsl #2]                /* use jump table below          */;\
+  add r1, r1, #((STORE_TBL_OFF + 16*4*tnum) >> 2)    /* add table offset   */;\
+  ldr pc, [reg_base, r1, lsl #2]          /* load handler addr             */;\
   nop                                                                        ;\
-                                                                             ;\
-  .long ld_bios_##load_type               /* 0 BIOS                        */;\
-  .long ld_slow_##load_type               /* 1 Bad region                  */;\
-  .long ld_ewram_##load_type              /* 2 EWRAM                       */;\
-  .long ld_iwram_##load_type              /* 3 IWRAM                       */;\
-  .long ld_ioram_##load_type              /* 4 I/O                         */;\
-  .long ld_palram_##load_type             /* 5 Palette RAM, via map        */;\
-  .long ld_rdmap_##load_type              /* 6 VRAM area                   */;\
-  .long ld_oamram_##load_type             /* 7 OAM RAM                     */;\
-  .long ld_rdmap_##load_type              /* 8 ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* 9 ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* A ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* B ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* C ROM, via map                */;\
-  .long ld_slow_##load_type               /* D ROM or EEPROM/FLASH         */;\
-  .long ld_slow_##load_type               /* E EEPROM/FLASH                */;\
-  .long ld_slow_##load_type               /* F Bad region                  */;\
                                                                              ;\
 ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
   save_flags()                                                               ;\
@@ -791,18 +785,18 @@ ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
   mov r2, r1, lsr #15                     /* r2 = High addr bits from PC   */;\
   cmp r2, #0                                                                 ;\
   bne 10f                                 /* Jump to slow handler          */;\
-  ldr  r2, =bios_rom                                                         ;\
+  ldr r2, [reg_base, #RDMAP_OFF]          /* r2 = read_mem[0]              */;\
   exec_ld_op_##load_type(15)              /* Clear upper bits (15 LSB)     */;\
   restore_flags()                                                            ;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
 ld_ewram_##load_type:                     /* EWRAM area                    */;\
-  ldr  r2, =(ewram)                                                          ;\
+  add r2, reg_base, #EWRAM_OFF                                               ;\
   exec_ld_op_##load_type(18)              /* Clear upper bits (18 LSB)     */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
 ld_iwram_##load_type:                     /* IWRAM area                    */;\
-  ldr  r2, =(iwram+0x8000)                                                   ;\
+  add r2, reg_base, #(IWRAM_OFF+0x8000)                                      ;\
   exec_ld_op_##load_type(15)              /* Clear upper bits (15 LSB)     */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
@@ -812,18 +806,18 @@ ld_ioram_##load_type:                     /* I/O RAM area                  */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
 ld_palram_##load_type:                    /* Palette RAM area              */;\
-  ldr  r2, =palette_ram                                                      ;\
+  add r2, reg_base, #PAL_RAM_OFF                                             ;\
   exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
 ld_oamram_##load_type:                    /* OAM RAM area                  */;\
-  ldr  r2, =oam_ram                                                          ;\
+  add r2, reg_base, #OAM_RAM_OFF                                             ;\
   exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
 /* ROM area (or VRAM): uses generic memory handlers */                       ;\
 ld_rdmap_##load_type:                                                        ;\
-  ldr r2, =memory_map_read                /* r2 = memory_map_read          */;\
+  add r2, reg_base, #RDMAP_OFF            /* r2 = memory_map_read          */;\
   mov r1, r0, lsr #15                     /* r1 = page index of address    */;\
   ldr r2, [r2, r1, lsl #2]                /* r2 = base addr                */;\
                                                                              ;\
@@ -842,15 +836,48 @@ ld_slow_##load_type:                                                         ;\
                                                                              ;\
 .size execute_load_##load_type, .-execute_load_##load_type
 
+#define load_table_gen(load_type)                                            ;\
+  .long ld_bios_##load_type               /* 0 BIOS                        */;\
+  .long ld_slow_##load_type               /* 1 Bad region                  */;\
+  .long ld_ewram_##load_type              /* 2 EWRAM                       */;\
+  .long ld_iwram_##load_type              /* 3 IWRAM                       */;\
+  .long ld_ioram_##load_type              /* 4 I/O                         */;\
+  .long ld_palram_##load_type             /* 5 Palette RAM, via map        */;\
+  .long ld_rdmap_##load_type              /* 6 VRAM area                   */;\
+  .long ld_oamram_##load_type             /* 7 OAM RAM                     */;\
+  .long ld_rdmap_##load_type              /* 8 ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* 9 ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* A ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* B ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* C ROM, via map                */;\
+  .long ld_slow_##load_type               /* D ROM or EEPROM/FLASH         */;\
+  .long ld_slow_##load_type               /* E EEPROM/FLASH                */;\
+  .long ld_slow_##load_type               /* F Bad region                  */;\
+
 .pool
 
-execute_load_builder(u8,  0, read_memory8)
-execute_load_builder(s8,  0, read_memory8s)
-execute_load_builder(u16, 1, read_memory16)
-execute_load_builder(s16, 1, read_memory16s)
-execute_load_builder(u32, 2, read_memory32)
+execute_load_builder(u8,  0, read_memory8,   4)
+execute_load_builder(s8,  0, read_memory8s,  5)
+execute_load_builder(u16, 1, read_memory16,  6)
+execute_load_builder(s16, 1, read_memory16s, 7)
+execute_load_builder(u32, 2, read_memory32,  8)
+
+.data
+.align 4
+
+defsymbl(ldst_handler_functions)
+  store_lookup_table(8)
+  store_lookup_table(16)
+  store_lookup_table(32)
+  store_lookup_table(32_safe)
+  load_table_gen(u8)
+  load_table_gen(s8)
+  load_table_gen(u16)
+  load_table_gen(s16)
+  load_table_gen(u32)
 
 .bss
+.align 4
 
 defsymbl(iwram)
   .space 0x10000
@@ -858,21 +885,26 @@ defsymbl(vram)
   .space 0x18000
 defsymbl(ewram)
   .space 0x80000
-defsymbl(memory_map_read)
-  .space 0x8000
-defsymbl(palette_ram)
-  .space 0x400
-defsymbl(palette_ram_converted)
-  .space 0x400
+defsymbl(reg)
+  .space 0x100
 defsymbl(spsr)
   .space 24
 defsymbl(reg_mode)
   .space 196
-
+  .space 36    @ Padding for alignment
 defsymbl(oam_ram)
   .space 0x400
-defsymbl(reg)
-  .space 0x100
+defsymbl(palette_ram)
+  .space 0x400
+@ Place lookup tables here for easy access via base_reg too
+defsymbl(ldst_lookup_tables)
+  .space 4*16*4   @ store
+  .space 5*16*4   @ loads
+defsymbl(memory_map_read)
+  .space 0x8000
+
+defsymbl(palette_ram_converted)
+  .space 0x400
 
 @ Vita and 3DS (and of course mmap) map their own cache sections through some
 @ platform-speficic mechanisms.
