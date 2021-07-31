@@ -308,7 +308,6 @@ u32 gamepak_waitstate_sequential[2][3][3] =
   }
 };
 
-u16 io_registers[512];
 u8 bios_rom[1024 * 16];
 u32 bios_read_protect;
 

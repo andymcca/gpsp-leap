@@ -72,10 +72,12 @@ _##symbol:
 #define EWRAM_OFF      -0x80000
 #define SPSR_RAM_OFF      0x100
 #define REGMODE_RAM_OFF   0x118
-#define OAM_RAM_OFF       0x200
-#define PAL_RAM_OFF       0x600
-#define STORE_TBL_OFF     0xA00
-#define RDMAP_OFF         0xC40
+#define STORE_TBL_OFF     0x1DC
+#define OAM_RAM_OFF       0x500
+#define PAL_RAM_OFF       0x900
+#define RDMAP_OFF         0xD00
+#define IOREG_OFF        0x8D00
+
 
 #define extract_u16(rd, rs) \
   uxth rd, rs
@@ -453,12 +455,12 @@ execute_swi_function_builder(div, thumb)
 
 @ Uses sp as reg_base; must hold consistently true.
 
-defsymbl(execute_arm_translate)
+defsymbl(execute_arm_translate_internal)
 
   @ save the registers to be able to return later
   stmdb sp!, { r4, r5, r6, r7, r8, r9, r10, r11, r12, lr }
 
-  ldr reg_base, =reg                      @ init base_reg
+  mov reg_base, r1                        @ init base_reg
 
   mvn reg_cycles, r0                      @ load cycle counter
 
@@ -801,7 +803,7 @@ ld_iwram_##load_type:                     /* IWRAM area                    */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
 ld_ioram_##load_type:                     /* I/O RAM area                  */;\
-  ldr  r2, =io_registers                                                     ;\
+  add r2, reg_base, #IOREG_OFF                                               ;\
   exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
@@ -891,17 +893,19 @@ defsymbl(spsr)
   .space 24
 defsymbl(reg_mode)
   .space 196
-  .space 36    @ Padding for alignment
-defsymbl(oam_ram)
-  .space 0x400
-defsymbl(palette_ram)
-  .space 0x400
 @ Place lookup tables here for easy access via base_reg too
 defsymbl(ldst_lookup_tables)
   .space 4*16*4   @ store
   .space 5*16*4   @ loads
+  .space 228      @ Padding for alignment
+defsymbl(oam_ram)
+  .space 0x400
+defsymbl(palette_ram)
+  .space 0x400
 defsymbl(memory_map_read)
   .space 0x8000
+defsymbl(io_registers)
+  .space 0x400
 
 defsymbl(palette_ram_converted)
   .space 0x400

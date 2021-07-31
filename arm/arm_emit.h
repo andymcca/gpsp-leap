@@ -1980,4 +1980,9 @@ void init_emitter(void) {
   memcpy(ldst_lookup_tables, ldst_handler_functions, sizeof(ldst_lookup_tables));
 }
 
+u32 execute_arm_translate_internal(u32 cycles, void *regptr);
+u32 function_cc execute_arm_translate(u32 cycles) {
+  return execute_arm_translate_internal(cycles, &reg[0]);
+}
+
 #endif

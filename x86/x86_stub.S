@@ -551,6 +551,8 @@ defsymbl(vram)
   .space 0x18000
 defsymbl(ewram)
   .space 0x80000
+defsymbl(io_registers)
+  .space 0x400
 
 defsymbl(spsr)
   .space 24
