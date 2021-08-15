@@ -1004,8 +1004,6 @@ const u32 psr_masks[16] =
   }                                                                           \
                                                                               \
   cpu_alert = write_memory##size(_address, value);                            \
-  if(cpu_alert)                                                               \
-    goto alert;                                                               \
 }                                                                             \
 
 #define load_aligned32(address, dest)                                         \
@@ -1036,8 +1034,6 @@ const u32 psr_masks[16] =
     memory_writes_u32++;                                                      \
   }                                                                           \
   cpu_alert = write_memory32(_address, value);                                \
-  if(cpu_alert)                                                               \
-    goto alert;                                                               \
 }                                                                             \
 
 #define load_memory_u8(address, dest)                                         \
@@ -1649,6 +1645,7 @@ void execute_arm(u32 cycles)
           return;
     }
 
+    cpu_alert = CPU_ALERT_NONE;
     pc = reg[REG_PC];
     extract_flags();
 
@@ -3222,6 +3219,10 @@ skip_instruction:
        cycles_remaining -= cycles_per_instruction;
 
        if (pc == idle_loop_target_pc && cycles_remaining > 0) cycles_remaining = 0;
+
+       if(cpu_alert)
+         goto alert;
+
     } while(cycles_remaining > 0);
 
     collapse_flags();
@@ -3728,6 +3729,10 @@ thumb_loop:
        cycles_remaining -= cycles_per_instruction;
 
        if (pc == idle_loop_target_pc && cycles_remaining > 0) cycles_remaining = 0;
+
+       if(cpu_alert)
+          goto alert;
+
     } while(cycles_remaining > 0);
 
     collapse_flags();
