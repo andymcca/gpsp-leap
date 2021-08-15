@@ -2346,19 +2346,23 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_function_call(mips_cheat_hook);
 
 #ifdef TRACE_INSTRUCTIONS
-  void trace_instruction(u32 pc)
+  void trace_instruction(u32 pc, u32 mode)
   {
-    printf("Executed %x\n", pc);
+    if (mode)
+      printf("Executed arm %x\n", pc);
+    else
+      printf("Executed thumb %x\n", pc);
   }
 
-  #define emit_trace_instruction(pc)                                            \
+  #define emit_trace_instruction(pc, mode)                                      \
     emit_save_regs(false);                                                      \
     generate_load_imm(reg_a0, pc);                                              \
+    generate_load_imm(reg_a1, mode);                                            \
     genccall(&trace_instruction);                                               \
     mips_emit_nop();                                                            \
     emit_restore_regs(false)
-  #define emit_trace_thumb_instruction(pc) emit_trace_instruction(pc)
-  #define emit_trace_arm_instruction(pc)   emit_trace_instruction(pc)
+  #define emit_trace_thumb_instruction(pc) emit_trace_instruction(pc, 0)
+  #define emit_trace_arm_instruction(pc)   emit_trace_instruction(pc, 1)
 #else
   #define emit_trace_thumb_instruction(pc)
   #define emit_trace_arm_instruction(pc)

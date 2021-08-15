@@ -529,22 +529,22 @@ typedef enum
   generate_mov(ireg, rv)                                                      \
 
 #ifdef TRACE_INSTRUCTIONS
-  void function_cc trace_instruction(u32 pc)
+  void function_cc trace_instruction(u32 pc, u32 mode)
   {
-    printf("Executed %x\n", pc);
+    if (mode)
+      printf("Executed arm %x\n", pc);
+    else
+      printf("Executed thumb %x\n", pc);
   }
 
-  #define emit_trace_thumb_instruction(pc)         \
-    x86_emit_push_reg(eax);                        \
-    x86_emit_push_reg(ecx);                        \
-    x86_emit_push_reg(edx);                        \
-    x86_emit_mov_reg_imm(eax, pc);                 \
-    generate_function_call(trace_instruction);     \
-    x86_emit_pop_reg(edx);                         \
-    x86_emit_pop_reg(ecx);                         \
-    x86_emit_pop_reg(eax);
+  #define emit_trace_instruction(pc, mode)         \
+    x86_emit_mov_reg_imm(reg_a0, pc);              \
+    x86_emit_mov_reg_imm(reg_a1, mode);            \
+    generate_function_call(trace_instruction);
   #define emit_trace_arm_instruction(pc)           \
-    emit_trace_thumb_instruction(pc)
+    emit_trace_instruction(pc, 1)
+  #define emit_trace_thumb_instruction(pc)         \
+    emit_trace_instruction(pc, 0)
 #else
   #define emit_trace_thumb_instruction(pc)
   #define emit_trace_arm_instruction(pc)
