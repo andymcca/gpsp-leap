@@ -729,7 +729,7 @@ static const ini_t gbaover[] = {
       0,                           /* mirroring_enabled    */
       0,                           /* use_bios             */
       0x8000fae,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
+      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -746,7 +746,7 @@ static const ini_t gbaover[] = {
       0,                           /* mirroring_enabled    */
       0,                           /* use_bios             */
       0x8000fae,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
+      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
