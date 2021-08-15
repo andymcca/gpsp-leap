@@ -190,16 +190,11 @@ defsymbl(arm_update_gba_##name)                                              ;\
   collapse_flags(r0)                      /* update the flags              */;\
                                                                              ;\
   store_registers_##mode()                /* save out registers            */;\
-wait_halt_##name:                                                            ;\
   call_c_function(update_gba)             /* update GBA state              */;\
                                                                              ;\
   ldr r1, [reg_base, #COMPLETED_FRAME]    /* return if new frame           */;\
   cmp r1, #0                                                                 ;\
   bne return_to_main                                                         ;\
-                                                                             ;\
-  ldr r1, [reg_base, #CPU_HALT_STATE]     /* keep iterating if halted      */;\
-  cmp r1, #0                                                                 ;\
-  bne wait_halt_##name                                                       ;\
                                                                              ;\
   mvn reg_cycles, r0                      /* load new cycle count          */;\
                                                                              ;\
