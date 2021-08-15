@@ -4502,14 +4502,4 @@ void update_scanline(void)
   affine_reference_y[1] += (s16)read_ioreg(REG_BG3PD);
 }
 
-#define video_savestate_builder(type)           \
-void video_##type##_savestate(void)             \
-{                                               \
-  state_mem_##type##_array(affine_reference_x); \
-  state_mem_##type##_array(affine_reference_y); \
-}
-
-video_savestate_builder(read)
-video_savestate_builder(write)
-
 
