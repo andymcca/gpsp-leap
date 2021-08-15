@@ -1866,9 +1866,8 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_update_pc(((pc + 2) | 0x01));                                      \
   thumb_generate_load_reg(reg_a1, REG_LR);                                    \
   thumb_generate_store_reg(reg_a0, REG_LR);                                   \
-  generate_mov(reg_a0, reg_a1);                                               \
-  generate_add_imm(reg_a0, (offset * 2), 0);                                  \
-  generate_indirect_branch_cycle_update(thumb);                               \
+  generate_add_reg_reg_imm(reg_a0, reg_a1, (offset * 2), 0);                  \
+  generate_indirect_branch_cycle_update(dual_thumb);                          \
 }                                                                             \
 
 #define thumb_bx()                                                            \

@@ -269,6 +269,7 @@ defsymbl(arm_indirect_branch_dual_arm)
   save_flags()
   tst r0, #0x01                           @ check lower bit
   bne 1f                                  @ if set going to Thumb mode
+  add r0, #2                              @ two LSB are cleared after
   call_c_function(block_lookup_address_arm)
   restore_flags()
   bx r0                                   @ keep executing arm code
@@ -296,6 +297,7 @@ defsymbl(arm_indirect_branch_dual_thumb)
   load_registers_arm()                    @ load in ARM registers
   bic r1, r1, #0x20                       @ clear Thumb mode
   str r1, [reg_base, #REG_CPSR]           @ store flags
+  add r0, #2                              @ two LSB are cleared after
   call_c_function(block_lookup_address_arm)
   restore_flags()
   bx r0
