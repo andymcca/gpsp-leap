@@ -2355,6 +2355,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
     emit_save_regs(false);                                                      \
     generate_load_imm(reg_a0, pc);                                              \
     genccall(&trace_instruction);                                               \
+    mips_emit_nop();                                                            \
     emit_restore_regs(false)
   #define emit_trace_thumb_instruction(pc) emit_trace_instruction(pc)
   #define emit_trace_arm_instruction(pc)   emit_trace_instruction(pc)
