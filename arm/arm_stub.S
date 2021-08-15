@@ -36,16 +36,17 @@ _##symbol:
 #define REG_C_FLAG        (18 * 4)
 #define REG_V_FLAG        (19 * 4)
 #define REG_CPSR          (20 * 4)
+#define CPU_MODE          (21 * 4)
+#define CPU_HALT_STATE    (22 * 4)
 
-#define REG_SAVE          (21 * 4)
-#define REG_SAVE2         (22 * 4)
-#define REG_SAVE3         (23 * 4)
-
-#define CPU_MODE          (29 * 4)
-#define CPU_HALT_STATE    (30 * 4)
-#define CHANGED_PC_STATUS (31 * 4)
-#define COMPLETED_FRAME   (32 * 4)
-#define OAM_UPDATED       (33 * 4)
+#define CHANGED_PC_STATUS (24 * 4)
+#define COMPLETED_FRAME   (25 * 4)
+#define OAM_UPDATED       (26 * 4)
+#define REG_SAVE          (27 * 4)
+#define REG_SAVE2         (28 * 4)
+#define REG_SAVE3         (29 * 4)
+#define REG_SAVE4         (30 * 4)
+#define REG_SAVE5         (31 * 4)
 
 #define reg_a0            r0
 #define reg_a1            r1

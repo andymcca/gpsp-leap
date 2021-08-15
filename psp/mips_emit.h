@@ -2513,13 +2513,13 @@ u8 swi_hle_handle[256] =
 
 
 // Register save layout as follows:
-#define ReOff_RegPC    (15*4) // REG_PC
-#define ReOff_CPSR     (20*4) // REG_CPSR
-#define ReOff_SaveR1   (21*4) // 3 save scratch regs
-#define ReOff_SaveR2   (22*4)
-#define ReOff_SaveR3   (23*4)
-#define ReOff_OamUpd   (33*4) // OAM_UPDATED
-#define ReOff_GP_Save  (34*4) // GP_SAVE
+#define ReOff_RegPC    (REG_PC    * 4) // REG_PC
+#define ReOff_CPSR     (REG_CPSR  * 4) // REG_CPSR
+#define ReOff_SaveR1   (REG_SAVE  * 4) // 3 save scratch regs
+#define ReOff_SaveR2   (REG_SAVE2 * 4)
+#define ReOff_SaveR3   (REG_SAVE3 * 4)
+#define ReOff_OamUpd   (OAM_UPDATED*4) // OAM_UPDATED
+#define ReOff_GP_Save  (REG_SAVE4 * 4) // GP_SAVE
 
 // Saves all regs to their right slot and loads gp
 #define emit_save_regs(save_a2) {                                             \

@@ -111,7 +111,6 @@ void execute_store_u32_safe(u32 address, u32 source);
 #define reg_x5         ARMREG_R8
 
 #define mem_reg        (~0U)
-#define save1_reg      21
 
 /*
 
@@ -1462,14 +1461,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   arm_block_memory_offset_##offset_type();                                    \
   arm_block_memory_writeback_##access_type(writeback_type);                   \
   ARM_BIC_REG_IMM(0, reg_s0, reg_s0, 0x03, 0);                                \
-  arm_generate_store_reg(reg_s0, save1_reg);                                  \
+  arm_generate_store_reg(reg_s0, REG_SAVE);                                   \
                                                                               \
   for(i = 0; i < 16; i++)                                                     \
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
     {                                                                         \
       cycle_count++;                                                          \
-      arm_generate_load_reg(reg_s0, save1_reg);                               \
+      arm_generate_load_reg(reg_s0, REG_SAVE);                                \
       generate_add_reg_reg_imm(reg_a0, reg_s0, offset, 0);                    \
       if(reg_list & ~((2 << i) - 1))                                          \
       {                                                                       \
@@ -1735,14 +1734,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_block_memory_extra_down()                                       \
 
 #define thumb_block_memory_extra_pop_pc()                                     \
-  thumb_generate_load_reg(reg_s0, save1_reg);                                 \
+  thumb_generate_load_reg(reg_s0, REG_SAVE);                                  \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
   generate_function_call(execute_load_u32);                                   \
   write32((pc + 4));                                                          \
   generate_indirect_branch_cycle_update(thumb)                                \
 
 #define thumb_block_memory_extra_push_lr(base_reg)                            \
-  thumb_generate_load_reg(reg_s0, save1_reg);                                 \
+  thumb_generate_load_reg(reg_s0, REG_SAVE);                                  \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
   thumb_generate_load_reg(reg_a1, REG_LR);                                    \
   generate_function_call(execute_store_u32_safe)                              \
@@ -1789,14 +1788,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   ARM_BIC_REG_IMM(0, reg_s0, reg_s0, 0x03, 0);                                \
   thumb_block_address_preadjust_##pre_op();                                   \
   thumb_block_address_postadjust_##post_op(base_reg);                         \
-  thumb_generate_store_reg(reg_s0, save1_reg);                                \
+  thumb_generate_store_reg(reg_s0, REG_SAVE);                                 \
                                                                               \
   for(i = 0; i < 8; i++)                                                      \
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
     {                                                                         \
       cycle_count++;                                                          \
-      thumb_generate_load_reg(reg_s0, save1_reg);                             \
+      thumb_generate_load_reg(reg_s0, REG_SAVE);                              \
       generate_add_reg_reg_imm(reg_a0, reg_s0, offset, 0);                    \
       if(reg_list & ~((2 << i) - 1))                                          \
       {                                                                       \

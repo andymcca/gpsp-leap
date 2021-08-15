@@ -3780,12 +3780,12 @@ void init_cpu(void)
   reg_mode[MODE_SUPERVISOR][5] = 0x03007FE0;
 }
 
-#define cpu_savestate_builder(type)   \
-void cpu_##type##_savestate(void)     \
-{                                     \
-  state_mem_##type(reg, 0x100);       \
-  state_mem_##type##_array(spsr);     \
-  state_mem_##type##_array(reg_mode); \
+#define cpu_savestate_builder(type)      \
+void cpu_##type##_savestate(void)        \
+{                                        \
+  state_mem_##type(reg, 4 * REG_IGNORE); \
+  state_mem_##type##_array(spsr);        \
+  state_mem_##type##_array(reg_mode);    \
 }
 
 cpu_savestate_builder(read)

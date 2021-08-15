@@ -69,6 +69,7 @@ typedef u16 irq_type;
 
 typedef enum
 {
+  // CPU status & registers
   REG_SP            = 13,
   REG_LR            = 14,
   REG_PC            = 15,
@@ -77,14 +78,22 @@ typedef enum
   REG_C_FLAG        = 18,
   REG_V_FLAG        = 19,
   REG_CPSR          = 20,
-  REG_SAVE          = 21,
-  REG_SAVE2         = 22,
-  REG_SAVE3         = 23,
-  CPU_MODE          = 29,
-  CPU_HALT_STATE    = 30,
-  CHANGED_PC_STATUS = 31,
-  COMPLETED_FRAME   = 32,
-  OAM_UPDATED       = 33
+  CPU_MODE          = 21,
+  CPU_HALT_STATE    = 22,
+  REG_IGNORE        = 23,
+
+  // Dynarec signaling and spilling
+  // (Not really part of the CPU state)
+  CHANGED_PC_STATUS = 24,
+  COMPLETED_FRAME   = 25,
+  OAM_UPDATED       = 26,
+  REG_SAVE          = 27,
+  REG_SAVE2         = 28,
+  REG_SAVE3         = 29,
+  REG_SAVE4         = 30,
+  REG_SAVE5         = 31,
+
+  REG_MAX           = 64
 } ext_reg_numbers;
 
 typedef enum
