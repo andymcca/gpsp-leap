@@ -195,14 +195,7 @@ u32 update_gba(void)
             irq_raised |= IRQ_VBLANK;
           }
 
-          affine_reference_x[0] =
-           (s32)(readaddress32(io_registers, 0x28) << 4) >> 4;
-          affine_reference_y[0] =
-           (s32)(readaddress32(io_registers, 0x2C) << 4) >> 4;
-          affine_reference_x[1] =
-           (s32)(readaddress32(io_registers, 0x38) << 4) >> 4;
-          affine_reference_y[1] =
-           (s32)(readaddress32(io_registers, 0x3C) << 4) >> 4;
+          video_reload_counters();
 
           for(i = 0; i < 4; i++)
           {

@@ -3122,8 +3122,7 @@ void memory_term(void)
   input_##type##_savestate();   \
   main_##type##_savestate();    \
   memory_##type##_savestate();  \
-  sound_##type##_savestate();   \
-  video_##type##_savestate()
+  sound_##type##_savestate();
 
 
 const u8 *state_mem_read_ptr;
@@ -3151,6 +3150,8 @@ void gba_load_state(const void* src)
       palette_ram_converted[i] =
        convert_palette(current_color);
    }
+
+   video_reload_counters();
 
    // Oops, these contain raw pointers
    for(i = 0; i < 4; i++)

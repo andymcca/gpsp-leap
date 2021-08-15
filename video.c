@@ -2336,6 +2336,19 @@ static void render_scanline_text_transparent_alpha(u32 layer,
 s32 affine_reference_x[2];
 s32 affine_reference_y[2];
 
+void video_reload_counters()
+{
+  /* This happens every Vblank */
+  affine_reference_x[0] = (s32)(read_ioreg(REG_BG2X_L) |
+     ((read_ioreg(REG_BG2X_H) & 0xFFF) << 16));
+  affine_reference_y[0] = (s32)(read_ioreg(REG_BG2Y_L) |
+     ((read_ioreg(REG_BG2Y_H) & 0xFFF) << 16));
+  affine_reference_x[1] = (s32)(read_ioreg(REG_BG3X_L) |
+     ((read_ioreg(REG_BG3X_H) & 0xFFF) << 16));
+  affine_reference_y[1] = (s32)(read_ioreg(REG_BG3Y_L) |
+     ((read_ioreg(REG_BG3Y_H) & 0xFFF) << 16));
+}
+
 #define affine_render_bg_pixel_normal()                                       \
   current_pixel = palette_ram_converted[0]                                    \
 

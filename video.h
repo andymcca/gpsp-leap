@@ -21,8 +21,7 @@
 #define VIDEO_H
 
 void update_scanline(void);
-void video_write_savestate(void);
-void video_read_savestate(void);
+void video_reload_counters(void);
 
 extern s32 affine_reference_x[2];
 extern s32 affine_reference_y[2];
