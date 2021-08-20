@@ -2835,7 +2835,6 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
   {
     src_ptr &= ~0x01;
     dest_ptr &= ~0x01;
-    cycle_dma16_words += length;
 
     switch((dma->dest_direction << 2) | dma->source_direction)
     {
@@ -2877,7 +2876,6 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
   {
     src_ptr &= ~0x03;
     dest_ptr &= ~0x03;
-    cycle_dma32_words += length;
 
     switch((dma->dest_direction << 2) | dma->source_direction)
     {

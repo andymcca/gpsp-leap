@@ -34,14 +34,6 @@ u32 arm_frame = 0;
 u32 thumb_frame = 0;
 u32 last_frame = 0;
 
-u32 cycle_memory_access = 0;
-u32 cycle_pc_relative_access = 0;
-u32 cycle_sp_relative_access = 0;
-u32 cycle_block_memory_access = 0;
-u32 cycle_block_memory_sp_access = 0;
-u32 cycle_block_memory_words = 0;
-u32 cycle_dma16_words = 0;
-u32 cycle_dma32_words = 0;
 u32 flush_ram_count = 0;
 u32 gbc_update_count = 0;
 u32 oam_update_count = 0;
@@ -119,8 +111,6 @@ void init_main(void)
 #endif
 }
 
-u32 no_alpha = 0;
-
 u32 update_gba(void)
 {
   irq_type irq_raised = IRQ_NONE;
@@ -161,8 +151,6 @@ u32 update_gba(void)
           if(reg[OAM_UPDATED])
             oam_update_count++;
 
-          if(no_alpha)
-            write_ioreg(REG_BLDCNT, 0);
           update_scanline();
 
           // If in visible area also fire HDMA
