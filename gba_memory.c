@@ -418,10 +418,8 @@ u8 read_backup(u32 address)
 
 eeprom_size_type eeprom_size = EEPROM_512_BYTE;
 eeprom_mode_type eeprom_mode = EEPROM_BASE_MODE;
-u32 eeprom_address_length;
 u32 eeprom_address = 0;
 u32 eeprom_counter = 0;
-u8 eeprom_buffer[8];
 
 void function_cc write_eeprom(u32 unused_address, u32 value)
 {
@@ -429,18 +427,10 @@ void function_cc write_eeprom(u32 unused_address, u32 value)
   {
     case EEPROM_BASE_MODE:
       backup_type = BACKUP_EEPROM;
-      eeprom_buffer[0] |= (value & 0x01) << (1 - eeprom_counter);
-      eeprom_counter++;
-      if(eeprom_counter == 2)
+      eeprom_address |= (value & 0x01) << (1 - eeprom_counter);
+      if(++eeprom_counter == 2)
       {
-        if(eeprom_size == EEPROM_512_BYTE)
-          eeprom_address_length = 6;
-        else
-          eeprom_address_length = 14;
-
-        eeprom_counter = 0;
-
-        switch(eeprom_buffer[0] & 0x03)
+        switch(eeprom_address & 0x03)
         {
           case 0x02:
             eeprom_mode = EEPROM_WRITE_ADDRESS_MODE;
@@ -450,30 +440,25 @@ void function_cc write_eeprom(u32 unused_address, u32 value)
             eeprom_mode = EEPROM_ADDRESS_MODE;
             break;
         }
-        address16(eeprom_buffer, 0) = 0;
+        eeprom_counter = 0;
+        eeprom_address = 0;
       }
       break;
 
     case EEPROM_ADDRESS_MODE:
     case EEPROM_WRITE_ADDRESS_MODE:
-      eeprom_buffer[eeprom_counter / 8]
-       |= (value & 0x01) << (7 - (eeprom_counter % 8));
-      eeprom_counter++;
-      if(eeprom_counter == eeprom_address_length)
-      {
-        if(eeprom_size == EEPROM_512_BYTE)
-        {
-          eeprom_address =
-           (readaddress16(eeprom_buffer, 0) >> 2) * 8;
-        }
-        else
-        {
-          eeprom_address = (((u32)eeprom_buffer[1] >> 2) |
-           ((u32)eeprom_buffer[0] << 6)) * 8;
-        }
+      eeprom_address |= (value & 0x01) << (15 - (eeprom_counter % 16));
 
-        address16(eeprom_buffer, 0) = 0;
+      if(++eeprom_counter == (eeprom_size == EEPROM_512_BYTE ? 6 : 14))
+      {
         eeprom_counter = 0;
+
+        if (eeprom_size == EEPROM_512_BYTE)
+          eeprom_address >>= 10;   // Addr is just 6 bits (drop 10LSB)
+        else
+          eeprom_address >>= 2;    // Addr is 14 bits (drop 2LSB)
+
+        eeprom_address <<= 3;   // EEPROM accessed in blocks of 8 bytes
 
         if(eeprom_mode == EEPROM_ADDRESS_MODE)
           eeprom_mode = EEPROM_ADDRESS_FOOTER_MODE;
@@ -3118,7 +3103,6 @@ void memory_##type##_savestate(void)                           \
   state_mem_##type##_variable(flash_size);                     \
   state_mem_##type##_variable(eeprom_size);                    \
   state_mem_##type##_variable(eeprom_mode);                    \
-  state_mem_##type##_variable(eeprom_address_length);          \
   state_mem_##type##_variable(eeprom_address);                 \
   state_mem_##type##_variable(eeprom_counter);                 \
   state_mem_##type##_variable(rtc_state);                      \
@@ -3129,7 +3113,6 @@ void memory_##type##_savestate(void)                           \
   state_mem_##type##_variable(rtc_status);                     \
   state_mem_##type##_variable(rtc_data_bytes);                 \
   state_mem_##type##_variable(rtc_bit_count);                  \
-  state_mem_##type##_array(eeprom_buffer);                     \
   state_mem_##type##_array(dma);                               \
                                                                \
   state_mem_##type(iwram + 0x8000, 0x8000);                    \
