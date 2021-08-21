@@ -156,7 +156,7 @@ u32 update_gba(void)
           for(i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_HBLANK)
-              dma_transfer(dma + i);
+              dma_transfer(&dma[i]);
           }
         }
 
@@ -187,7 +187,7 @@ u32 update_gba(void)
           for(i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_VBLANK)
-              dma_transfer(dma + i);
+              dma_transfer(&dma[i]);
           }
         }
         else

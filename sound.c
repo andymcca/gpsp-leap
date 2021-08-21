@@ -165,10 +165,10 @@ void sound_timer(fixed8_24 frequency_step, u32 channel)
   if(((ds->fifo_top - ds->fifo_base) % 32) <= 16)
   {
     if(dma[1].direct_sound_channel == channel)
-      dma_transfer(dma + 1);
+      dma_transfer(&dma[1]);
 
     if(dma[2].direct_sound_channel == channel)
-      dma_transfer(dma + 2);
+      dma_transfer(&dma[2]);
   }
 }
 

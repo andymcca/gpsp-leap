@@ -666,13 +666,14 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
     if(dma[dma_number].start_type == DMA_INACTIVE)
     {
       dma_start_type start_type = (dma_start_type)((value >> 12) & 0x03);
-      u32 dest_address = readaddress32(io_registers, (dma_number * 12) + 0xB4) &
-       0xFFFFFFF;
+      u32 src_address = 0xFFFFFFF & (read_dmareg(REG_DMA0SAD, dma_number) |
+                         (read_dmareg(REG_DMA0SAD + 1, dma_number) << 16));
+      u32 dst_address = 0xFFFFFFF & (read_dmareg(REG_DMA0DAD, dma_number) |
+                         (read_dmareg(REG_DMA0DAD + 1, dma_number) << 16));
 
       dma[dma_number].dma_channel = dma_number;
-      dma[dma_number].source_address =
-       readaddress32(io_registers, (dma_number * 12) + 0xB0) & 0xFFFFFFF;
-      dma[dma_number].dest_address = dest_address;
+      dma[dma_number].source_address = src_address;
+      dma[dma_number].dest_address = dst_address;
       dma[dma_number].source_direction = (dma_increment_type)((value >>  7) & 3);
       dma[dma_number].repeat_type = (dma_repeat_type)((value >> 9) & 0x01);
       dma[dma_number].start_type = start_type;
@@ -685,16 +686,16 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
         dma[dma_number].length_type = DMA_32BIT;
         dma[dma_number].length = 4;
         dma[dma_number].dest_direction = DMA_FIXED;
-        if(dest_address == 0x40000A4)
+        if(dst_address == 0x40000A4)
           dma[dma_number].direct_sound_channel = DMA_DIRECT_SOUND_B;
         else
           dma[dma_number].direct_sound_channel = DMA_DIRECT_SOUND_A;
       }
       else
       {
-        u32 length = read_ioreg(REG_DMA0CNT_L + (dma_number * 6));
+        u32 length = read_dmareg(REG_DMA0CNT_L, dma_number);
 
-        if((dma_number == 3) && ((dest_address >> 24) == 0x0D) &&
+        if((dma_number == 3) && ((dst_address >> 24) == 0x0D) &&
          ((length & 0x1F) == 17))
           eeprom_size = EEPROM_8_KBYTE;
 
@@ -714,16 +715,16 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
         dma[dma_number].dest_direction = (dma_increment_type)((value >> 5) & 3);
       }
 
-      write_ioreg(REG_DMA0CNT_H + (dma_number * 6), value);
+      write_dmareg(REG_DMA0CNT_H, dma_number, value);
       if(start_type == DMA_START_IMMEDIATELY)
-        return dma_transfer(dma + dma_number);
+        return dma_transfer(&dma[dma_number]);
     }
   }
   else
   {
     dma[dma_number].start_type = DMA_INACTIVE;
     dma[dma_number].direct_sound_channel = DMA_NO_DIRECT_SOUND;
-    write_ioreg(REG_DMA0CNT_H + (dma_number * 6), value);
+    write_dmareg(REG_DMA0CNT_H, dma_number, value);
   }
 
   return CPU_ALERT_NONE;
@@ -2916,9 +2917,9 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
   if((dma->repeat_type == DMA_NO_REPEAT) ||
    (dma->start_type == DMA_START_IMMEDIATELY))
   {
+    u32 cntrl = read_dmareg(REG_DMA0CNT_H, dma->dma_channel);
+    write_dmareg(REG_DMA0CNT_H, dma->dma_channel, cntrl & (~0x8000));
     dma->start_type = DMA_INACTIVE;
-    address16(io_registers, (dma->dma_channel * 12) + 0xBA) =
-      readaddress16(io_registers, (dma->dma_channel * 12) + 0xBA) & (~0x8000);
   }
 
   if(dma->irq)
