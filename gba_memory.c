@@ -2831,86 +2831,24 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
     src_ptr += first_length;
   }
 
-  if(dma->length_type == DMA_16BIT)
+  if (dma->source_direction < 3)
   {
-    src_ptr &= ~0x01;
-    dest_ptr &= ~0x01;
+    const int stridetbl[4] = {1, -1, 0, 1};
+    int dst_stride = stridetbl[dma->dest_direction];
+    int src_stride = stridetbl[dma->source_direction];
+    bool dst_wb = dma->dest_direction < 3;
 
-    switch((dma->dest_direction << 2) | dma->source_direction)
+    if(dma->length_type == DMA_16BIT)
     {
-       case 0x00:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  2,  2, true, length, dma); break;
-       case 0x01:
-          ret = dma_tf_loop16(src_ptr, dest_ptr, -2,  2, true, length, dma); break;
-       case 0x02:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  0,  2, true, length, dma); break;
-       case 0x03:
-          break;
-       case 0x04:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  2, -2, true, length, dma); break;
-       case 0x05:
-          ret = dma_tf_loop16(src_ptr, dest_ptr, -2, -2, true, length, dma); break;
-       case 0x06:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  0, -2, true, length, dma); break;
-       case 0x07:
-          break;
-       case 0x08:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  2,  0, true, length, dma); break;
-       case 0x09:
-          ret = dma_tf_loop16(src_ptr, dest_ptr, -2,  0, true, length, dma); break;
-       case 0x0A:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  0,  0, true, length, dma); break;
-       case 0x0B:
-          break;
-       case 0x0C:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  2,  2, false, length, dma); break;
-       case 0x0D:
-          ret = dma_tf_loop16(src_ptr, dest_ptr, -2,  2, false, length, dma); break;
-       case 0x0E:
-          ret = dma_tf_loop16(src_ptr, dest_ptr,  0,  2, false, length, dma); break;
-       case 0x0F:
-          break;
+       src_ptr &= ~0x01;
+       dest_ptr &= ~0x01;
+       ret = dma_tf_loop16(src_ptr, dest_ptr, 2 * src_stride, 2 * dst_stride, dst_wb, length, dma);
     }
-  }
-  else
-  {
-    src_ptr &= ~0x03;
-    dest_ptr &= ~0x03;
-
-    switch((dma->dest_direction << 2) | dma->source_direction)
+    else
     {
-       case 0x00:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  4,  4, true, length, dma); break;
-       case 0x01:
-          ret = dma_tf_loop32(src_ptr, dest_ptr, -4,  4, true, length, dma); break;
-       case 0x02:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  0,  4, true, length, dma); break;
-       case 0x03:
-          break;
-       case 0x04:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  4, -4, true, length, dma); break;
-       case 0x05:
-          ret = dma_tf_loop32(src_ptr, dest_ptr, -4, -4, true, length, dma); break;
-       case 0x06:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  0, -4, true, length, dma); break;
-       case 0x07:
-          break;
-       case 0x08:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  4,  0, true, length, dma); break;
-       case 0x09:
-          ret = dma_tf_loop32(src_ptr, dest_ptr, -4,  0, true, length, dma); break;
-       case 0x0A:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  0,  0, true, length, dma); break;
-       case 0x0B:
-          break;
-       case 0x0C:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  4,  4, false, length, dma); break;
-       case 0x0D:
-          ret = dma_tf_loop32(src_ptr, dest_ptr, -4,  4, false, length, dma); break;
-       case 0x0E:
-          ret = dma_tf_loop32(src_ptr, dest_ptr,  0,  4, false, length, dma); break;
-       case 0x0F:
-          break;
+       src_ptr &= ~0x03;
+       dest_ptr &= ~0x03;
+       ret = dma_tf_loop32(src_ptr, dest_ptr, 4 * src_stride, 4 * dst_stride, dst_wb, length, dma);
     }
   }
 
