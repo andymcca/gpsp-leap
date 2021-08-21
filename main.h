@@ -49,7 +49,6 @@ typedef struct
   s32 count;
   u32 reload;
   u32 prescale;
-  u32 stop_cpu_ticks;
   fixed8_24 frequency_step;
   timer_ds_channel_type direct_sound_channels;
   timer_irq_type irq;

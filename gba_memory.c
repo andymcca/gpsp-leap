@@ -266,7 +266,6 @@ static void trigger_timer(u32 timer_number, u32 value)
       if(timer[timer_number].status != TIMER_INACTIVE)
       {
          timer[timer_number].status = TIMER_INACTIVE;
-         timer[timer_number].stop_cpu_ticks = cpu_ticks;
       }
    }
    write_ioreg(REG_TM0CNT + (timer_number * 2), value);

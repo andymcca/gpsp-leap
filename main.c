@@ -94,7 +94,6 @@ void init_main(void)
     dma[i].direct_sound_channel = DMA_NO_DIRECT_SOUND;
     timer[i].status = TIMER_INACTIVE;
     timer[i].reload = 0x10000;
-    timer[i].stop_cpu_ticks = 0;
   }
 
   timer[0].direct_sound_channels = TIMER_DS_CHANNEL_BOTH;
