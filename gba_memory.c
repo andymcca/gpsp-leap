@@ -82,7 +82,7 @@
   write_ioreg(REG_SOUND3CNT_L, value);                                        \
 }                                                                             \
 
-static u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
+static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
 
 #define gbc_sound_tone_control_low_wave()                                     \
 {                                                                             \
@@ -206,7 +206,7 @@ static void sound_control_x(u32 value)
 
 /* Main */
 extern timer_type timer[4];
-static u32 prescale_table[] = { 0, 6, 8, 10 };
+static const u32 prescale_table[] = { 0, 6, 8, 10 };
 
 #define count_timer(timer_number)                                             \
   timer[timer_number].reload = 0x10000 - value;                               \
@@ -273,7 +273,7 @@ static void trigger_timer(u32 timer_number, u32 value)
 
 // This table is configured for sequential access on system defaults
 
-u32 waitstate_cycles_sequential[16][3] =
+const u32 waitstate_cycles_sequential[16][3] =
 {
   { 1, 1, 1 }, // BIOS
   { 1, 1, 1 }, // Invalid
@@ -293,7 +293,7 @@ u32 waitstate_cycles_sequential[16][3] =
 
 // Different settings for gamepak ws0-2 sequential (2nd) access
 
-u32 gamepak_waitstate_sequential[2][3][3] =
+const u32 gamepak_waitstate_sequential[2][3][3] =
 {
   {
     { 3, 3, 6 },
@@ -2328,7 +2328,7 @@ typedef enum
   DMA_REGION_NULL
 } dma_region_type;
 
-dma_region_type dma_region_map[16] =
+const dma_region_type dma_region_map[16] =
 {
   DMA_REGION_BIOS,          // 0x00 - BIOS
   DMA_REGION_NULL,          // 0x01 - Nothing

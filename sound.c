@@ -19,12 +19,11 @@
 
 
 #include "common.h"
-u32 global_enable_audio = 1;
 
 direct_sound_struct direct_sound_channel[2];
 gbc_sound_struct gbc_sound_channel[4];
 
-u32 sound_frequency = GBA_SOUND_FREQUENCY;
+const u32 sound_frequency = GBA_SOUND_FREQUENCY;
 
 u32 sound_on;
 static s16 sound_buffer[BUFFER_SIZE];
@@ -202,9 +201,9 @@ s8 wave_samples[64];
 u32 noise_table15[1024];
 u32 noise_table7[4];
 
-u32 gbc_sound_master_volume_table[4] = { 1, 2, 4, 0 };
+const u32 gbc_sound_master_volume_table[4] = { 1, 2, 4, 0 };
 
-u32 gbc_sound_channel_volume_table[8] =
+const u32 gbc_sound_channel_volume_table[8] =
 {
   fixed_div(0, 7, 12),
   fixed_div(1, 7, 12),
@@ -216,7 +215,7 @@ u32 gbc_sound_channel_volume_table[8] =
   fixed_div(7, 7, 12)
 };
 
-u32 gbc_sound_envelope_volume_table[16] =
+const u32 gbc_sound_envelope_volume_table[16] =
 {
   fixed_div(0, 15, 14),
   fixed_div(1, 15, 14),

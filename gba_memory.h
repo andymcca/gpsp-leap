@@ -205,7 +205,7 @@ void function_cc write_backup(u32 address, u32 value);
 void function_cc write_rtc(u32 address, u32 value);
 
 /* EDIT: Shouldn't this be extern ?! */
-extern u32 waitstate_cycles_sequential[16][3];
+extern const u32 waitstate_cycles_sequential[16][3];
 
 extern u32 gamepak_size;
 extern char gamepak_title[13];

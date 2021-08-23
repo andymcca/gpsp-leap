@@ -696,10 +696,6 @@ void print_register_usage(void)
       pc_address_block = load_gamepak_page(pc_region & 0x3FF);                \
   }                                                                           \
 
-u32 branch_targets = 0;
-u32 high_frequency_branch_targets = 0;
-
-#define BRANCH_ACTIVITY_THRESHOLD 50
 
 #define arm_update_pc()                                                       \
   pc = reg[REG_PC]                                                            \
@@ -1531,13 +1527,6 @@ const u32 cpu_modes[32] =
 // shadowing it since it has a constant 1bit represenation.
 
 u32 instruction_count = 0;
-
-u32 output_field = 0;
-const u32 num_output_fields = 2;
-
-u32 last_instruction = 0;
-
-u32 in_interrupt = 0;
 
 void set_cpu_mode(cpu_mode_type new_mode)
 {

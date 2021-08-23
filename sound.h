@@ -104,11 +104,8 @@ extern u32 gbc_sound_master_volume;
 extern u32 gbc_sound_buffer_index;
 extern u32 gbc_sound_last_cpu_ticks;
 
-extern u32 sound_frequency;
+extern const u32 sound_frequency;
 extern u32 sound_on;
-
-extern u32 global_enable_audio;
-extern u32 enable_low_pass_filter;
 
 void sound_timer_queue8(u32 channel, u8 value);
 void sound_timer_queue16(u32 channel, u16 value);

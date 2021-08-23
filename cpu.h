@@ -103,7 +103,6 @@ typedef enum
 } translation_region_type;
 
 extern u32 instruction_count;
-extern u32 last_instruction;
 
 void execute_arm(u32 cycles);
 void raise_interrupt(irq_type irq_raised);
@@ -156,8 +155,6 @@ extern u32 idle_loop_target_pc;
 extern u32 iwram_stack_optimize;
 extern u32 translation_gate_targets;
 extern u32 translation_gate_target_pc[MAX_TRANSLATION_GATES];
-
-extern u32 in_interrupt;
 
 extern u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 

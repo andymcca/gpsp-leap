@@ -22,18 +22,14 @@
 
 timer_type timer[4];
 
-u32 global_cycles_per_instruction = 1;
+const u32 global_cycles_per_instruction = 1;
 
 u32 cpu_ticks = 0;
 
 u32 execute_cycles = 960;
 s32 video_count = 960;
-u32 ticks;
 
-u32 arm_frame = 0;
-u32 thumb_frame = 0;
 u32 last_frame = 0;
-
 u32 flush_ram_count = 0;
 u32 gbc_update_count = 0;
 u32 oam_update_count = 0;

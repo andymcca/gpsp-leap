@@ -2660,10 +2660,7 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
          should never be hit) */                                              \
       if(translation_recursion_level == 0)                                    \
       {                                                                       \
-        char buffer[256];                                                     \
-        sprintf(buffer, "bad jump %x (%x) (%x)\n", pc, reg[REG_PC],           \
-         last_instruction);                                                   \
-        printf("%s", buffer);                                                 \
+        printf("bad jump %x (%x)\n", pc, reg[REG_PC]);                        \
       }                                                                       \
       block_address = (u8 *)(-1);                                             \
       break;                                                                  \
