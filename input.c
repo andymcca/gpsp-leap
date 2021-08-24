@@ -133,11 +133,21 @@ u32 update_input(void)
    return 0;
 }
 
-#define input_savestate_builder(type)   \
-void input_##type##_savestate(void)     \
-{                                       \
-  state_mem_##type##_variable(old_key); \
+bool input_read_savestate(const u8 *src)
+{
+  const u8 *p = bson_find_key(src, "input");
+  if (p)
+    return bson_read_int32(p, "prevkey", &old_key);
+  return false;
 }
 
-input_savestate_builder(read)
-input_savestate_builder(write)
+unsigned input_write_savestate(u8 *dst)
+{
+  u8 *wbptr1, *startp = dst;
+  bson_start_document(dst, "input", wbptr1);
+  bson_write_int32(dst, "prevkey", old_key);
+  bson_finish_document(dst, wbptr1);
+  return (unsigned int)(dst - startp);
+}
+
+

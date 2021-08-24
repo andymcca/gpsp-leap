@@ -3774,13 +3774,26 @@ void init_cpu(void)
   reg_mode[MODE_SUPERVISOR][5] = 0x03007FE0;
 }
 
-#define cpu_savestate_builder(type)      \
-void cpu_##type##_savestate(void)        \
-{                                        \
-  state_mem_##type(reg, 4 * REG_IGNORE); \
-  state_mem_##type##_array(spsr);        \
-  state_mem_##type##_array(reg_mode);    \
+bool cpu_read_savestate(const u8 *src)
+{
+  const u8 *cpudoc = bson_find_key(src, "cpu");
+  return bson_read_int32(cpudoc, "bus-value", &bios_read_protect) &&
+         bson_read_int32_array(cpudoc, "regs", reg, REG_IGNORE) &&
+         bson_read_int32_array(cpudoc, "spsr", spsr, 6) &&
+         bson_read_int32_array(cpudoc, "regmod", (u32*)reg_mode, 7*7);
 }
 
-cpu_savestate_builder(read)
-cpu_savestate_builder(write)
+unsigned cpu_write_savestate(u8 *dst)
+{
+  u8 *wbptr, *startp = dst;
+  bson_start_document(dst, "cpu", wbptr);
+  bson_write_int32array(dst, "regs", reg, REG_IGNORE);
+  bson_write_int32array(dst, "spsr", spsr, 6);
+  bson_write_int32array(dst, "regmod", reg_mode, 7*7);
+  bson_write_int32(dst, "bus-value", bios_read_protect);
+
+  bson_finish_document(dst, wbptr);
+  return (unsigned int)(dst - startp);
+}
+
+

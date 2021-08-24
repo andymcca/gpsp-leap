@@ -664,9 +664,7 @@ bool retro_unserialize(const void* data, size_t size)
    if (size != GBA_STATE_MEM_SIZE)
       return false;
 
-   gba_load_state(data);
-
-   return true;
+   return gba_load_state(data);
 }
 
 void retro_cheat_reset(void)

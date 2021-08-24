@@ -29,7 +29,6 @@ u32 sound_on;
 static s16 sound_buffer[BUFFER_SIZE];
 static u32 sound_buffer_base;
 
-static u32 sound_last_cpu_ticks;
 static fixed16_16 gbc_sound_tick_step;
 
 /* Queue 1 sample to the top of the DS FIFO, wrap around circularly */
@@ -164,10 +163,10 @@ void sound_timer(fixed8_24 frequency_step, u32 channel)
   if(((ds->fifo_top - ds->fifo_base) % 32) <= 16)
   {
     if(dma[1].direct_sound_channel == channel)
-      dma_transfer(&dma[1]);
+      dma_transfer(1);
 
     if(dma[2].direct_sound_channel == channel)
-      dma_transfer(&dma[2]);
+      dma_transfer(2);
   }
 }
 
@@ -567,7 +566,6 @@ void reset_sound(void)
 
   sound_on = 0;
   sound_buffer_base = 0;
-  sound_last_cpu_ticks = 0;
   memset(sound_buffer, 0, sizeof(sound_buffer));
 
   for(i = 0; i < 2; i++, ds++)
@@ -577,7 +575,6 @@ void reset_sound(void)
     ds->fifo_top = 0;
     ds->fifo_base = 0;
     ds->fifo_fractional = 0;
-    ds->last_cpu_ticks = 0;
     memset(ds->fifo, 0, 32);
   }
 
@@ -610,25 +607,152 @@ void init_sound(int need_reset)
     reset_sound();
 }
 
-#define sound_savestate_builder(type)                         \
-void sound_##type##_savestate(void)                           \
-{                                                             \
-  state_mem_##type##_variable(sound_on);                      \
-  state_mem_##type##_variable(sound_buffer_base);             \
-  state_mem_##type##_variable(sound_last_cpu_ticks);          \
-  state_mem_##type##_variable(gbc_sound_buffer_index);        \
-  state_mem_##type##_variable(gbc_sound_last_cpu_ticks);      \
-  state_mem_##type##_variable(gbc_sound_partial_ticks);       \
-  state_mem_##type##_variable(gbc_sound_master_volume_left);  \
-  state_mem_##type##_variable(gbc_sound_master_volume_right); \
-  state_mem_##type##_variable(gbc_sound_master_volume);       \
-  state_mem_##type##_array(wave_samples);                     \
-  state_mem_##type##_array(direct_sound_channel);             \
-  state_mem_##type##_array(gbc_sound_channel);                \
+bool sound_read_savestate(const u8 *src)
+{
+  int i;
+  const u8 *snddoc = bson_find_key(src, "sound");
+
+  if (!(
+    bson_read_int32(snddoc, "on", &sound_on) &&
+    bson_read_int32(snddoc, "buf-base", &sound_buffer_base) &&
+    bson_read_int32(snddoc, "gbc-buf-idx", &gbc_sound_buffer_index) &&
+    bson_read_int32(snddoc, "gbc-last-cpu-ticks", &gbc_sound_last_cpu_ticks) &&
+    bson_read_int32(snddoc, "gbc-partial-ticks", &gbc_sound_partial_ticks) &&
+    bson_read_int32(snddoc, "gbc-ms-vol-left", &gbc_sound_master_volume_left) &&
+    bson_read_int32(snddoc, "gbc-ms-vol-right", &gbc_sound_master_volume_right) &&
+    bson_read_int32(snddoc, "gbc-ms-vol", &gbc_sound_master_volume) &&
+    bson_read_bytes(snddoc, "wav-samples", wave_samples, sizeof(wave_samples))))
+    return false;
+
+  for (i = 0; i < 2; i++)
+  {
+    direct_sound_struct *ds = &direct_sound_channel[i];
+    char tn[4] = {'d', 's', '0' + i, 0};
+    const u8 *sndchan = bson_find_key(snddoc, tn);
+    if (!(
+      bson_read_int32(sndchan, "status", &ds->status) &&
+      bson_read_int32(sndchan, "volume", &ds->volume) &&
+      bson_read_int32(sndchan, "fifo-base", &ds->fifo_base) &&
+      bson_read_int32(sndchan, "fifo-top", &ds->fifo_top) &&
+      bson_read_int32(sndchan, "fifo-frac", &ds->fifo_fractional) &&
+      bson_read_bytes(sndchan, "fifo-bytes", ds->fifo, sizeof(ds->fifo)) &&
+      bson_read_int32(sndchan, "buf-idx", &ds->buffer_index)))
+      return false;
+  }
+
+  for (i = 0; i < 4; i++)
+  {
+    gbc_sound_struct *gs = &gbc_sound_channel[i];
+    char tn[4] = {'g', 's', '0' + i, 0};
+    const u8 *sndchan = bson_find_key(snddoc, tn);
+    if (!(
+      bson_read_int32(sndchan, "status", &gs->status) &&
+      bson_read_int32(sndchan, "rate", &gs->rate) &&
+      bson_read_int32(sndchan, "freq-step", &gs->frequency_step) &&
+      bson_read_int32(sndchan, "sample-idx", &gs->sample_index) &&
+      bson_read_int32(sndchan, "tick-cnt", &gs->tick_counter) &&
+      bson_read_int32(sndchan, "volume", &gs->total_volume) &&
+      bson_read_int32(sndchan, "active", &gs->active_flag) &&
+      bson_read_int32(sndchan, "enable", &gs->master_enable) &&
+
+      bson_read_int32(sndchan, "env-vol0", &gs->envelope_initial_volume) &&
+      bson_read_int32(sndchan, "env-vol", &gs->envelope_volume) &&
+      bson_read_int32(sndchan, "env-dir", &gs->envelope_direction) &&
+      bson_read_int32(sndchan, "env-status", &gs->envelope_status) &&
+      bson_read_int32(sndchan, "env-step", &gs->envelope_step) &&
+      bson_read_int32(sndchan, "env-ticks0", &gs->envelope_initial_ticks) &&
+      bson_read_int32(sndchan, "env-ticks", &gs->envelope_ticks) &&
+      bson_read_int32(sndchan, "sweep-status", &gs->sweep_status) &&
+      bson_read_int32(sndchan, "sweep-dir", &gs->sweep_direction) &&
+      bson_read_int32(sndchan, "sweep-ticks0", &gs->sweep_initial_ticks) &&
+      bson_read_int32(sndchan, "sweep-ticks", &gs->sweep_ticks) &&
+      bson_read_int32(sndchan, "sweep-shift", &gs->sweep_shift) &&
+      bson_read_int32(sndchan, "wav-type", &gs->wave_type) &&
+      bson_read_int32(sndchan, "wav-bank", &gs->wave_bank) &&
+      bson_read_int32(sndchan, "wav-vol", &gs->wave_volume) &&
+
+      bson_read_int32(sndchan, "len-status", &gs->length_status) &&
+      bson_read_int32(sndchan, "len-ticks", &gs->length_ticks) &&
+      bson_read_int32(sndchan, "noise-type", &gs->noise_type) &&
+      bson_read_int32(sndchan, "sample-tbl", &gs->sample_table_idx)))
+      return false;
+  }
+
+  return true;
 }
 
-sound_savestate_builder(read)
-sound_savestate_builder(write)
+unsigned sound_write_savestate(u8 *dst)
+{
+  int i;
+  u8 *wbptr, *startp = dst;
+  bson_start_document(dst, "sound", wbptr);
+  bson_write_int32(dst, "on", sound_on);
+  bson_write_int32(dst, "buf-base", sound_buffer_base);
+  bson_write_int32(dst, "gbc-buf-idx", gbc_sound_buffer_index);
+  bson_write_int32(dst, "gbc-last-cpu-ticks", gbc_sound_last_cpu_ticks);
+  bson_write_int32(dst, "gbc-partial-ticks", gbc_sound_partial_ticks);
+  bson_write_int32(dst, "gbc-ms-vol-left", gbc_sound_master_volume_left);
+  bson_write_int32(dst, "gbc-ms-vol-right", gbc_sound_master_volume_right);
+  bson_write_int32(dst, "gbc-ms-vol", gbc_sound_master_volume);
+  bson_write_bytes(dst, "wav-samples", wave_samples, sizeof(wave_samples));
+
+  for (i = 0; i < 2; i++)
+  {
+    u8 *wbptr2;
+    char tn[4] = {'d', 's', '0' + i, 0};
+    bson_start_document(dst, tn, wbptr2);
+    bson_write_int32(dst, "status", direct_sound_channel[i].status);
+    bson_write_int32(dst, "volume", direct_sound_channel[i].volume);
+    bson_write_int32(dst, "fifo-base", direct_sound_channel[i].fifo_base);
+    bson_write_int32(dst, "fifo-top", direct_sound_channel[i].fifo_top);
+    bson_write_int32(dst, "fifo-frac", direct_sound_channel[i].fifo_fractional);
+    bson_write_bytes(dst, "fifo-bytes", direct_sound_channel[i].fifo,
+                          sizeof(direct_sound_channel[i].fifo));
+    bson_write_int32(dst, "buf-idx", direct_sound_channel[i].buffer_index);
+    bson_finish_document(dst, wbptr2);
+  }
+
+  for (i = 0; i < 4; i++)
+  {
+    gbc_sound_struct *gs = &gbc_sound_channel[i];
+    u8 *wbptr2;
+    char tn[4] = {'g', 's', '0' + i, 0};
+    bson_start_document(dst, tn, wbptr2);
+    bson_write_int32(dst, "status", gs->status);
+    bson_write_int32(dst, "rate", gs->rate);
+    bson_write_int32(dst, "freq-step", gs->frequency_step);
+    bson_write_int32(dst, "sample-idx", gs->sample_index);
+    bson_write_int32(dst, "tick-cnt", gs->tick_counter);
+    bson_write_int32(dst, "volume", gs->total_volume);
+    bson_write_int32(dst, "active", gs->active_flag);
+    bson_write_int32(dst, "enable", gs->master_enable);
+
+    bson_write_int32(dst, "env-vol0", gs->envelope_initial_volume);
+    bson_write_int32(dst, "env-vol", gs->envelope_volume);
+    bson_write_int32(dst, "env-dir", gs->envelope_direction);
+    bson_write_int32(dst, "env-status", gs->envelope_status);
+    bson_write_int32(dst, "env-step", gs->envelope_step);
+    bson_write_int32(dst, "env-ticks0", gs->envelope_initial_ticks);
+    bson_write_int32(dst, "env-ticks", gs->envelope_ticks);
+    bson_write_int32(dst, "sweep-status", gs->sweep_status);
+    bson_write_int32(dst, "sweep-dir", gs->sweep_direction);
+    bson_write_int32(dst, "sweep-ticks0", gs->sweep_initial_ticks);
+    bson_write_int32(dst, "sweep-ticks", gs->sweep_ticks);
+    bson_write_int32(dst, "sweep-shift", gs->sweep_shift);
+    bson_write_int32(dst, "wav-type", gs->wave_type);
+    bson_write_int32(dst, "wav-bank", gs->wave_bank);
+    bson_write_int32(dst, "wav-vol", gs->wave_volume);
+
+    bson_write_int32(dst, "len-status", gs->length_status);
+    bson_write_int32(dst, "len-ticks", gs->length_ticks);
+    bson_write_int32(dst, "noise-type", gs->noise_type);
+    bson_write_int32(dst, "sample-tbl", gs->sample_table_idx);
+    bson_finish_document(dst, wbptr2);
+  }
+
+  bson_finish_document(dst, wbptr);
+  return (unsigned int)(dst - startp);
+}
 
 
 #include "libretro.h"

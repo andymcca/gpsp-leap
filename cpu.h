@@ -20,6 +20,7 @@
 #ifndef CPU_H
 #define CPU_H
 
+#include <stdbool.h>
 #include "gpsp_config.h"
 
 // System mode and user mode are represented as the same here
@@ -118,8 +119,8 @@ void function_cc execute_store_u16(u32 address, u32 source);
 void function_cc execute_store_u32(u32 address, u32 source);
 u32 function_cc execute_arm_translate(u32 cycles);
 void init_translater(void);
-void cpu_write_savestate(void);
-void cpu_read_savestate(void);
+unsigned cpu_write_savestate(u8* dst);
+bool cpu_read_savestate(const u8 *src);
 
 u8 function_cc *block_lookup_address_arm(u32 pc);
 u8 function_cc *block_lookup_address_thumb(u32 pc);

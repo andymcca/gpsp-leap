@@ -75,7 +75,7 @@ extern unsigned turbo_b_counter;
 
 void init_input(void);
 u32 update_input(void);
-void input_write_savestate(void);
-void input_read_savestate(void);
+unsigned input_write_savestate(u8* dst);
+bool input_read_savestate(const u8 *src);
 
 #endif

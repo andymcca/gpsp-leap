@@ -360,7 +360,7 @@ sram_size_type sram_size = SRAM_SIZE_32KB;
 
 flash_mode_type flash_mode = FLASH_BASE_MODE;
 u32 flash_command_position = 0;
-u8 *flash_bank_ptr = gamepak_backup;
+u32 flash_bank_num;  // 0 or 1
 
 flash_device_id_type flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
 flash_manufacturer_id_type flash_manufacturer_id =
@@ -398,7 +398,10 @@ u8 read_backup(u32 address)
     }
   }
   else
-    value = flash_bank_ptr[address];
+  {
+    u32 fulladdr = address + 64*1024*flash_bank_num;
+    value = gamepak_backup[fulladdr];
+  }
 
   return value;
 }
@@ -656,7 +659,6 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
       u32 dst_address = 0xFFFFFFF & (read_dmareg(REG_DMA0DAD, dma_number) |
                          (read_dmareg(REG_DMA0DAD + 1, dma_number) << 16));
 
-      dma[dma_number].dma_channel = dma_number;
       dma[dma_number].source_address = src_address;
       dma[dma_number].dest_address = dst_address;
       dma[dma_number].source_direction = (dma_increment_type)((value >>  7) & 3);
@@ -702,7 +704,7 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
 
       write_dmareg(REG_DMA0CNT_H, dma_number, value);
       if(start_type == DMA_START_IMMEDIATELY)
-        return dma_transfer(&dma[dma_number]);
+        return dma_transfer(dma_number);
     }
   }
   else
@@ -1431,7 +1433,7 @@ cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
 {                                                                             \
   u32 palette_address = address;                                              \
   address16(palette_ram, palette_address) = eswap16(value);                   \
-  convert_palette(value);                                                     \
+  value = convert_palette(value);                                             \
   address16(palette_ram_converted, palette_address) = value;                  \
 }                                                                             \
 
@@ -1441,9 +1443,9 @@ cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
   u32 value_high = value >> 16;                                               \
   u32 value_low = value & 0xFFFF;                                             \
   address32(palette_ram, palette_address) = eswap32(value);                   \
-  convert_palette(value_high);                                                \
+  value_high = convert_palette(value_high);                                   \
   address16(palette_ram_converted, palette_address + 2) = value_high;         \
-  convert_palette(value_low);                                                 \
+  value_low = convert_palette(value_low);                                     \
   address16(palette_ram_converted, palette_address) = value_low;              \
 }                                                                             \
 
@@ -1535,7 +1537,8 @@ void function_cc write_backup(u32 address, u32 value)
      (flash_mode == FLASH_ERASE_MODE) && (value == 0x30))
     {
       // Erase sector
-      memset(flash_bank_ptr + (address & 0xF000), 0xFF, 1024 * 4);
+      u32 fulladdr = (address & 0xF000) + 64*1024*flash_bank_num;
+      memset(&gamepak_backup[fulladdr], 0xFF, 1024 * 4);
       flash_mode = FLASH_BASE_MODE;
       flash_command_position = 0;
     }
@@ -1545,7 +1548,7 @@ void function_cc write_backup(u32 address, u32 value)
      (flash_mode == FLASH_BANKSWITCH_MODE) && (address == 0x0000) &&
      (flash_size == FLASH_SIZE_128KB))
     {
-      flash_bank_ptr = gamepak_backup + ((value & 0x01) * (1024 * 64));
+      flash_bank_num = value & 1;
       flash_mode = FLASH_BASE_MODE;
     }
     else
@@ -1553,7 +1556,8 @@ void function_cc write_backup(u32 address, u32 value)
     if((flash_command_position == 0) && (flash_mode == FLASH_WRITE_MODE))
     {
       // Write value to flash ROM
-      flash_bank_ptr[address] = value;
+      u32 fulladdr = address + 64*1024*flash_bank_num;
+      gamepak_backup[fulladdr] = value;
       flash_mode = FLASH_BASE_MODE;
     }
     else
@@ -2791,11 +2795,12 @@ cpu_alert_type dma_tf_loop##transfer_size(                                    \
 dma_tf_loop_builder(16);
 dma_tf_loop_builder(32);
 
-cpu_alert_type dma_transfer(dma_transfer_type *dma)
+cpu_alert_type dma_transfer(unsigned dma_chan)
 {
-  u32 length = dma->length;
-  u32 src_ptr = dma->source_address;
-  uintptr_t dest_ptr = dma->dest_address;
+  dma_transfer_type *dmach = &dma[dma_chan];
+  u32 length = dmach->length;
+  u32 src_ptr = dmach->source_address;
+  uintptr_t dest_ptr = dmach->dest_address;
   cpu_alert_type ret = CPU_ALERT_NONE;
 
   // Technically this should be done for source and destination, but
@@ -2805,49 +2810,49 @@ cpu_alert_type dma_transfer(dma_transfer_type *dma)
   {
     u32 first_length = ((dest_ptr & 0xFF000000) + 0x1000000) - dest_ptr;
     u32 second_length = length - first_length;
-    dma->length = first_length;
+    dmach->length = first_length;
 
-    dma_transfer(dma);
+    dma_transfer(dma_chan);
 
-    dma->length = length;
+    dmach->length = length;
 
     length = second_length;
     dest_ptr += first_length;
     src_ptr += first_length;
   }
 
-  if (dma->source_direction < 3)
+  if (dmach->source_direction < 3)
   {
     const int stridetbl[4] = {1, -1, 0, 1};
-    int dst_stride = stridetbl[dma->dest_direction];
-    int src_stride = stridetbl[dma->source_direction];
-    bool dst_wb = dma->dest_direction < 3;
+    int dst_stride = stridetbl[dmach->dest_direction];
+    int src_stride = stridetbl[dmach->source_direction];
+    bool dst_wb = dmach->dest_direction < 3;
 
-    if(dma->length_type == DMA_16BIT)
+    if(dmach->length_type == DMA_16BIT)
     {
        src_ptr &= ~0x01;
        dest_ptr &= ~0x01;
-       ret = dma_tf_loop16(src_ptr, dest_ptr, 2 * src_stride, 2 * dst_stride, dst_wb, length, dma);
+       ret = dma_tf_loop16(src_ptr, dest_ptr, 2 * src_stride, 2 * dst_stride, dst_wb, length, dmach);
     }
     else
     {
        src_ptr &= ~0x03;
        dest_ptr &= ~0x03;
-       ret = dma_tf_loop32(src_ptr, dest_ptr, 4 * src_stride, 4 * dst_stride, dst_wb, length, dma);
+       ret = dma_tf_loop32(src_ptr, dest_ptr, 4 * src_stride, 4 * dst_stride, dst_wb, length, dmach);
     }
   }
 
-  if((dma->repeat_type == DMA_NO_REPEAT) ||
-   (dma->start_type == DMA_START_IMMEDIATELY))
+  if((dmach->repeat_type == DMA_NO_REPEAT) ||
+   (dmach->start_type == DMA_START_IMMEDIATELY))
   {
-    u32 cntrl = read_dmareg(REG_DMA0CNT_H, dma->dma_channel);
-    write_dmareg(REG_DMA0CNT_H, dma->dma_channel, cntrl & (~0x8000));
-    dma->start_type = DMA_INACTIVE;
+    u32 cntrl = read_dmareg(REG_DMA0CNT_H, dma_chan);
+    write_dmareg(REG_DMA0CNT_H, dma_chan, cntrl & (~0x8000));
+    dmach->start_type = DMA_INACTIVE;
   }
 
-  if(dma->irq)
+  if(dmach->irq)
   {
-    raise_interrupt(IRQ_DMA0 << dma->dma_channel);
+    raise_interrupt(IRQ_DMA0 << dma_chan);
     ret = CPU_ALERT_IRQ;
   }
 
@@ -3010,7 +3015,7 @@ void init_memory(void)
   sram_size = SRAM_SIZE_32KB;
   //flash_size = FLASH_SIZE_64KB;
 
-  flash_bank_ptr = gamepak_backup;
+  flash_bank_num = 0;
   flash_command_position = 0;
   eeprom_size = EEPROM_512_BYTE;
   eeprom_mode = EEPROM_BASE_MODE;
@@ -3038,99 +3043,131 @@ void memory_term(void)
   }
 }
 
-#define savestate_block(type)   \
-  cpu_##type##_savestate();     \
-  input_##type##_savestate();   \
-  main_##type##_savestate();    \
-  memory_##type##_savestate();  \
-  sound_##type##_savestate();
-
-
-const u8 *state_mem_read_ptr;
-u8 *state_mem_write_ptr;
-
-void gba_load_state(const void* src)
+bool memory_read_savestate(const u8 *src)
 {
-   u32 i;
-   u32 current_color;
+  int i;
+  const u8 *memdoc = bson_find_key(src, "memory");
+  const u8 *bakdoc = bson_find_key(src, "backup");
+  const u8 *dmadoc = bson_find_key(src, "dma");
+  if (!memdoc || !bakdoc || !dmadoc)
+    return false;
 
-   state_mem_read_ptr = (u8*)src;
-   savestate_block(read);
+  if (!(
+    bson_read_bytes(memdoc, "iwram", &iwram[0x8000], 0x8000) &&
+    bson_read_bytes(memdoc, "ewram", ewram, 0x40000) &&
+    bson_read_bytes(memdoc, "vram", vram, sizeof(vram)) &&
+    bson_read_bytes(memdoc, "oamram", oam_ram, sizeof(oam_ram)) &&
+    bson_read_bytes(memdoc, "palram", palette_ram, sizeof(palette_ram)) &&
+    bson_read_bytes(memdoc, "ioregs", io_registers, sizeof(io_registers)) &&
 
-#ifdef HAVE_DYNAREC
-   if (dynarec_enable)
-      init_caches();
-#endif
+    bson_read_int32(bakdoc, "backup-type", &backup_type) &&
+    bson_read_int32(bakdoc, "sram-size", &sram_size) &&
 
-   reg[OAM_UPDATED] = 1;
-   gbc_sound_update = 1;
+    bson_read_int32(bakdoc, "flash-mode", &flash_mode) &&
+    bson_read_int32(bakdoc, "flash-cmd-pos", &flash_command_position) &&
+    bson_read_int32(bakdoc, "flash-bank-num", &flash_bank_num) &&
+    bson_read_int32(bakdoc, "flash-dev-id", &flash_device_id) &&
+    bson_read_int32(bakdoc, "flash-man-id", &flash_manufacturer_id) &&
+    bson_read_int32(bakdoc, "flash-size", &flash_size) &&
 
-   for(i = 0; i < 512; i++)
-   {
-      current_color = palette_ram[i];
-      palette_ram_converted[i] =
-       convert_palette(current_color);
-   }
+    bson_read_int32(bakdoc, "eeprom-size", &eeprom_size) &&
+    bson_read_int32(bakdoc, "eeprom-mode", &eeprom_mode) &&
+    bson_read_int32(bakdoc, "eeprom-addr", &eeprom_address) &&
+    bson_read_int32(bakdoc, "eeprom-counter", &eeprom_counter) &&
 
-   video_reload_counters();
+    bson_read_int32(bakdoc, "rtc-state", &rtc_state) &&
+    bson_read_int32(bakdoc, "rtc-write-mode", &rtc_write_mode) &&
+    bson_read_int32(bakdoc, "rtc-cmd", &rtc_command) &&
+    bson_read_int32(bakdoc, "rtc-status", &rtc_status) &&
+    bson_read_int32(bakdoc, "rtc-data-byte-cnt", &rtc_data_bytes) &&
+    bson_read_int32(bakdoc, "rtc-bit-cnt", (u32*)&rtc_bit_count) &&
+    bson_read_bytes(bakdoc, "rtc-regs", rtc_registers, sizeof(rtc_registers)) &&
+    bson_read_int32_array(bakdoc, "rtc-data-words", rtc_data,
+                            sizeof(rtc_data)/sizeof(rtc_data[0]))))
+    return false;
 
-   // Oops, these contain raw pointers
-   for(i = 0; i < 4; i++)
-      gbc_sound_channel[i].sample_table_idx = 2;
+  for (i = 0; i < DMA_CHAN_CNT; i++)
+  {
+    char tname[2] = {'0' + i, 0};
+    const u8 *dmastr = bson_find_key(dmadoc, tname);
+    if (!(
+      bson_read_int32(dmastr, "src-addr", &dma[i].source_address) &&
+      bson_read_int32(dmastr, "dst-addr", &dma[i].dest_address) &&
+      bson_read_int32(dmastr, "src-dir", &dma[i].source_direction) &&
+      bson_read_int32(dmastr, "dst-dir", &dma[i].dest_direction) &&
+      bson_read_int32(dmastr, "len", &dma[i].length) &&
+      bson_read_int32(dmastr, "size", &dma[i].length_type) &&
+      bson_read_int32(dmastr, "repeat", &dma[i].repeat_type) &&
+      bson_read_int32(dmastr, "start", &dma[i].start_type) &&
+      bson_read_int32(dmastr, "dsc", &dma[i].direct_sound_channel) &&
+      bson_read_int32(dmastr, "irq", &dma[i].irq)))
+      return false;
+  }
 
-   instruction_count = 0;
-
-   reg[CHANGED_PC_STATUS] = 1;
+  return true;
 }
 
-void gba_save_state(void* dst)
+unsigned memory_write_savestate(u8 *dst)
 {
-  state_mem_write_ptr = (u8*)dst;
-  savestate_block(write);
+  int i;
+  u8 *wbptr, *wbptr2, *startp = dst;
+  bson_start_document(dst, "memory", wbptr);
+  bson_write_bytes(dst, "iwram", &iwram[0x8000], 0x8000);
+  bson_write_bytes(dst, "ewram", ewram, 0x40000);
+  bson_write_bytes(dst, "vram", vram, sizeof(vram));
+  bson_write_bytes(dst, "oamram", oam_ram, sizeof(oam_ram));
+  bson_write_bytes(dst, "palram", palette_ram, sizeof(palette_ram));
+  bson_write_bytes(dst, "ioregs", io_registers, sizeof(io_registers));
+  bson_finish_document(dst, wbptr);
+
+  bson_start_document(dst, "backup", wbptr);
+  bson_write_int32(dst, "backup-type", backup_type);
+  bson_write_int32(dst, "sram-size", sram_size);
+
+  bson_write_int32(dst, "flash-mode", flash_mode);
+  bson_write_int32(dst, "flash-cmd-pos", flash_command_position);
+  bson_write_int32(dst, "flash-bank-num", flash_bank_num);
+  bson_write_int32(dst, "flash-dev-id", flash_device_id);
+  bson_write_int32(dst, "flash-man-id", flash_manufacturer_id);
+  bson_write_int32(dst, "flash-size", flash_size);
+
+  bson_write_int32(dst, "eeprom-size", eeprom_size);
+  bson_write_int32(dst, "eeprom-mode", eeprom_mode);
+  bson_write_int32(dst, "eeprom-addr", eeprom_address);
+  bson_write_int32(dst, "eeprom-counter", eeprom_counter);
+
+  bson_write_int32(dst, "rtc-state", rtc_state);
+  bson_write_int32(dst, "rtc-write-mode", rtc_write_mode);
+  bson_write_int32(dst, "rtc-cmd", rtc_command);
+  bson_write_int32(dst, "rtc-status", rtc_status);
+  bson_write_int32(dst, "rtc-data-byte-cnt", rtc_data_bytes);
+  bson_write_int32(dst, "rtc-bit-cnt", rtc_bit_count);
+  bson_write_bytes(dst, "rtc-regs", rtc_registers, sizeof(rtc_registers));
+  bson_write_int32array(dst, "rtc-data-words", rtc_data,
+                          sizeof(rtc_data)/sizeof(rtc_data[0]));
+  bson_finish_document(dst, wbptr);
+
+  bson_start_document(dst, "dma", wbptr);
+  for (i = 0; i < DMA_CHAN_CNT; i++)
+  {
+    char tname[2] = {'0' + i, 0};
+    bson_start_document(dst, tname, wbptr2);
+    bson_write_int32(dst, "src-addr", dma[i].source_address);
+    bson_write_int32(dst, "dst-addr", dma[i].dest_address);
+    bson_write_int32(dst, "src-dir", dma[i].source_direction);
+    bson_write_int32(dst, "dst-dir", dma[i].dest_direction);
+    bson_write_int32(dst, "len", dma[i].length);
+    bson_write_int32(dst, "size", dma[i].length_type);
+    bson_write_int32(dst, "repeat", dma[i].repeat_type);
+    bson_write_int32(dst, "start", dma[i].start_type);
+    bson_write_int32(dst, "dsc", dma[i].direct_sound_channel);
+    bson_write_int32(dst, "irq", dma[i].irq);
+    bson_finish_document(dst, wbptr2);
+  }
+  bson_finish_document(dst, wbptr);
+
+  return (unsigned int)(dst - startp);
 }
-
-
-#define memory_savestate_builder(type)                         \
-void memory_##type##_savestate(void)                           \
-{                                                              \
-  state_mem_##type##_variable(backup_type);                    \
-  state_mem_##type##_variable(sram_size);                      \
-  state_mem_##type##_variable(flash_mode);                     \
-  state_mem_##type##_variable(flash_command_position);         \
-  state_mem_##type##_pointer(flash_bank_ptr, gamepak_backup);  \
-  state_mem_##type##_variable(flash_device_id);                \
-  state_mem_##type##_variable(flash_manufacturer_id);          \
-  state_mem_##type##_variable(flash_size);                     \
-  state_mem_##type##_variable(eeprom_size);                    \
-  state_mem_##type##_variable(eeprom_mode);                    \
-  state_mem_##type##_variable(eeprom_address);                 \
-  state_mem_##type##_variable(eeprom_counter);                 \
-  state_mem_##type##_variable(rtc_state);                      \
-  state_mem_##type##_variable(rtc_write_mode);                 \
-  state_mem_##type##_array(rtc_registers);                     \
-  state_mem_##type##_variable(rtc_command);                    \
-  state_mem_##type##_array(rtc_data);                          \
-  state_mem_##type##_variable(rtc_status);                     \
-  state_mem_##type##_variable(rtc_data_bytes);                 \
-  state_mem_##type##_variable(rtc_bit_count);                  \
-  state_mem_##type##_array(dma);                               \
-                                                               \
-  state_mem_##type(iwram + 0x8000, 0x8000);                    \
-  state_mem_##type(ewram, 0x40000);                            \
-  state_mem_##type(vram, 0x18000);                             \
-  state_mem_##type(oam_ram, 0x400);                            \
-  state_mem_##type(palette_ram, 0x400);                        \
-  state_mem_##type(io_registers, 0x400);                       \
-                                                               \
-  /* This should not happen anymore :P */                      \
-  if((flash_bank_ptr < gamepak_backup) ||                      \
-  (flash_bank_ptr > (&gamepak_backup[sizeof(gamepak_backup)])))\
-    flash_bank_ptr = gamepak_backup;                           \
-}
-
-memory_savestate_builder(read)
-memory_savestate_builder(write)
-
 
 static s32 load_gamepak_raw(const char *name)
 {

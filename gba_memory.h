@@ -23,6 +23,8 @@
 #include "libretro.h"
 extern int use_libretro_save_method;
 
+#define DMA_CHAN_CNT   4
+
 typedef enum
 {
   DMA_START_IMMEDIATELY = 0,
@@ -67,7 +69,6 @@ typedef enum
 
 typedef struct
 {
-  u32 dma_channel;
   u32 source_address;
   u32 dest_address;
   u32 length;
@@ -213,7 +214,7 @@ extern char gamepak_code[5];
 extern char gamepak_maker[3];
 extern char gamepak_filename[512];
 
-cpu_alert_type dma_transfer(dma_transfer_type *dma);
+cpu_alert_type dma_transfer(unsigned dma_chan);
 u8 *memory_region(u32 address, u32 *memory_limit);
 u32 load_gamepak(const struct retro_game_info* info, const char *name);
 u32 load_backup(char *name);
@@ -227,7 +228,7 @@ u8 *load_gamepak_page(u32 physical_index);
 extern u32 oam_update;
 extern u32 gbc_sound_update;
 extern u32 gbc_sound_wave_update;
-extern dma_transfer_type dma[4];
+extern dma_transfer_type dma[DMA_CHAN_CNT];
 
 extern u8 open_gba_bios_rom[1024*16];
 extern u32 bios_read_protect;
@@ -246,9 +247,6 @@ extern u8 *memory_map_read[8 * 1024];
 extern u32 reg[64];
 
 extern flash_device_id_type flash_device_id;
-
-extern const u8 *state_mem_read_ptr;
-extern u8 *state_mem_write_ptr;
 
 typedef enum
 {
@@ -306,12 +304,6 @@ extern eeprom_size_type eeprom_size;
 
 extern u8 gamepak_backup[1024 * 128];
 
-static inline void state_mem_write(const void* src, size_t size)
-{
-  memcpy(state_mem_write_ptr, src, size);
-  state_mem_write_ptr += size;
-}
-
 // Page sticky bit routines
 extern u32 gamepak_sticky_bit[1024/32];
 static inline void touch_gamepak_page(u32 physical_index)
@@ -327,33 +319,7 @@ static inline void clear_gamepak_stickybits(void)
   memset(gamepak_sticky_bit, 0, sizeof(gamepak_sticky_bit));
 }
 
-/* this is an upper limit, ToDo : calculate the exact state size */
-#define GBA_STATE_MEM_SIZE                    (512*1024)
-
-#define state_mem_write_array(array)          state_mem_write(array,     sizeof(array))
-#define state_mem_write_variable(variable)    state_mem_write(&variable, sizeof(variable))
-#define state_mem_write_pointer(ptr, base) { \
-  u32 offset = ((u8*)ptr) - ((u8*)base);     \
-  state_mem_write(&offset, sizeof(offset));  \
-}
-
-static inline void state_mem_read(void* dst, size_t size)
-{
-  memcpy(dst, state_mem_read_ptr, size);
-  state_mem_read_ptr += size;
-}
-
-#define state_mem_read_array(array)           state_mem_read(array,     sizeof(array))
-#define state_mem_read_variable(variable)     state_mem_read(&variable, sizeof(variable))
-#define state_mem_read_pointer(ptr, base) {  \
-  u32 offset;                                \
-  state_mem_read(&offset, sizeof(offset));   \
-  ptr = (typeof(ptr))(((u8*)base) + offset); \
-}
-
-void memory_write_savestate(void);
-void memory_read_savestate(void);
-void gba_load_state(const void *src);
-void gba_save_state(void *dst);
+unsigned memory_write_savestate(u8 *dst);
+bool memory_read_savestate(const u8*src);
 
 #endif

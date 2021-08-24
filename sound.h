@@ -52,7 +52,6 @@ typedef struct
    u32 buffer_index;
    direct_sound_status_type status;
    direct_sound_volume_type volume;
-   u32 last_cpu_ticks;
 } direct_sound_struct;
 
 typedef enum
@@ -114,8 +113,8 @@ void sound_timer(fixed8_24 frequency_step, u32 channel);
 void sound_reset_fifo(u32 channel);
 void update_gbc_sound(u32 cpu_ticks);
 void init_sound(int need_reset);
-void sound_write_savestate(void);
-void sound_read_savestate(void);
+unsigned sound_write_savestate(u8 *dst);
+bool sound_read_savestate(const u8 *src);
 
 void render_audio(void);
 

@@ -77,13 +77,13 @@
 
 #ifdef USE_BGR_FORMAT
   #define convert_palette(value)  \
-    value = ((value & 0x7FE0) << 1) | (value & 0x1F)
+    (((value & 0x7FE0) << 1) | (value & 0x1F))
 #elif defined(USE_XBGR1555_FORMAT)
   #define convert_palette(value)  \
-    value = (value & 0x7FFF)
+    (value & 0x7FFF)
 #else
   #define convert_palette(value) \
-    value = ((value & 0x1F) << 11) | ((value & 0x03E0) << 1) | (value >> 10)
+    (((value & 0x1F) << 11) | ((value & 0x03E0) << 1) | (value >> 10))
 #endif
 
 #define GBA_SCREEN_WIDTH  (240)
@@ -153,6 +153,7 @@ typedef u32 fixed8_24;
 #include <stdarg.h>
 #include "cpu.h"
 #include "gba_memory.h"
+#include "savestate.h"
 #include "video.h"
 #include "input.h"
 #include "sound.h"

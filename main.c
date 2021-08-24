@@ -152,7 +152,7 @@ u32 update_gba(void)
           for(i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_HBLANK)
-              dma_transfer(&dma[i]);
+              dma_transfer(i);
           }
         }
 
@@ -183,7 +183,7 @@ u32 update_gba(void)
           for(i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_VBLANK)
-              dma_transfer(&dma[i]);
+              dma_transfer(i);
           }
         }
         else
@@ -279,16 +279,65 @@ void change_ext(const char *src, char *buffer, const char *extension)
     strcpy(dot_position, extension);
 }
 
-#define main_savestate_builder(type)            \
-void main_##type##_savestate(void)              \
-{                                               \
-  state_mem_##type##_variable(cpu_ticks);       \
-  state_mem_##type##_variable(execute_cycles);  \
-  state_mem_##type##_variable(video_count);     \
-  state_mem_##type##_array(timer);              \
+bool main_read_savestate(const u8 *src)
+{
+  int i;
+  const u8 *p1 = bson_find_key(src, "emu");
+  const u8 *p2 = bson_find_key(src, "timers");
+  if (!p1 || !p2)
+    return false;
+  execute_cycles = 123;
+  if (!(bson_read_int32(p1, "cpu-ticks", &cpu_ticks) &&
+         bson_read_int32(p1, "exec-cycles", &execute_cycles) &&
+         bson_read_int32(p1, "video-count", (u32*)&video_count)))
+    return false;
+
+  for (i = 0; i < 4; i++)
+  {
+    char tname[2] = {'0' + i, 0};
+    const u8 *p = bson_find_key(p2, tname);
+
+    if (!(
+      bson_read_int32(p, "count", (u32*)&timer[i].count) &&
+      bson_read_int32(p, "reload", &timer[i].reload) &&
+      bson_read_int32(p, "prescale", &timer[i].prescale) &&
+      bson_read_int32(p, "freq-step", &timer[i].frequency_step) &&
+      bson_read_int32(p, "dsc", &timer[i].direct_sound_channels) &&
+      bson_read_int32(p, "irq", &timer[i].irq) &&
+      bson_read_int32(p, "status", &timer[i].status)))
+      return false;
+  }  
+
+  return true;
 }
 
-main_savestate_builder(read)
-main_savestate_builder(write)
+unsigned main_write_savestate(u8* dst)
+{
+  int i;
+  u8 *wbptr, *wbptr2, *startp = dst;
+  bson_start_document(dst, "emu", wbptr);
+  bson_write_int32(dst, "cpu-ticks", cpu_ticks);
+  bson_write_int32(dst, "exec-cycles", execute_cycles);
+  bson_write_int32(dst, "video-count", video_count);
+  bson_finish_document(dst, wbptr);
+
+  bson_start_document(dst, "timers", wbptr);
+  for (i = 0; i < 4; i++)
+  {
+    char tname[2] = {'0' + i, 0};
+    bson_start_document(dst, tname, wbptr2);
+    bson_write_int32(dst, "count", timer[i].count);
+    bson_write_int32(dst, "reload", timer[i].reload);
+    bson_write_int32(dst, "prescale", timer[i].prescale);
+    bson_write_int32(dst, "freq-step", timer[i].frequency_step);
+    bson_write_int32(dst, "dsc", timer[i].direct_sound_channels);
+    bson_write_int32(dst, "irq", timer[i].irq);
+    bson_write_int32(dst, "status", timer[i].status);
+    bson_finish_document(dst, wbptr2);
+  }
+  bson_finish_document(dst, wbptr);
+
+  return (unsigned int)(dst - startp);
+}
 
 
