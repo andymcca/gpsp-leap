@@ -954,7 +954,7 @@ const u32 psr_masks[16] =
   }                                                                           \
   if(((_address >> 24) == 0) && (pc >= 0x4000))                               \
   {                                                                           \
-    dest = *((type *)((u8 *)&bios_read_protect + (_address & 0x03)));         \
+    ror(dest, bios_read_protect, (_address & 0x03) << 3);                     \
   }                                                                           \
   else                                                                        \
                                                                               \

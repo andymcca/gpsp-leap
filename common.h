@@ -21,7 +21,7 @@
 #define COMMON_H
 
 #define ror(dest, value, shift)                                               \
-  dest = ((value) >> shift) | ((value) << (32 - shift))                       \
+  dest = ((value) >> (shift)) | ((value) << (32 - (shift)))                   \
 
 #if defined(_WIN32)
   #define PATH_SEPARATOR "\\"

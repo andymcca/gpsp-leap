@@ -1355,7 +1355,8 @@ void function_cc execute_store_spsr(u32 new_spsr, u32 store_mask)
                                                                               \
   if(((address >> 24) == 0) && (reg[REG_PC] >= 0x4000))                       \
   {                                                                           \
-    dest = *((type *)((u8 *)&bios_read_protect + (address & 0x03)));          \
+    ror(dest, bios_read_protect, (address & 0x03) << 3);                      \
+    dest = (type)dest;                                                        \
   }                                                                           \
   else                                                                        \
                                                                               \
@@ -1376,7 +1377,8 @@ void function_cc execute_store_spsr(u32 new_spsr, u32 store_mask)
                                                                               \
   if(((address >> 24) == 0) && (reg[REG_PC] >= 0x4000))                       \
   {                                                                           \
-    dest = *((s16 *)((u8 *)&bios_read_protect + (address & 0x03)));           \
+    ror(dest, bios_read_protect, (address & 0x03) << 3);                      \
+    dest = (s16)dest;                                                         \
   }                                                                           \
   else                                                                        \
                                                                               \

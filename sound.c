@@ -77,7 +77,7 @@ void sound_timer_queue32(u32 channel, u32 value)
 void sound_timer(fixed8_24 frequency_step, u32 channel)
 {
   direct_sound_status_type sample_status = DIRECT_SOUND_INACTIVE;
-  direct_sound_struct *ds = direct_sound_channel + channel;
+  direct_sound_struct *ds = &direct_sound_channel[channel];
 
   fixed8_24 fifo_fractional = ds->fifo_fractional;
   u32 buffer_index = ds->buffer_index;
@@ -172,9 +172,7 @@ void sound_timer(fixed8_24 frequency_step, u32 channel)
 
 void sound_reset_fifo(u32 channel)
 {
-  direct_sound_struct *ds = direct_sound_channel;
-
-  memset(ds->fifo, 0, 32);
+  memset(direct_sound_channel[channel].fifo, 0, 32);
 }
 
 // Initial pattern data = 4bits (signed)

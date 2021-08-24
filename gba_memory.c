@@ -574,7 +574,7 @@ u32 function_cc read_eeprom(void)
     case 0x00:                                                                \
       /* BIOS */                                                              \
       if(reg[REG_PC] >= 0x4000)                                               \
-        value = readaddress##type(&bios_read_protect, address & 0x03);        \
+        ror(value, bios_read_protect, (address & 0x03) << 3);                 \
       else                                                                    \
         value = readaddress##type(bios_rom, address & 0x3FFF);                \
       break;                                                                  \
