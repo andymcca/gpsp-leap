@@ -3132,7 +3132,8 @@ s32 translate_block_arm(u32 pc, translation_region_type
 
     /* If the next instruction is a block entry point update the
        cycle counter and update */
-    if(block_data[block_data_position].update_cycles == 1)
+    if (pc != block_end_pc &&
+        block_data[block_data_position].update_cycles)
     {
       generate_cycle_update();
     }
@@ -3342,7 +3343,8 @@ s32 translate_block_thumb(u32 pc, translation_region_type
 
     /* If the next instruction is a block entry point update the
        cycle counter and update */
-    if(block_data[block_data_position].update_cycles == 1)
+    if (pc != block_end_pc &&
+        block_data[block_data_position].update_cycles)
     {
       generate_cycle_update();
     }
