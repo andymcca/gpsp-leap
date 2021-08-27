@@ -2332,7 +2332,7 @@ typedef enum
   DMA_REGION_NULL
 } dma_region_type;
 
-const dma_region_type dma_region_map[16] =
+const dma_region_type dma_region_map[17] =
 {
   DMA_REGION_BIOS,          // 0x00 - BIOS
   DMA_REGION_NULL,          // 0x01 - Nothing
@@ -2349,7 +2349,8 @@ const dma_region_type dma_region_map[16] =
   DMA_REGION_GAMEPAK,       // 0x0C - gamepak ROM
   DMA_REGION_EXT,           // 0x0D - EEPROM
   DMA_REGION_EXT,           // 0x0E - gamepak SRAM/flash ROM
-  DMA_REGION_EXT            // 0x0F - gamepak SRAM/flash ROM
+  DMA_REGION_EXT,           // 0x0F - gamepak SRAM/flash ROM
+  DMA_REGION_NULL           // 0x10 - Not possible (undefined?)
 };
 
 #define dma_print(src_op, dest_op, transfer_size, wb)                         \
@@ -2795,52 +2796,73 @@ cpu_alert_type dma_tf_loop##transfer_size(                                    \
 dma_tf_loop_builder(16);
 dma_tf_loop_builder(32);
 
-cpu_alert_type dma_transfer(unsigned dma_chan)
+static const int dma_stride[4] = {1, -1, 0, 1};
+
+static cpu_alert_type dma_transfer_copy(
+  dma_transfer_type *dmach, u32 src_ptr, u32 dest_ptr, u32 length)
 {
-  dma_transfer_type *dmach = &dma[dma_chan];
-  u32 length = dmach->length;
-  u32 src_ptr = dmach->source_address;
-  uintptr_t dest_ptr = dmach->dest_address;
-  cpu_alert_type ret = CPU_ALERT_NONE;
-
-  // Technically this should be done for source and destination, but
-  // chances are this is only ever used (probably mistakingly!) for dest.
-  // The only game I know of that requires this is Lucky Luke.
-  if((dest_ptr >> 24) != ((dest_ptr + length - 1) >> 24))
-  {
-    u32 first_length = ((dest_ptr & 0xFF000000) + 0x1000000) - dest_ptr;
-    u32 second_length = length - first_length;
-    dmach->length = first_length;
-
-    dma_transfer(dma_chan);
-
-    dmach->length = length;
-
-    length = second_length;
-    dest_ptr += first_length;
-    src_ptr += first_length;
-  }
-
   if (dmach->source_direction < 3)
   {
-    const int stridetbl[4] = {1, -1, 0, 1};
-    int dst_stride = stridetbl[dmach->dest_direction];
-    int src_stride = stridetbl[dmach->source_direction];
+    int dst_stride = dma_stride[dmach->dest_direction];
+    int src_stride = dma_stride[dmach->source_direction];
     bool dst_wb = dmach->dest_direction < 3;
 
     if(dmach->length_type == DMA_16BIT)
     {
-       src_ptr &= ~0x01;
-       dest_ptr &= ~0x01;
-       ret = dma_tf_loop16(src_ptr, dest_ptr, 2 * src_stride, 2 * dst_stride, dst_wb, length, dmach);
+       return dma_tf_loop16(src_ptr, dest_ptr, 2 * src_stride, 2 * dst_stride, dst_wb, length, dmach);
     }
     else
     {
-       src_ptr &= ~0x03;
-       dest_ptr &= ~0x03;
-       ret = dma_tf_loop32(src_ptr, dest_ptr, 4 * src_stride, 4 * dst_stride, dst_wb, length, dmach);
+       return dma_tf_loop32(src_ptr, dest_ptr, 4 * src_stride, 4 * dst_stride, dst_wb, length, dmach);
     }
   }
+
+  return CPU_ALERT_NONE;
+}
+
+cpu_alert_type dma_transfer(unsigned dma_chan)
+{
+  dma_transfer_type *dmach = &dma[dma_chan];
+  u32 src_ptr = dmach->source_address & (
+                   dmach->length_type == DMA_16BIT ? ~1U : ~3U);
+  u32 dst_ptr = dmach->dest_address & (
+                   dmach->length_type == DMA_16BIT ? ~1U : ~3U);
+  cpu_alert_type ret = CPU_ALERT_NONE;
+  u32 tfsizes = dmach->length_type == DMA_16BIT ? 1 : 2;
+  u32 byte_length = dmach->length << tfsizes;
+
+  // Divide the DMA transaction into up to three transactions depending on
+  // the source and destination memory regions.
+  u32 src_end = MIN(0x10000000, src_ptr + byte_length * dma_stride[dmach->source_direction]);
+  u32 dst_end = MIN(0x10000000, dst_ptr + byte_length * dma_stride[dmach->dest_direction]);
+
+  dma_region_type src_reg0 = dma_region_map[src_ptr >> 24];
+  dma_region_type src_reg1 = dma_region_map[src_end >> 24];
+  dma_region_type dst_reg0 = dma_region_map[dst_ptr >> 24];
+  dma_region_type dst_reg1 = dma_region_map[dst_end >> 24];
+
+  if (src_reg0 == src_reg1 && dst_reg0 == dst_reg1)
+    ret = dma_transfer_copy(dmach, src_ptr, dst_ptr, byte_length >> tfsizes);
+  else if (src_reg0 == src_reg1) {
+    // Source stays within the region, dest crosses over
+    u32 blen0 = dma_stride[dmach->dest_direction] < 0 ?
+        dst_ptr & 0xFFFFFF : 0x1000000 - (dst_ptr & 0xFFFFFF);
+    u32 src1 = src_ptr + blen0 * dma_stride[dmach->source_direction];
+    u32 dst1 = dst_ptr + blen0 * dma_stride[dmach->dest_direction];
+    ret = dma_transfer_copy(dmach, src_ptr, dst_ptr, blen0 >> tfsizes);
+    ret = dma_transfer_copy(dmach, src1, dst1, (byte_length - blen0) >> tfsizes);
+  }
+  else if (dst_reg0 == dst_reg1) {
+    // Dest stays within the region, source crosses over
+    u32 blen0 = dma_stride[dmach->source_direction] < 0 ?
+        src_ptr & 0xFFFFFF : 0x1000000 - (src_ptr & 0xFFFFFF);
+    u32 src1 = src_ptr + blen0 * dma_stride[dmach->source_direction];
+    u32 dst1 = dst_ptr + blen0 * dma_stride[dmach->dest_direction];
+    ret = dma_transfer_copy(dmach, src_ptr, dst_ptr, blen0 >> tfsizes);
+    ret = dma_transfer_copy(dmach, src1, dst1, (byte_length - blen0) >> tfsizes);
+  }
+  // TODO: We do not cover the three-region case, seems no game uses that?
+  // Lucky Luke does cross dest region due to some off-by-one error.
 
   if((dmach->repeat_type == DMA_NO_REPEAT) ||
    (dmach->start_type == DMA_START_IMMEDIATELY))

@@ -23,6 +23,9 @@
 #define ror(dest, value, shift)                                               \
   dest = ((value) >> (shift)) | ((value) << (32 - (shift)))                   \
 
+#define MAX(a,b)  ((a) > (b) ? (a) : (b))
+#define MIN(a,b)  ((a) < (b) ? (a) : (b))
+
 #if defined(_WIN32)
   #define PATH_SEPARATOR "\\"
   #define PATH_SEPARATOR_CHAR '\\'
