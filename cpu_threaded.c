@@ -54,10 +54,10 @@ u8 *ram_translation_ptr = ram_translation_cache;
 #endif
 /* Note, see stub files for more cache definitions */
 
-u32 iwram_code_min = 0xFFFFFFFF;
-u32 iwram_code_max = 0xFFFFFFFF;
-u32 ewram_code_min = 0xFFFFFFFF;
-u32 ewram_code_max = 0xFFFFFFFF;
+u32 iwram_code_min = ~0U;
+u32 iwram_code_max =  0U;
+u32 ewram_code_min = ~0U;
+u32 ewram_code_max =  0U;
 
 
 u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
@@ -3034,18 +3034,10 @@ s32 translate_block_arm(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if(pc >= 0x3000000)
-      {
-        if((pc < iwram_code_min) || (iwram_code_min == 0xFFFFFFFF))
-          iwram_code_min = pc;
-      }
-      else
-
-      if(pc >= 0x2000000)
-      {
-        if((pc < ewram_code_min) || (ewram_code_min == 0xFFFFFFFF))
-          ewram_code_min = pc;
-      }
+      if (pc >= 0x3000000)
+        iwram_code_min = MIN(pc & 0x7FFF, iwram_code_min);
+      else if (pc >= 0x2000000)
+        ewram_code_min = MIN(pc & 0x3FFFF, ewram_code_min);
 
       translation_ptr = ram_translation_ptr;
       translation_cache_limit =
@@ -3181,18 +3173,10 @@ s32 translate_block_arm(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if(pc >= 0x3000000)
-      {
-        if((pc > iwram_code_max) || (iwram_code_max == 0xFFFFFFFF))
-          iwram_code_max = pc;
-      }
-      else
-
-      if(pc >= 0x2000000)
-      {
-        if((pc > ewram_code_max) || (ewram_code_max == 0xFFFFFFFF))
-          ewram_code_max = pc;
-      }
+      if (pc >= 0x3000000)
+        iwram_code_max = MAX(pc & 0x7FFF, iwram_code_max);
+      else if (pc >= 0x2000000)
+        ewram_code_max = MAX(pc & 0x3FFFF, ewram_code_max);
 
       ram_translation_ptr = translation_ptr;
       break;
@@ -3247,18 +3231,10 @@ s32 translate_block_thumb(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if(pc >= 0x3000000)
-      {
-        if((pc < iwram_code_min) || (iwram_code_min == 0xFFFFFFFF))
-          iwram_code_min = pc;
-      }
-      else
-
-      if(pc >= 0x2000000)
-      {
-        if((pc < ewram_code_min) || (ewram_code_min == 0xFFFFFFFF))
-          ewram_code_min = pc;
-      }
+      if (pc >= 0x3000000)
+        iwram_code_min = MIN(pc & 0x7FFF, iwram_code_min);
+      else if (pc >= 0x2000000)
+        ewram_code_min = MIN(pc & 0x3FFFF, ewram_code_min);
 
       translation_ptr = ram_translation_ptr;
       translation_cache_limit =
@@ -3386,18 +3362,10 @@ s32 translate_block_thumb(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if(pc >= 0x3000000)
-      {
-        if((pc > iwram_code_max) || (iwram_code_max == 0xFFFFFFFF))
-          iwram_code_max = pc;
-      }
-      else
-
-      if(pc >= 0x2000000)
-      {
-        if((pc > ewram_code_max) || (ewram_code_max == 0xFFFFFFFF))
-          ewram_code_max = pc;
-      }
+      if (pc >= 0x3000000)
+        iwram_code_max = MAX(pc & 0x7FFF, iwram_code_max);
+      else if (pc >= 0x2000000)
+        ewram_code_max = MAX(pc & 0x3FFFF, ewram_code_max);
 
       ram_translation_ptr = translation_ptr;
       break;
@@ -3432,24 +3400,16 @@ void flush_translation_cache_ram(void)
 
   // Proceed to clean the SMC area if needed
   // (also try to memset as little as possible for performance)
-  if(iwram_code_min != 0xFFFFFFFF)
-  {
-    iwram_code_min &= 0x7FFF;
-    iwram_code_max &= 0x7FFF;
-    memset(iwram + iwram_code_min, 0, iwram_code_max - iwram_code_min);
-  }
+  if(iwram_code_max)
+    memset(&iwram[iwram_code_min], 0, iwram_code_max - iwram_code_min);
 
-  if(ewram_code_min != 0xFFFFFFFF)
-  {
-    ewram_code_min &= 0x3FFFF;
-    ewram_code_max &= 0x3FFFF;
+  if(ewram_code_max)
     memset(&ewram[0x40000 + ewram_code_min], 0, ewram_code_max - ewram_code_min);
-  }
 
-  iwram_code_min = 0xFFFFFFFF;
-  iwram_code_max = 0xFFFFFFFF;
-  ewram_code_min = 0xFFFFFFFF;
-  ewram_code_max = 0xFFFFFFFF;
+  iwram_code_min = ~0U;
+  iwram_code_max =  0U;
+  ewram_code_min = ~0U;
+  ewram_code_max =  0U;
 }
 
 void flush_translation_cache_rom(void)
@@ -3465,9 +3425,9 @@ void init_caches(void)
   /* Ensure we wipe everything including the SMC mirrors */
   flush_translation_cache_rom();
   ewram_code_min = 0;
-  ewram_code_max = 0x3FFFF;
+  ewram_code_max = 0x40000;
   iwram_code_min = 0;
-  iwram_code_max = 0x7FFF;
+  iwram_code_max = 0x8000;
   flush_translation_cache_ram();
 }
 
