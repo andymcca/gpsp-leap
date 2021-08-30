@@ -1582,13 +1582,13 @@ ARM_CMN_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, ARMCOND_AL)
 #define ARM_TST_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, cond) \
 ARM_DPIOP_S_REG_REGSHIFT_COND(p, ARMOP_TST, 0, rn, rm, shift_type, rs, cond)
 #define ARM_TST_REG_REGSHIFT(p, rn, rm, shift_type, rs) \
-ARM_CMN_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, ARMCOND_AL)
+ARM_TST_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, ARMCOND_AL)
 
 /* PSR := TEQ Rn, (Rm <shift_type> Rs) */
 #define ARM_TEQ_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, cond) \
 ARM_DPIOP_S_REG_REGSHIFT_COND(p, ARMOP_TEQ, 0, rn, rm, shift_type, rs, cond)
 #define ARM_TEQ_REG_REGSHIFT(p, rn, rm, shift_type, rs) \
-ARM_CMN_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, ARMCOND_AL)
+ARM_TEQ_REG_REGSHIFT_COND(p, rn, rm, shift_type, rs, ARMCOND_AL)
 
 
 
