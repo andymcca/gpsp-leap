@@ -101,6 +101,7 @@ typedef enum
   x86_opcode_ret                        = 0xC3,
   x86_opcode_test_rm_imm                = 0x00F7,
   x86_opcode_test_reg_rm                = 0x85,
+  x86_opcode_not_rm                     = 0x02F7,
   x86_opcode_mul_eax_rm                 = 0x04F7,
   x86_opcode_imul_eax_rm                = 0x05F7,
   x86_opcode_idiv_eax_rm                = 0x07F7,
@@ -110,13 +111,20 @@ typedef enum
   x86_opcode_xor_rm_imm                 = 0x0681,
   x86_opcode_add_reg_rm                 = 0x03,
   x86_opcode_adc_reg_rm                 = 0x13,
+  x86_opcode_and_reg_rm                 = 0x23,
   x86_opcode_or_reg_rm                  = 0x0B,
   x86_opcode_sub_reg_rm                 = 0x2B,
+  x86_opcode_sbb_reg_rm                 = 0x1B,
   x86_opcode_xor_reg_rm                 = 0x33,
   x86_opcode_cmp_reg_rm                 = 0x39,
   x86_opcode_cmp_rm_imm                 = 0x053B,
   x86_opcode_lea_reg_rm                 = 0x8D,
   x86_opcode_j                          = 0x80,
+  x86_opcode_seto                       = 0x90,
+  x86_opcode_setc                       = 0x92,
+  x86_opcode_setnc                      = 0x93,
+  x86_opcode_setz                       = 0x94,
+  x86_opcode_sets                       = 0x98,
   x86_opcode_jmp                        = 0xE9,
   x86_opcode_jmp_reg                    = 0x04FF,
   x86_opcode_ext                        = 0x0F
@@ -177,6 +185,13 @@ typedef enum
 #define x86_emit_mov_mem_reg(source, base, offset)                            \
   x86_emit_opcode_1b_mem(mov_rm_reg, source, base, offset)                    \
 
+#define x86_emit_setcc_mem(ccode, base, offset)                               \
+  x86_emit_byte(x86_opcode_ext);                                              \
+  x86_emit_opcode_1b_mem(set##ccode, eax, base, offset);                      \
+
+#define x86_emit_add_reg_mem(dst, base, offset)                               \
+  x86_emit_opcode_1b_mem(add_reg_rm, dst, base, offset);                      \
+
 #define x86_emit_mov_reg_reg(dest, source)                                    \
   if(x86_unequal_operands(dest, source))                                      \
   {                                                                           \
@@ -215,6 +230,12 @@ typedef enum
 
 #define x86_emit_sub_reg_reg(dest, source)                                    \
   x86_emit_opcode_1b_reg(sub_reg_rm, dest, source)                            \
+
+#define x86_emit_sbb_reg_reg(dest, source)                                    \
+  x86_emit_opcode_1b_reg(sbb_reg_rm, dest, source)                            \
+
+#define x86_emit_and_reg_reg(dest, source)                                    \
+  x86_emit_opcode_1b_reg(and_reg_rm, dest, source)                            \
 
 #define x86_emit_or_reg_reg(dest, source)                                     \
   x86_emit_opcode_1b_reg(or_reg_rm, dest, source)                             \
@@ -266,6 +287,9 @@ typedef enum
 
 #define x86_emit_idiv_eax_reg(source)                                         \
   x86_emit_opcode_1b_ext_reg(idiv_eax_rm, source)                             \
+
+#define x86_emit_not_reg(srcdst)                                              \
+  x86_emit_opcode_1b_ext_reg(not_rm, srcdst)                                  \
 
 #define x86_emit_pop_reg(regn)                                                \
   x86_emit_opcode_1b(pop_reg, regn)                                           \
@@ -321,6 +345,9 @@ typedef enum
 #define reg_rv      eax
 #define reg_s0      esi
 
+#define generate_update_flag(condcode, regnum)                                \
+  x86_emit_setcc_mem(condcode, reg_base, regnum * 4)                          \
+
 #define generate_load_reg(ireg, reg_index)                                    \
   x86_emit_mov_reg_mem(reg_##ireg, reg_base, reg_index * 4);                  \
 
@@ -345,11 +372,23 @@ typedef enum
 #define generate_rotate_right(ireg, imm)                                      \
   x86_emit_ror_reg_imm(reg_##ireg, imm)                                       \
 
+#define generate_and(ireg_dest, ireg_src)                                     \
+  x86_emit_and_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
+
 #define generate_add(ireg_dest, ireg_src)                                     \
   x86_emit_add_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
 
+#define generate_adc(ireg_dest, ireg_src)                                     \
+  x86_emit_adc_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
+
+#define generate_add_memreg(ireg_dest, arm_reg_src)                           \
+  x86_emit_add_reg_mem(reg_##ireg_dest, reg_base, arm_reg_src * 4)            \
+
 #define generate_sub(ireg_dest, ireg_src)                                     \
   x86_emit_sub_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
+
+#define generate_sbb(ireg_dest, ireg_src)                                     \
+  x86_emit_sbb_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
 
 #define generate_or(ireg_dest, ireg_src)                                      \
   x86_emit_or_reg_reg(reg_##ireg_dest, reg_##ireg_src)                        \
@@ -374,6 +413,9 @@ typedef enum
 
 #define generate_mov(ireg_dest, ireg_src)                                     \
   x86_emit_mov_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
+
+#define generate_not(ireg)                                                    \
+  x86_emit_not_reg(reg_##ireg)                                                \
 
 #define generate_multiply(ireg)                                               \
   x86_emit_imul_eax_reg(reg_##ireg)                                           \
@@ -884,18 +926,6 @@ u32 function_cc execute_rrx(u32 value)
     }                                                                         \
   }                                                                           \
 
-#define calculate_flags_add(dest, src_a, src_b)                               \
-  calculate_z_flag(dest);                                                     \
-  calculate_n_flag(dest);                                                     \
-  calculate_c_flag_add(dest, src_a, src_b);                                   \
-  calculate_v_flag_add(dest, src_a, src_b)                                    \
-
-#define calculate_flags_sub(dest, src_a, src_b)                               \
-  calculate_z_flag(dest);                                                     \
-  calculate_n_flag(dest);                                                     \
-  calculate_c_flag_sub(dest, src_a, src_b);                                   \
-  calculate_v_flag_sub(dest, src_a, src_b)                                    \
-
 #define calculate_flags_logic(dest)                                           \
   calculate_z_flag(dest);                                                     \
   calculate_n_flag(dest)                                                      \
@@ -1163,7 +1193,7 @@ typedef enum
 #define rm_op_imm imm
 
 #define arm_data_proc_reg_flags()                                             \
-  arm_decode_data_proc_reg(opcode);                                                 \
+  arm_decode_data_proc_reg(opcode);                                           \
   if(flag_status & 0x02)                                                      \
   {                                                                           \
     generate_load_rm_sh(flags)                                                \
@@ -1198,22 +1228,20 @@ typedef enum
 {                                                                             \
   arm_data_proc_##type();                                                     \
   generate_load_reg_pc(a1, rn, 8);                                            \
-  generate_function_call(execute_##name);                                     \
-  generate_store_reg_pc_##flags_op(rv, rd);                                   \
+  arm_data_proc_##name(rd, generate_store_reg_pc_##flags_op);                 \
 }                                                                             \
 
 #define arm_data_proc_test(name, type)                                        \
 {                                                                             \
   arm_data_proc_##type();                                                     \
   generate_load_reg_pc(a1, rn, 8);                                            \
-  generate_function_call(execute_##name);                                     \
+  arm_data_proc_test_##name();                                                \
 }                                                                             \
 
 #define arm_data_proc_unary(name, type, flags_op)                             \
 {                                                                             \
   arm_data_proc_##type();                                                     \
-  generate_function_call(execute_##name);                                     \
-  generate_store_reg_pc_##flags_op(rv, rd);                                   \
+  arm_data_proc_unary_##name(rd, generate_store_reg_pc_##flags_op);           \
 }                                                                             \
 
 #define arm_data_proc_mov(type)                                               \
@@ -1632,8 +1660,7 @@ u32 function_cc execute_aligned_load32(u32 address)
   thumb_decode_##type();                                                      \
   thumb_rn_op_##rn_type(_rn);                                                 \
   generate_load_reg(a1, _rs);                                                 \
-  generate_function_call(execute_##name);                                     \
-  generate_store_reg(rv, _rd);                                                \
+  arm_data_proc_##name(_rd, generate_store_reg);                              \
 }                                                                             \
 
 #define thumb_data_proc_test(type, name, rn_type, _rs, _rn)                   \
@@ -1641,15 +1668,14 @@ u32 function_cc execute_aligned_load32(u32 address)
   thumb_decode_##type();                                                      \
   thumb_rn_op_##rn_type(_rn);                                                 \
   generate_load_reg(a1, _rs);                                                 \
-  generate_function_call(execute_##name);                                     \
+  arm_data_proc_test_##name();                                                \
 }                                                                             \
 
 #define thumb_data_proc_unary(type, name, rn_type, _rd, _rn)                  \
 {                                                                             \
   thumb_decode_##type();                                                      \
   thumb_rn_op_##rn_type(_rn);                                                 \
-  generate_function_call(execute_##name);                                     \
-  generate_store_reg(rv, _rd);                                                \
+  arm_data_proc_unary_##name(_rd, generate_store_reg);                        \
 }                                                                             \
 
 #define thumb_data_proc_mov(type, rn_type, _rd, _rn)                          \
@@ -1659,7 +1685,7 @@ u32 function_cc execute_aligned_load32(u32 address)
   generate_store_reg(a0, _rd);                                                \
 }                                                                             \
 
-#define generate_store_reg_pc_thumb(ireg)                                     \
+#define generate_store_reg_pc_thumb(ireg, rd)                                 \
   generate_store_reg(ireg, rd);                                               \
   if(rd == 15)                                                                \
   {                                                                           \
@@ -1671,8 +1697,7 @@ u32 function_cc execute_aligned_load32(u32 address)
   thumb_decode_hireg_op();                                                    \
   generate_load_reg_pc(a0, rs, 4);                                            \
   generate_load_reg_pc(a1, rd, 4);                                            \
-  generate_function_call(execute_##name);                                     \
-  generate_store_reg_pc_thumb(rv);                                            \
+  arm_data_proc_##name(rd, generate_store_reg_pc_thumb);                      \
 }                                                                             \
 
 #define thumb_data_proc_test_hi(name)                                         \
@@ -1680,22 +1705,21 @@ u32 function_cc execute_aligned_load32(u32 address)
   thumb_decode_hireg_op();                                                    \
   generate_load_reg_pc(a0, rs, 4);                                            \
   generate_load_reg_pc(a1, rd, 4);                                            \
-  generate_function_call(execute_##name);                                     \
+  arm_data_proc_test_##name();                                                \
 }                                                                             \
 
 #define thumb_data_proc_unary_hi(name)                                        \
 {                                                                             \
   thumb_decode_hireg_op();                                                    \
   generate_load_reg_pc(a0, rn, 4);                                            \
-  generate_function_call(execute_##name);                                     \
-  generate_store_reg_pc_thumb(rv);                                            \
+  arm_data_proc_unary_##name(rd, generate_store_reg_pc_thumb);                \
 }                                                                             \
 
 #define thumb_data_proc_mov_hi()                                              \
 {                                                                             \
   thumb_decode_hireg_op();                                                    \
   generate_load_reg_pc(a0, rs, 4);                                            \
-  generate_store_reg_pc_thumb(a0);                                            \
+  generate_store_reg_pc_thumb(a0, rd);                                        \
 }                                                                             \
 
 #define thumb_load_pc(_rd)                                                    \
@@ -2058,120 +2082,161 @@ u32 function_cc execute_ror_imm_op(u32 value, u32 shift)
   block_exit_position++;                                                      \
 }                                                                             \
 
-#define flags_vars(src_a, src_b)                                              \
-  u32 dest;                                                                   \
-  const u32 _sa = src_a;                                                      \
-  const u32 _sb = src_b                                                       \
-
-#define data_proc_generate_logic_function(name, expr)                         \
-u32 function_cc execute_##name(u32 rm, u32 rn)                                \
-{                                                                             \
-  return expr;                                                                \
-}                                                                             \
-                                                                              \
-u32 function_cc execute_##name##s(u32 rm, u32 rn)                             \
-{                                                                             \
-  u32 dest = expr;                                                            \
-  calculate_z_flag(dest);                                                     \
-  calculate_n_flag(dest);                                                     \
-  return expr;                                                                \
-}                                                                             \
-
-#define data_proc_generate_logic_unary_function(name, expr)                   \
-u32 function_cc execute_##name(u32 rm)                                        \
-{                                                                             \
-  return expr;                                                                \
-}                                                                             \
-                                                                              \
-u32 function_cc execute_##name##s(u32 rm)                                     \
-{                                                                             \
-  u32 dest = expr;                                                            \
-  calculate_z_flag(dest);                                                     \
-  calculate_n_flag(dest);                                                     \
-  return expr;                                                                \
-}                                                                             \
-
-
-#define data_proc_generate_sub_function(name, src_a, src_b)                   \
-u32 function_cc execute_##name(u32 rm, u32 rn)                                \
-{                                                                             \
-  return (src_a) - (src_b);                                                   \
-}                                                                             \
-                                                                              \
-u32 function_cc execute_##name##s(u32 rm, u32 rn)                             \
-{                                                                             \
-  flags_vars(src_a, src_b);                                                   \
-  dest = _sa - _sb;                                                           \
-  calculate_flags_sub(dest, _sa, _sb);                                        \
-  return dest;                                                                \
-}                                                                             \
-
-#define data_proc_generate_add_function(name, src_a, src_b)                   \
-u32 function_cc execute_##name(u32 rm, u32 rn)                                \
-{                                                                             \
-  return (src_a) + (src_b);                                                   \
-}                                                                             \
-                                                                              \
-u32 function_cc execute_##name##s(u32 rm, u32 rn)                             \
-{                                                                             \
-  flags_vars(src_a, src_b);                                                   \
-  dest = _sa + _sb;                                                           \
-  calculate_flags_add(dest, _sa, _sb);                                        \
-  return dest;                                                                \
-}                                                                             \
-
-#define data_proc_generate_sub_test_function(name, src_a, src_b)              \
-void function_cc execute_##name(u32 rm, u32 rn)                               \
-{                                                                             \
-  flags_vars(src_a, src_b);                                                   \
-  dest = _sa - _sb;                                                           \
-  calculate_flags_sub(dest, _sa, _sb);                                        \
-}                                                                             \
-
-#define data_proc_generate_add_test_function(name, src_a, src_b)              \
-void function_cc execute_##name(u32 rm, u32 rn)                               \
-{                                                                             \
-  flags_vars(src_a, src_b);                                                   \
-  dest = _sa + _sb;                                                           \
-  calculate_flags_add(dest, _sa, _sb);                                        \
-}                                                                             \
-
-#define data_proc_generate_logic_test_function(name, expr)                    \
-void function_cc execute_##name(u32 rm, u32 rn)                               \
-{                                                                             \
-  u32 dest = expr;                                                            \
-  calculate_z_flag(dest);                                                     \
-  calculate_n_flag(dest);                                                     \
-}                                                                             \
-
-u32 function_cc execute_neg(u32 rm)                                           \
-{                                                                             \
-  u32 dest = 0 - rm;                                                          \
-  calculate_flags_sub(dest, 0, rm);                                           \
-  return dest;                                                                \
-}                                                                             \
 
 // Execute functions
 
-data_proc_generate_logic_function(and, rn & rm);
-data_proc_generate_logic_function(eor, rn ^ rm);
-data_proc_generate_logic_function(orr, rn | rm);
-data_proc_generate_logic_function(bic, rn & (~rm));
-data_proc_generate_logic_function(mul, rn * rm);
-data_proc_generate_logic_unary_function(mov, rm);
-data_proc_generate_logic_unary_function(mvn, ~rm);
+#define update_logical_flags()                                                \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)
 
-data_proc_generate_sub_function(sub, rn, rm);
-data_proc_generate_sub_function(rsb, rm, rn);
-data_proc_generate_sub_function(sbc, rn, (rm + (reg[REG_C_FLAG] ^ 1)));
-data_proc_generate_sub_function(rsc, (rm + reg[REG_C_FLAG] - 1), rn);
-data_proc_generate_add_function(add, rn, rm);
-data_proc_generate_add_function(adc, rn, rm + reg[REG_C_FLAG]);
+#define update_add_flags()                                                    \
+  update_logical_flags()                                                      \
+  generate_update_flag(c, REG_C_FLAG)                                         \
+  generate_update_flag(o, REG_V_FLAG)
 
-data_proc_generate_logic_test_function(tst, rn & rm);
-data_proc_generate_logic_test_function(teq, rn ^ rm);
-data_proc_generate_sub_test_function(cmp, rn, rm);
-data_proc_generate_add_test_function(cmn, rn, rm);
+#define update_sub_flags()                                                    \
+  update_logical_flags()                                                      \
+  generate_update_flag(nc, REG_C_FLAG)                                        \
+  generate_update_flag(o, REG_V_FLAG)
+
+#define arm_data_proc_and(rd, storefnc)                                       \
+  generate_and(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+#define arm_data_proc_ands(rd, storefnc)                                      \
+  arm_data_proc_and(rd, storefnc);                                            \
+  update_logical_flags()
+
+#define arm_data_proc_eor(rd, storefnc)                                       \
+  generate_xor(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+#define arm_data_proc_eors(rd, storefnc)                                      \
+  arm_data_proc_eor(rd, storefnc);                                            \
+  update_logical_flags()
+
+#define arm_data_proc_orr(rd, storefnc)                                       \
+  generate_or(a0, a1);                                                        \
+  storefnc(a0, rd);
+
+#define arm_data_proc_orrs(rd, storefnc)                                      \
+  arm_data_proc_orr(rd, storefnc);                                            \
+  update_logical_flags()
+
+#define arm_data_proc_bic(rd, storefnc)                                       \
+  generate_not(a0);                                                           \
+  generate_and(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+#define arm_data_proc_bics(rd, storefnc)                                      \
+  arm_data_proc_bic(rd, storefnc);                                            \
+  update_logical_flags()
+
+#define arm_data_proc_add(rd, storefnc)                                       \
+  generate_add(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+#define arm_data_proc_adds(rd, storefnc)                                      \
+  arm_data_proc_add(rd, storefnc);                                            \
+  update_add_flags();
+
+// Argument ordering is inverted between arm and x86
+#define arm_data_proc_sub(rd, storefnc)                                       \
+  generate_sub(a1, a0);                                                       \
+  storefnc(a1, rd);
+
+#define arm_data_proc_rsb(rd, storefnc)                                       \
+  generate_sub(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+// Borrow flag in ARM is opposite to carry flag in x86
+#define arm_data_proc_subs(rd, storefnc)                                      \
+  arm_data_proc_sub(rd, storefnc)                                             \
+  update_sub_flags()
+
+#define arm_data_proc_rsbs(rd, storefnc)                                      \
+  arm_data_proc_rsb(rd, storefnc)                                             \
+  update_sub_flags()
+
+#define arm_data_proc_mul(rd, storefnc)                                       \
+  generate_multiply(a1);                                                      \
+  storefnc(a0, rd);
+
+#define arm_data_proc_muls(rd, storefnc)                                      \
+  arm_data_proc_mul(rd, storefnc);                                            \
+  update_logical_flags();
+
+
+#define arm_data_proc_adc(rd, storefnc)                                       \
+  /* Loads the flag to the right value by adding it to ~0 causing carry */    \
+  generate_load_imm(a2, 0xffffffff);                                          \
+  generate_add_memreg(a2, REG_C_FLAG);                                        \
+  generate_adc(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+#define arm_data_proc_adcs(rd, storefnc)                                      \
+  arm_data_proc_adc(rd, storefnc)                                             \
+  update_add_flags()
+
+#define arm_data_proc_sbc(rd, storefnc)                                       \
+  generate_load_reg(a2, REG_C_FLAG);                                          \
+  generate_sub_imm(a2, 1);                                                    \
+  generate_sbb(a1, a0);                                                       \
+  storefnc(a1, rd);
+
+#define arm_data_proc_sbcs(rd, storefnc)                                      \
+  arm_data_proc_sbc(rd, storefnc)                                             \
+  update_sub_flags()
+
+#define arm_data_proc_rsc(rd, storefnc)                                       \
+  generate_load_reg(a2, REG_C_FLAG);                                          \
+  generate_sub_imm(a2, 1);                                                    \
+  generate_sbb(a0, a1);                                                       \
+  storefnc(a0, rd);
+
+#define arm_data_proc_rscs(rd, storefnc)                                      \
+  arm_data_proc_rsc(rd, storefnc)                                             \
+  update_sub_flags()
+
+
+#define arm_data_proc_test_cmp()                                              \
+  generate_sub(a1, a0);                                                       \
+  update_sub_flags()
+
+#define arm_data_proc_test_cmn()                                              \
+  generate_add(a1, a0);                                                       \
+  update_add_flags()
+
+#define arm_data_proc_test_tst()                                              \
+  generate_and(a0, a1);                                                       \
+  update_logical_flags()
+
+#define arm_data_proc_test_teq()                                              \
+  generate_xor(a0, a1);                                                       \
+  update_logical_flags()
+
+#define arm_data_proc_unary_mov(rd, storefnc)                                 \
+  storefnc(a0, rd);
+
+#define arm_data_proc_unary_movs(rd, storefnc)                                \
+  arm_data_proc_unary_mov(rd, storefnc);                                      \
+  generate_or(a0, a0);                                                        \
+  update_logical_flags()
+
+#define arm_data_proc_unary_mvn(rd, storefnc)                                 \
+  generate_not(a0);                                                           \
+  storefnc(a0, rd);
+
+#define arm_data_proc_unary_mvns(rd, storefnc)                                \
+  arm_data_proc_unary_mvn(rd, storefnc);                                      \
+  /* NOT does not update the flag register */                                 \
+  generate_or(a0, a0);                                                        \
+  update_logical_flags()
+
+#define arm_data_proc_unary_neg(rd, storefnc)                                 \
+  generate_xor(a1, a1);                                                       \
+  arm_data_proc_subs(rd, storefnc)
+
 
 static void function_cc execute_swi(u32 pc)
 {
