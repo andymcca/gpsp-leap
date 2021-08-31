@@ -93,6 +93,12 @@ typedef enum
   x86_opcode_shl_reg_imm                = 0x04C1,
   x86_opcode_shr_reg_imm                = 0x05C1,
   x86_opcode_sar_reg_imm                = 0x07C1,
+  x86_opcode_ror_reg_rm                 = 0x01D3,
+  x86_opcode_rcr_reg_rm                 = 0x03D3,
+  x86_opcode_shl_reg_rm                 = 0x04D3,
+  x86_opcode_shr_reg_rm                 = 0x05D3,
+  x86_opcode_sar_reg_rm                 = 0x07D3,
+  x86_opcode_rcr_reg1                   = 0x03D1,
   x86_opcode_push_reg                   = 0x50,
   x86_opcode_push_rm                    = 0xFF,
   x86_opcode_push_imm                   = 0x0668,
@@ -117,14 +123,16 @@ typedef enum
   x86_opcode_sbb_reg_rm                 = 0x1B,
   x86_opcode_xor_reg_rm                 = 0x33,
   x86_opcode_cmp_reg_rm                 = 0x39,
-  x86_opcode_cmp_rm_imm                 = 0x053B,
+  x86_opcode_cmp_rm_imm                 = 0x0781,
   x86_opcode_lea_reg_rm                 = 0x8D,
   x86_opcode_j                          = 0x80,
   x86_opcode_seto                       = 0x90,
   x86_opcode_setc                       = 0x92,
   x86_opcode_setnc                      = 0x93,
   x86_opcode_setz                       = 0x94,
+  x86_opcode_setnz                      = 0x95,
   x86_opcode_sets                       = 0x98,
+  x86_opcode_setns                      = 0x99,
   x86_opcode_jmp                        = 0xE9,
   x86_opcode_jmp_reg                    = 0x04FF,
   x86_opcode_ext                        = 0x0F
@@ -279,6 +287,21 @@ typedef enum
   x86_emit_opcode_1b_ext_reg(cmp_rm_imm, dest);                               \
   x86_emit_dword(imm)                                                         \
 
+#define x86_emit_rot_reg_reg(type, dest)                                      \
+  x86_emit_opcode_1b_ext_reg(type##_reg_rm, dest)                             \
+
+#define x86_emit_rot_reg1(type, dest)                                         \
+  x86_emit_opcode_1b_ext_reg(type##_reg1, dest)                               \
+
+#define x86_emit_shr_reg_reg(dest)                                            \
+  x86_emit_opcode_1b_ext_reg(shr_reg_rm, dest)                                \
+
+#define x86_emit_sar_reg_reg(dest)                                            \
+  x86_emit_opcode_1b_ext_reg(sar_reg_rm, dest)                                \
+
+#define x86_emit_shl_reg_reg(dest)                                            \
+  x86_emit_opcode_1b_ext_reg(shl_reg_rm, dest)                                \
+
 #define x86_emit_mul_eax_reg(source)                                          \
   x86_emit_opcode_1b_ext_reg(mul_eax_rm, source)                              \
 
@@ -345,6 +368,12 @@ typedef enum
 #define reg_rv      eax
 #define reg_s0      esi
 
+#define generate_test_imm(ireg, imm)                                          \
+  x86_emit_test_reg_imm(reg_##ireg, imm);                                     \
+
+#define generate_cmp_imm(ireg, imm)                                           \
+  x86_emit_cmp_reg_imm(reg_##ireg, imm)                                       \
+
 #define generate_update_flag(condcode, regnum)                                \
   x86_emit_setcc_mem(condcode, reg_base, regnum * 4)                          \
 
@@ -363,14 +392,32 @@ typedef enum
 #define generate_shift_left(ireg, imm)                                        \
   x86_emit_shl_reg_imm(reg_##ireg, imm)                                       \
 
+#define generate_shift_left_var(ireg)                                         \
+  x86_emit_shl_reg_reg(reg_##ireg)                                            \
+
 #define generate_shift_right(ireg, imm)                                       \
   x86_emit_shr_reg_imm(reg_##ireg, imm)                                       \
+
+#define generate_shift_right_var(ireg)                                        \
+  x86_emit_shr_reg_reg(reg_##ireg)                                            \
 
 #define generate_shift_right_arithmetic(ireg, imm)                            \
   x86_emit_sar_reg_imm(reg_##ireg, imm)                                       \
 
+#define generate_shift_right_arithmetic_var(ireg)                             \
+  x86_emit_sar_reg_reg(reg_##ireg)                                            \
+
 #define generate_rotate_right(ireg, imm)                                      \
   x86_emit_ror_reg_imm(reg_##ireg, imm)                                       \
+
+#define generate_rotate_right_var(ireg)                                       \
+  x86_emit_rot_reg_reg(ror, reg_##ireg)                                       \
+
+#define generate_rcr(ireg)                                                    \
+  x86_emit_rot_reg_reg(rcr, reg_##ireg)                                       \
+
+#define generate_rcr1(ireg)                                                   \
+  x86_emit_rot_reg1(rcr, reg_##ireg)                                          \
 
 #define generate_and(ireg_dest, ireg_src)                                     \
   x86_emit_and_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
@@ -567,8 +614,7 @@ typedef enum
 #define generate_shift_reg(ireg, name, flags_op)                              \
   generate_load_reg_pc(ireg, rm, 12);                                         \
   generate_load_reg(a1, ((opcode >> 8) & 0x0F));                              \
-  generate_function_call(execute_##name##_##flags_op##_reg);                  \
-  generate_mov(ireg, rv)                                                      \
+  generate_##name##_##flags_op##_reg(ireg);                                   \
 
 #ifdef TRACE_INSTRUCTIONS
   void function_cc trace_instruction(u32 pc, u32 mode)
@@ -592,137 +638,134 @@ typedef enum
   #define emit_trace_arm_instruction(pc)
 #endif
 
-u32 function_cc execute_lsl_no_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-      value = 0;
-    else
-      value <<= shift;
-  }
-  return value;
+
+#define generate_asr_no_flags_reg(ireg)                                       \
+{                                                                             \
+  u8 *jmpinst;                                                                \
+  generate_mov(a2, a1);                                                       \
+  generate_shift_right_arithmetic_var(a0);                                    \
+  generate_cmp_imm(a2, 32);                                                   \
+  x86_emit_j_filler(x86_condition_code_l, jmpinst);                           \
+  generate_shift_right_arithmetic(a0, 31);                                    \
+  generate_branch_patch_conditional(jmpinst, translation_ptr);                \
+  generate_mov(ireg, a0);                                                     \
 }
 
-u32 function_cc execute_lsr_no_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-      value = 0;
-    else
-      value >>= shift;
-  }
-  return value;
+#define generate_asr_flags_reg(ireg)                                          \
+{                                                                             \
+  u8 *jmpinst1, *jmpinst2;                                                    \
+  generate_mov(a2, a1);                                                       \
+  generate_or(a2, a2);                                                        \
+  x86_emit_j_filler(x86_condition_code_z, jmpinst1);                          \
+  generate_shift_right_arithmetic_var(a0);                                    \
+  generate_update_flag(c, REG_C_FLAG)                                         \
+  generate_cmp_imm(a2, 32);                                                   \
+  x86_emit_j_filler(x86_condition_code_l, jmpinst2);                          \
+  generate_shift_right_arithmetic(a0, 16);                                    \
+  generate_shift_right_arithmetic(a0, 16);                                    \
+  generate_update_flag(c, REG_C_FLAG)                                         \
+  generate_branch_patch_conditional(jmpinst1, translation_ptr);               \
+  generate_branch_patch_conditional(jmpinst2, translation_ptr);               \
+  generate_mov(ireg, a0);                                                     \
 }
 
-u32 function_cc execute_asr_no_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-      value = (s32)value >> 31;
-    else
-      value = (s32)value >> shift;
-  }
-  return value;
+#define generate_lsl_no_flags_reg(ireg)                                       \
+{                                                                             \
+  u8 *jmpinst;                                                                \
+  generate_mov(a2, a1);                                                       \
+  generate_shift_left_var(a0);                                                \
+  generate_cmp_imm(a2, 32);                                                   \
+  x86_emit_j_filler(x86_condition_code_l, jmpinst);                           \
+  generate_load_imm(a0, 0);                                                   \
+  generate_branch_patch_conditional(jmpinst, translation_ptr);                \
+  generate_mov(ireg, a0);                                                     \
 }
 
-u32 function_cc execute_ror_no_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    ror(value, value, shift);
-  }
-
-  return value;
+#define generate_lsl_flags_reg(ireg)                                          \
+{                                                                             \
+  u8 *jmpinst1, *jmpinst2;                                                    \
+  generate_mov(a2, a1);                                                       \
+  generate_or(a2, a2);                                                        \
+  x86_emit_j_filler(x86_condition_code_z, jmpinst1);                          \
+  generate_sub_imm(a2, 1);                                                    \
+  generate_shift_left_var(a0);                                                \
+  generate_or(a0, a0);                                                        \
+  generate_update_flag(s, REG_C_FLAG)                                         \
+  generate_shift_left(a0, 1);                                                 \
+  generate_cmp_imm(a2, 32);                                                   \
+  x86_emit_j_filler(x86_condition_code_l, jmpinst2);                          \
+  generate_load_imm(a0, 0);                                                   \
+  generate_store_reg(a0, REG_C_FLAG)                                          \
+  generate_branch_patch_conditional(jmpinst1, translation_ptr);               \
+  generate_branch_patch_conditional(jmpinst2, translation_ptr);               \
+  generate_mov(ireg, a0);                                                     \
 }
 
-
-u32 function_cc execute_lsl_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-    {
-      reg[REG_C_FLAG] = value & 0x01;
-
-      if(shift != 32)
-        reg[REG_C_FLAG] = 0;
-
-      value = 0;
-    }
-    else
-    {
-      reg[REG_C_FLAG] = (value >> (32 - shift)) & 0x01;
-      value <<= shift;
-    }
-  }
-  return value;
+#define generate_lsr_no_flags_reg(ireg)                                       \
+{                                                                             \
+  u8 *jmpinst;                                                                \
+  generate_mov(a2, a1);                                                       \
+  generate_shift_right_var(a0);                                               \
+  generate_cmp_imm(a2, 32);                                                   \
+  x86_emit_j_filler(x86_condition_code_l, jmpinst);                           \
+  generate_xor(a0, a0);                                                       \
+  generate_branch_patch_conditional(jmpinst, translation_ptr);                \
+  generate_mov(ireg, a0);                                                     \
 }
 
-u32 function_cc execute_lsr_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-    {
-      reg[REG_C_FLAG] = value >> 31;
-
-      if(shift != 32)
-        reg[REG_C_FLAG] = 0;
-
-      value = 0;
-    }
-    else
-    {
-      reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-      value >>= shift;
-    }
-  }
-  return value;
+#define generate_lsr_flags_reg(ireg)                                          \
+{                                                                             \
+  u8 *jmpinst1, *jmpinst2;                                                    \
+  generate_mov(a2, a1);                                                       \
+  generate_or(a2, a2);                                                        \
+  x86_emit_j_filler(x86_condition_code_z, jmpinst1);                          \
+  generate_sub_imm(a2, 1);                                                    \
+  generate_shift_right_var(a0);                                               \
+  generate_test_imm(a0, 1);                                                   \
+  generate_update_flag(nz, REG_C_FLAG)                                        \
+  generate_shift_right(a0, 1);                                                \
+  generate_cmp_imm(a2, 32);                                                   \
+  x86_emit_j_filler(x86_condition_code_l, jmpinst2);                          \
+  generate_xor(a0, a0);                                                       \
+  generate_store_reg(a0, REG_C_FLAG)                                          \
+  generate_branch_patch_conditional(jmpinst1, translation_ptr);               \
+  generate_branch_patch_conditional(jmpinst2, translation_ptr);               \
+  generate_mov(ireg, a0);                                                     \
 }
 
-u32 function_cc execute_asr_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-    {
-      value = (s32)value >> 31;
-      reg[REG_C_FLAG] = value & 0x01;
-    }
-    else
-    {
-      reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-      value = (s32)value >> shift;
-    }
-  }
-  return value;
+#define generate_ror_no_flags_reg(ireg)                                       \
+  generate_mov(a2, a1);                                                       \
+  generate_rotate_right_var(a0);                                              \
+  generate_mov(ireg, a0);
+
+#define generate_ror_flags_reg(ireg)                                          \
+{                                                                             \
+  u8 *jmpinst;                                                                \
+  generate_mov(a2, a1);                                                       \
+  generate_or(a2, a2);                                                        \
+  x86_emit_j_filler(x86_condition_code_z, jmpinst);                           \
+  generate_sub_imm(a2, 1);                                                    \
+  generate_rotate_right_var(a0);                                              \
+  generate_test_imm(a0, 1);                                                   \
+  generate_update_flag(nz, REG_C_FLAG)                                        \
+  generate_rotate_right(a0, 1);                                               \
+  generate_branch_patch_conditional(jmpinst, translation_ptr);                \
+  generate_mov(ireg, a0);                                                     \
 }
 
-u32 function_cc execute_ror_flags_reg(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-    ror(value, value, shift);
-  }
+// Shift right sets the CF of the shifted-out bit, use it with setc
+#define generate_rrx_flags(ireg)                                              \
+  generate_load_imm(a2, 0xffffffff);                                          \
+  generate_add_memreg(a2, REG_C_FLAG);                                        \
+  generate_rcr1(a0);                                                          \
+  generate_update_flag(c, REG_C_FLAG)                                         \
+  generate_mov(ireg, a0);
 
-  return value;
-}
-
-u32 function_cc execute_rrx_flags(u32 value)
-{
-  u32 c_flag = reg[REG_C_FLAG];
-  reg[REG_C_FLAG] = value & 0x01;
-  return (value >> 1) | (c_flag << 31);
-}
-
-u32 function_cc execute_rrx(u32 value)
-{
-  return (value >> 1) | (reg[REG_C_FLAG] << 31);
-}
+#define generate_rrx(ireg)                                                    \
+  generate_load_reg(a2, REG_C_FLAG);                                          \
+  generate_shift_right(ireg, 1);                                              \
+  generate_shift_left(a2, 31);                                                \
+  generate_or(ireg, a2);                                                      \
 
 #define generate_shift_imm_lsl_no_flags(ireg)                                 \
   generate_load_reg_pc(ireg, rm, 8);                                          \
@@ -761,9 +804,8 @@ u32 function_cc execute_rrx(u32 value)
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    generate_load_reg_pc(a0, rm, 8);                                          \
-    generate_function_call(execute_rrx);                                      \
-    generate_mov(ireg, rv);                                                   \
+    generate_load_reg_pc(ireg, rm, 8);                                        \
+    generate_rrx(ireg);                                                       \
   }                                                                           \
 
 #define generate_shift_imm_lsl_flags(ireg)                                    \
@@ -826,8 +868,7 @@ u32 function_cc execute_rrx(u32 value)
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    generate_function_call(execute_rrx_flags);                                \
-    generate_mov(ireg, rv);                                                   \
+    generate_rrx_flags(ireg);                                                 \
   }                                                                           \
 
 #define generate_shift_imm(ireg, name, flags_op)                              \
@@ -1250,14 +1291,9 @@ typedef enum
   generate_store_reg_pc_no_flags(a0, rd);                                     \
 }                                                                             \
 
-static void function_cc execute_mul_flags(u32 dest)
-{
-  calculate_z_flag(dest);
-  calculate_n_flag(dest);
-}
-
 #define arm_multiply_flags_yes()                                              \
-  generate_function_call(execute_mul_flags)                                   \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)
 
 #define arm_multiply_flags_no(_dest)                                          \
 
@@ -1278,14 +1314,12 @@ static void function_cc execute_mul_flags(u32 dest)
   arm_multiply_flags_##flags();                                               \
 }                                                                             \
 
-static void function_cc execute_mul_long_flags(u32 dest_lo, u32 dest_hi)
-{
-  reg[REG_Z_FLAG] = (dest_lo == 0) & (dest_hi == 0);
-  calculate_n_flag(dest_hi);
-}
-
 #define arm_multiply_long_flags_yes()                                         \
-  generate_function_call(execute_mul_long_flags)                              \
+  generate_mov(s0, a1);                                                       \
+  generate_and(s0, s0);                                                       \
+  generate_update_flag(s, REG_N_FLAG)                                         \
+  generate_or(s0, a0);                                                        \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
 
 #define arm_multiply_long_flags_no(_dest)                                     \
 
