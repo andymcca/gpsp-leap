@@ -614,6 +614,7 @@ typedef enum
 #define generate_shift_reg(ireg, name, flags_op)                              \
   generate_load_reg_pc(ireg, rm, 12);                                         \
   generate_load_reg(a1, ((opcode >> 8) & 0x0F));                              \
+  generate_and_imm(a1, 0xFF);                                                 \
   generate_##name##_##flags_op##_reg(ireg);                                   \
 
 #ifdef TRACE_INSTRUCTIONS
@@ -812,59 +813,43 @@ typedef enum
   generate_load_reg_pc(ireg, rm, 8);                                          \
   if(shift != 0)                                                              \
   {                                                                           \
-    generate_mov(a1, ireg);                                                   \
-    generate_shift_right(a1, (32 - shift));                                   \
-    generate_and_imm(a1, 1);                                                  \
-    generate_store_reg(a1, REG_C_FLAG);                                       \
     generate_shift_left(ireg, shift);                                         \
+    generate_update_flag(c, REG_C_FLAG);                                      \
   }                                                                           \
 
 #define generate_shift_imm_lsr_flags(ireg)                                    \
+  generate_load_reg_pc(ireg, rm, 8);                                          \
   if(shift != 0)                                                              \
   {                                                                           \
-    generate_load_reg_pc(ireg, rm, 8);                                        \
-    generate_mov(a1, ireg);                                                   \
-    generate_shift_right(a1, shift - 1);                                      \
-    generate_and_imm(a1, 1);                                                  \
-    generate_store_reg(a1, REG_C_FLAG);                                       \
     generate_shift_right(ireg, shift);                                        \
+    generate_update_flag(c, REG_C_FLAG);                                      \
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    generate_load_reg_pc(a1, rm, 8);                                          \
-    generate_shift_right(a1, 31);                                             \
-    generate_store_reg(a1, REG_C_FLAG);                                       \
+    generate_shift_right(ireg, 31);                                           \
+    generate_store_reg(ireg, REG_C_FLAG);                                     \
     generate_load_imm(ireg, 0);                                               \
   }                                                                           \
 
 #define generate_shift_imm_asr_flags(ireg)                                    \
+  generate_load_reg_pc(ireg, rm, 8);                                          \
   if(shift != 0)                                                              \
   {                                                                           \
-    generate_load_reg_pc(ireg, rm, 8);                                        \
-    generate_mov(a1, ireg);                                                   \
-    generate_shift_right_arithmetic(a1, shift - 1);                           \
-    generate_and_imm(a1, 1);                                                  \
-    generate_store_reg(a1, REG_C_FLAG);                                       \
     generate_shift_right_arithmetic(ireg, shift);                             \
+    generate_update_flag(c, REG_C_FLAG);                                      \
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    generate_load_reg_pc(a0, rm, 8);                                          \
     generate_shift_right_arithmetic(ireg, 31);                                \
-    generate_mov(a1, ireg);                                                   \
-    generate_and_imm(a1, 1);                                                  \
-    generate_store_reg(a1, REG_C_FLAG);                                       \
+    generate_update_flag(nz, REG_C_FLAG);                                     \
   }                                                                           \
 
 #define generate_shift_imm_ror_flags(ireg)                                    \
   generate_load_reg_pc(ireg, rm, 8);                                          \
   if(shift != 0)                                                              \
   {                                                                           \
-    generate_mov(a1, ireg);                                                   \
-    generate_shift_right(a1, shift - 1);                                      \
-    generate_and_imm(a1, 1);                                                  \
-    generate_store_reg(a1, REG_C_FLAG);                                       \
     generate_rotate_right(ireg, shift);                                       \
+    generate_update_flag(c, REG_C_FLAG)                                       \
   }                                                                           \
   else                                                                        \
   {                                                                           \
@@ -1790,149 +1775,49 @@ u32 function_cc execute_aligned_load32(u32 address)
 // Operation types: lsl, lsr, asr, ror
 // Affects N/Z/C flags
 
-u32 function_cc execute_lsl_reg_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-    {
-      if(shift == 32)
-        reg[REG_C_FLAG] = value & 0x01;
-      else
-        reg[REG_C_FLAG] = 0;
+#define thumb_lsl_imm_op()                                                    \
+  if (imm) {                                                                  \
+    generate_shift_left(a0, imm);                                             \
+    generate_update_flag(c, REG_C_FLAG)                                       \
+  } else {                                                                    \
+    generate_or(a0, a0);                                                      \
+  }                                                                           \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)                                         \
 
-      value = 0;
-    }
-    else
-    {
-      reg[REG_C_FLAG] = (value >> (32 - shift)) & 0x01;
-      value <<= shift;
-    }
-  }
+#define thumb_lsr_imm_op()                                                    \
+  if (imm) {                                                                  \
+    generate_shift_right(a0, imm);                                            \
+    generate_update_flag(c, REG_C_FLAG)                                       \
+  } else {                                                                    \
+    generate_shift_right(a0, 31);                                             \
+    generate_update_flag(nz, REG_C_FLAG)                                      \
+    generate_xor(a0, a0);                                                     \
+  }                                                                           \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)                                         \
 
-  calculate_flags_logic(value);
-  return value;
-}
+#define thumb_asr_imm_op()                                                    \
+  if (imm) {                                                                  \
+    generate_shift_right_arithmetic(a0, imm);                                 \
+    generate_update_flag(c, REG_C_FLAG)                                       \
+  } else {                                                                    \
+    generate_shift_right_arithmetic(a0, 31);                                  \
+    generate_update_flag(s, REG_C_FLAG)                                       \
+  }                                                                           \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)                                         \
 
-u32 function_cc execute_lsr_reg_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-    {
-      if(shift == 32)
-        reg[REG_C_FLAG] = (value >> 31) & 0x01;
-      else
-        reg[REG_C_FLAG] = 0;
+#define thumb_ror_imm_op()                                                    \
+  if (imm) {                                                                  \
+    generate_rotate_right(a0, imm);                                           \
+    generate_update_flag(c, REG_C_FLAG)                                       \
+  } else {                                                                    \
+    generate_rrx_flags(a0);                                                   \
+  }                                                                           \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)                                         \
 
-      value = 0;
-    }
-    else
-    {
-      reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-      value >>= shift;
-    }
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
-
-u32 function_cc execute_asr_reg_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    if(shift > 31)
-    {
-      value = (s32)value >> 31;
-      reg[REG_C_FLAG] = value & 0x01;
-    }
-    else
-    {
-      reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-      value = (s32)value >> shift;
-    }
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
-
-u32 function_cc execute_ror_reg_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-    ror(value, value, shift);
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
-
-u32 function_cc execute_lsl_imm_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    reg[REG_C_FLAG] = (value >> (32 - shift)) & 0x01;
-    value <<= shift;
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
-
-u32 function_cc execute_lsr_imm_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-    value >>= shift;
-  }
-  else
-  {
-    reg[REG_C_FLAG] = value >> 31;
-    value = 0;
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
-
-u32 function_cc execute_asr_imm_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-    value = (s32)value >> shift;
-  }
-  else
-  {
-    value = (s32)value >> 31;
-    reg[REG_C_FLAG] = value & 0x01;
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
-
-u32 function_cc execute_ror_imm_op(u32 value, u32 shift)
-{
-  if(shift != 0)
-  {
-    reg[REG_C_FLAG] = (value >> (shift - 1)) & 0x01;
-    ror(value, value, shift);
-  }
-  else
-  {
-    u32 c_flag = reg[REG_C_FLAG];
-    reg[REG_C_FLAG] = value & 0x01;
-    value = (value >> 1) | (c_flag << 31);
-  }
-
-  calculate_flags_logic(value);
-  return value;
-}
 
 #define generate_shift_load_operands_reg()                                    \
   generate_load_reg(a0, rd);                                                  \
@@ -1942,11 +1827,20 @@ u32 function_cc execute_ror_imm_op(u32 value, u32 shift)
   generate_load_reg(a0, rs);                                                  \
   generate_load_imm(a1, imm)                                                  \
 
+#define thumb_shift_operation_imm(op_type)                                    \
+  thumb_##op_type##_imm_op()
+
+#define thumb_shift_operation_reg(op_type)                                    \
+  generate_##op_type##_flags_reg(a0);                                         \
+  generate_or(a0, a0);                                                        \
+  generate_update_flag(z, REG_Z_FLAG)                                         \
+  generate_update_flag(s, REG_N_FLAG)                                         \
+
 #define thumb_shift(decode_type, op_type, value_type)                         \
 {                                                                             \
   thumb_decode_##decode_type();                                               \
   generate_shift_load_operands_##value_type();                                \
-  generate_function_call(execute_##op_type##_##value_type##_op);              \
+  thumb_shift_operation_##value_type(op_type);                                \
   generate_store_reg(rv, rd);                                                 \
 }                                                                             \
 
