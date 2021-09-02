@@ -1851,7 +1851,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_indirect_branch_dual();                                            \
 
 #define arm_swi()                                                             \
-  generate_swi_hle_handler((opcode >> 16) & 0xFF, arm);                       \
   generate_function_call(execute_swi_arm);                                    \
   write32((pc + 4));                                                          \
   generate_branch(arm)                                                        \
@@ -1888,61 +1887,15 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_function_call(arm_cheat_hook);
 
 #define thumb_swi()                                                           \
-  generate_swi_hle_handler(opcode & 0xFF, thumb);                             \
   generate_function_call(execute_swi_thumb);                                  \
   write32((pc + 2));                                                          \
   /* We're in ARM mode now */                                                 \
   generate_branch(arm)                                                        \
 
-u8 swi_hle_handle[256] =
-{
-  0x0,    // SWI 0:  SoftReset
-  0x0,    // SWI 1:  RegisterRAMReset
-  0x0,    // SWI 2:  Halt
-  0x0,    // SWI 3:  Stop/Sleep
-  0x0,    // SWI 4:  IntrWait
-  0x0,    // SWI 5:  VBlankIntrWait
-  0x1,    // SWI 6:  Div
-  0x0,    // SWI 7:  DivArm
-  0x0,    // SWI 8:  Sqrt
-  0x0,    // SWI 9:  ArcTan
-  0x0,    // SWI A:  ArcTan2
-  0x0,    // SWI B:  CpuSet
-  0x0,    // SWI C:  CpuFastSet
-  0x0,    // SWI D:  GetBIOSCheckSum
-  0x0,    // SWI E:  BgAffineSet
-  0x0,    // SWI F:  ObjAffineSet
-  0x0,    // SWI 10: BitUnpack
-  0x0,    // SWI 11: LZ77UnCompWram
-  0x0,    // SWI 12: LZ77UnCompVram
-  0x0,    // SWI 13: HuffUnComp
-  0x0,    // SWI 14: RLUnCompWram
-  0x0,    // SWI 15: RLUnCompVram
-  0x0,    // SWI 16: Diff8bitUnFilterWram
-  0x0,    // SWI 17: Diff8bitUnFilterVram
-  0x0,    // SWI 18: Diff16bitUnFilter
-  0x0,    // SWI 19: SoundBias
-  0x0,    // SWI 1A: SoundDriverInit
-  0x0,    // SWI 1B: SoundDriverMode
-  0x0,    // SWI 1C: SoundDriverMain
-  0x0,    // SWI 1D: SoundDriverVSync
-  0x0,    // SWI 1E: SoundChannelClear
-  0x0,    // SWI 1F: MidiKey2Freq
-  0x0,    // SWI 20: SoundWhatever0
-  0x0,    // SWI 21: SoundWhatever1
-  0x0,    // SWI 22: SoundWhatever2
-  0x0,    // SWI 23: SoundWhatever3
-  0x0,    // SWI 24: SoundWhatever4
-  0x0,    // SWI 25: MultiBoot
-  0x0,    // SWI 26: HardReset
-  0x0,    // SWI 27: CustomHalt
-  0x0,    // SWI 28: SoundDriverVSyncOff
-  0x0,    // SWI 29: SoundDriverVSyncOn
-  0x0     // SWI 2A: SoundGetJumpList
-};
-
 void execute_swi_hle_div_arm(void);
 void execute_swi_hle_div_thumb(void);
+void execute_swi_hle_divarm_arm(void);
+void execute_swi_hle_divarm_thumb(void);
 
 void execute_swi_hle_div_c(void)
 {
@@ -1956,19 +1909,23 @@ void execute_swi_hle_div_c(void)
    reg[3] = (result ^ (result >> 31)) - (result >> 31);
 }
 
-#define generate_swi_hle_handler(_swi_number, mode)                           \
-{                                                                             \
-  u32 swi_number = _swi_number;                                               \
-  if(swi_hle_handle[swi_number])                                              \
-  {                                                                           \
-    /* Div */                                                                 \
-    if(swi_number == 0x06)                                                    \
-    {                                                                         \
-      generate_function_call(execute_swi_hle_div_##mode);                     \
-    }                                                                         \
-    break;                                                                    \
-  }                                                                           \
-}                                                                             \
+void execute_swi_hle_divarm_c(void)
+{
+   /* real BIOS supposedly locks up, but game can recover on interrupt */
+   if (reg[0] == 0)
+      return;
+   s32 result = (s32)reg[1] / (s32)reg[0];
+   reg[1] = (s32)reg[1] % (s32)reg[0];
+   reg[0] = result;
+
+   reg[3] = (result ^ (result >> 31)) - (result >> 31);
+}
+
+#define arm_hle_div(cpu_mode)                                                 \
+  generate_function_call(execute_swi_hle_div_##cpu_mode);
+
+#define arm_hle_div_arm(cpu_mode)                                             \
+  generate_function_call(execute_swi_hle_divarm_##cpu_mode);
 
 #define generate_translation_gate(type)                                       \
   generate_update_pc(pc);                                                     \
@@ -1983,7 +1940,7 @@ void init_emitter(void) {
 }
 
 u32 execute_arm_translate_internal(u32 cycles, void *regptr);
-u32 function_cc execute_arm_translate(u32 cycles) {
+u32 execute_arm_translate(u32 cycles) {
   return execute_arm_translate_internal(cycles, &reg[0]);
 }
 

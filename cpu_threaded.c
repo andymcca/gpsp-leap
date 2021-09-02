@@ -78,6 +78,9 @@ typedef struct
 
 extern u8 bit_count[256];
 
+// Div (6) and DivArm (7)
+#define is_div_swi(swinum) (((swinum) & 0xFE) == 0x06)
+
 #define arm_decode_data_proc_reg(opcode)                                      \
   u32 rn = (opcode >> 16) & 0x0F;                                             \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
@@ -191,9 +194,6 @@ extern u8 bit_count[256];
 
 #define thumb_decode_branch_cond()                                            \
   s32 offset = (s8)(opcode & 0xFF)                                            \
-
-#define thumb_decode_swi()                                                    \
-  u32 comment = opcode & 0xFF                                                 \
 
 #define thumb_decode_branch()                                                 \
   u32 offset = opcode & 0x07FF                                                \
@@ -1708,8 +1708,16 @@ void translate_icache_sync() {
                                                                               \
     case 0xF0 ... 0xFF:                                                       \
     {                                                                         \
-      /* SWI comment */                                                       \
-      arm_swi();                                                              \
+      u32 swinum = (opcode >> 16) & 0xFF;                                     \
+      if (swinum == 6) {                                                      \
+        arm_hle_div(arm);                                                     \
+      }                                                                       \
+      else if (swinum == 7) {                                                 \
+        arm_hle_div_arm(arm);                                                 \
+      }                                                                       \
+      else {                                                                  \
+        arm_swi();                                                            \
+      }                                                                       \
       break;                                                                  \
     }                                                                         \
   }                                                                           \
@@ -2270,8 +2278,16 @@ void translate_icache_sync() {
                                                                               \
     case 0xDF:                                                                \
     {                                                                         \
-      /* SWI comment */                                                       \
-      thumb_swi();                                                            \
+      u32 swinum = opcode & 0xFF;                                             \
+      if (swinum == 6) {                                                      \
+        arm_hle_div(thumb);                                                   \
+      }                                                                       \
+      else if (swinum == 7) {                                                 \
+        arm_hle_div_arm(thumb);                                               \
+      }                                                                       \
+      else {                                                                  \
+        thumb_swi();                                                          \
+      }                                                                       \
       break;                                                                  \
     }                                                                         \
                                                                               \
@@ -2688,7 +2704,7 @@ block_lookup_address_builder(dual);
   ((opcode & 0x12FFF10) == 0x12FFF10) ||                                      \
   ((opcode & 0x8108000) == 0x8108000) ||                                      \
   ((opcode >= 0xA000000) && (opcode < 0xF000000)) ||                          \
-  ((opcode > 0xF000000) && (!swi_hle_handle[((opcode >> 16) & 0xFF)])))       \
+  ((opcode > 0xF000000) && (!is_div_swi((opcode >> 16) & 0xFF))))             \
 
 #define arm_opcode_branch                                                     \
   ((opcode & 0xE000000) == 0xA000000)                                         \
@@ -2783,7 +2799,7 @@ block_lookup_address_builder(dual);
 #define thumb_exit_point                                                      \
   (((opcode >= 0xD000) && (opcode < 0xDF00)) ||                               \
    (((opcode & 0xFF00) == 0xDF00) &&                                          \
-    (!swi_hle_handle[opcode & 0xFF])) ||                                      \
+    (!is_div_swi(opcode & 0xFF))) ||                                          \
    ((opcode >= 0xE000) && (opcode < 0xE800)) ||                               \
    ((opcode & 0xFF00) == 0x4700) ||                                           \
    ((opcode & 0xFF00) == 0xBD00) ||                                           \

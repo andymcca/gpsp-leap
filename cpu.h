@@ -117,7 +117,7 @@ u32 function_cc execute_load_s16(u32 address);
 void function_cc execute_store_u8(u32 address, u32 source);
 void function_cc execute_store_u16(u32 address, u32 source);
 void function_cc execute_store_u32(u32 address, u32 source);
-u32 function_cc execute_arm_translate(u32 cycles);
+u32 execute_arm_translate(u32 cycles);
 void init_translater(void);
 unsigned cpu_write_savestate(u8* dst);
 bool cpu_read_savestate(const u8 *src);

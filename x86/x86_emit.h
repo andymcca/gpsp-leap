@@ -99,10 +99,6 @@ typedef enum
   x86_opcode_shr_reg_rm                 = 0x05D3,
   x86_opcode_sar_reg_rm                 = 0x07D3,
   x86_opcode_rcr_reg1                   = 0x03D1,
-  x86_opcode_push_reg                   = 0x50,
-  x86_opcode_push_rm                    = 0xFF,
-  x86_opcode_push_imm                   = 0x0668,
-  x86_opcode_pop_reg                    = 0x58,
   x86_opcode_call_offset                = 0xE8,
   x86_opcode_ret                        = 0xC3,
   x86_opcode_test_rm_imm                = 0x00F7,
@@ -126,6 +122,14 @@ typedef enum
   x86_opcode_cmp_rm_imm                 = 0x0781,
   x86_opcode_lea_reg_rm                 = 0x8D,
   x86_opcode_j                          = 0x80,
+  x86_opcode_cdq                        = 0x99,
+  x86_opcode_jmp                        = 0xE9,
+  x86_opcode_jmp_reg                    = 0x04FF,
+  x86_opcode_ext                        = 0x0F
+} x86_opcodes;
+
+typedef enum
+{
   x86_opcode_seto                       = 0x90,
   x86_opcode_setc                       = 0x92,
   x86_opcode_setnc                      = 0x93,
@@ -133,10 +137,7 @@ typedef enum
   x86_opcode_setnz                      = 0x95,
   x86_opcode_sets                       = 0x98,
   x86_opcode_setns                      = 0x99,
-  x86_opcode_jmp                        = 0xE9,
-  x86_opcode_jmp_reg                    = 0x04FF,
-  x86_opcode_ext                        = 0x0F
-} x86_opcodes;
+} x86_ext_opcodes;
 
 typedef enum
 {
@@ -314,18 +315,8 @@ typedef enum
 #define x86_emit_not_reg(srcdst)                                              \
   x86_emit_opcode_1b_ext_reg(not_rm, srcdst)                                  \
 
-#define x86_emit_pop_reg(regn)                                                \
-  x86_emit_opcode_1b(pop_reg, regn)                                           \
-
-#define x86_emit_push_reg(regn)                                               \
-  x86_emit_opcode_1b(push_reg, regn)                                          \
-
-#define x86_emit_push_mem(base, offset)                                       \
-  x86_emit_opcode_1b_mem(push_rm, 0x06, base, offset)                         \
-
-#define x86_emit_push_imm(imm)                                                \
-  x86_emit_byte(x86_opcode_push_imm);                                         \
-  x86_emit_dword(imm)                                                         \
+#define x86_emit_cdq()                                                        \
+  x86_emit_byte(x86_opcode_cdq)                                               \
 
 #define x86_emit_call_offset(relative_offset)                                 \
   x86_emit_byte(x86_opcode_call_offset);                                      \
@@ -2196,7 +2187,6 @@ static void function_cc execute_swi(u32 pc)
   generate_indirect_branch_dual();                                            \
 
 #define arm_swi()                                                             \
-  generate_swi_hle_handler((opcode >> 16) & 0xFF);                            \
   generate_update_pc((pc + 4));                                               \
   generate_function_call(execute_swi);                                        \
   generate_branch()                                                           \
@@ -2240,7 +2230,6 @@ static void function_cc execute_swi(u32 pc)
   generate_function_call(process_cheats);
 
 #define thumb_swi()                                                           \
-  generate_swi_hle_handler(opcode & 0xFF);                                    \
   generate_update_pc((pc + 2));                                               \
   generate_function_call(execute_swi);                                        \
   generate_branch_cycle_update(                                               \
@@ -2248,74 +2237,33 @@ static void function_cc execute_swi(u32 pc)
    block_exits[block_exit_position].branch_target);                           \
   block_exit_position++                                                       \
 
-u8 swi_hle_handle[256] =
-{
-  0x0,    // SWI 0:  SoftReset
-  0x0,    // SWI 1:  RegisterRAMReset
-  0x0,    // SWI 2:  Halt
-  0x0,    // SWI 3:  Stop/Sleep
-  0x0,    // SWI 4:  IntrWait
-  0x0,    // SWI 5:  VBlankIntrWait
-  0x1,    // SWI 6:  Div
-  0x0,    // SWI 7:  DivArm
-  0x0,    // SWI 8:  Sqrt
-  0x0,    // SWI 9:  ArcTan
-  0x0,    // SWI A:  ArcTan2
-  0x0,    // SWI B:  CpuSet
-  0x0,    // SWI C:  CpuFastSet
-  0x0,    // SWI D:  GetBIOSCheckSum
-  0x0,    // SWI E:  BgAffineSet
-  0x0,    // SWI F:  ObjAffineSet
-  0x0,    // SWI 10: BitUnpack
-  0x0,    // SWI 11: LZ77UnCompWram
-  0x0,    // SWI 12: LZ77UnCompVram
-  0x0,    // SWI 13: HuffUnComp
-  0x0,    // SWI 14: RLUnCompWram
-  0x0,    // SWI 15: RLUnCompVram
-  0x0,    // SWI 16: Diff8bitUnFilterWram
-  0x0,    // SWI 17: Diff8bitUnFilterVram
-  0x0,    // SWI 18: Diff16bitUnFilter
-  0x0,    // SWI 19: SoundBias
-  0x0,    // SWI 1A: SoundDriverInit
-  0x0,    // SWI 1B: SoundDriverMode
-  0x0,    // SWI 1C: SoundDriverMain
-  0x0,    // SWI 1D: SoundDriverVSync
-  0x0,    // SWI 1E: SoundChannelClear
-  0x0,    // SWI 1F: MidiKey2Freq
-  0x0,    // SWI 20: SoundWhatever0
-  0x0,    // SWI 21: SoundWhatever1
-  0x0,    // SWI 22: SoundWhatever2
-  0x0,    // SWI 23: SoundWhatever3
-  0x0,    // SWI 24: SoundWhatever4
-  0x0,    // SWI 25: MultiBoot
-  0x0,    // SWI 26: HardReset
-  0x0,    // SWI 27: CustomHalt
-  0x0,    // SWI 28: SoundDriverVSyncOff
-  0x0,    // SWI 29: SoundDriverVSyncOn
-  0x0     // SWI 2A: SoundGetJumpList
-};
+#define arm_hle_div(cpu_mode)                                                 \
+  generate_load_reg(a0, 0);                                                   \
+  generate_load_reg(a2, 1);                                                   \
+  x86_emit_cdq();                                                             \
+  x86_emit_idiv_eax_reg(ecx);                                                 \
+  generate_store_reg(a0, 0);                                                  \
+  generate_store_reg(a1, 1);                                                  \
+  generate_mov(a1, a0);                                                       \
+  generate_shift_right(a1, 31);                                               \
+  generate_xor(a1, a0);                                                       \
+  generate_shift_right_arithmetic(a0, 31);                                    \
+  generate_add(a0, a1);                                                       \
+  generate_store_reg(a0, 3);                                                  \
 
-void function_cc swi_hle_div(void)
-{
-  s32 result = (s32)reg[0] / (s32)reg[1];
-  reg[1] = (s32)reg[0] % (s32)reg[1];
-  reg[0] = result;
-  reg[3] = (result ^ (result >> 31)) - (result >> 31);
-}
-
-#define generate_swi_hle_handler(_swi_number)                                 \
-{                                                                             \
-  u32 swi_number = _swi_number;                                               \
-  if(swi_hle_handle[swi_number])                                              \
-  {                                                                           \
-    /* Div */                                                                 \
-    if(swi_number == 0x06)                                                    \
-    {                                                                         \
-      generate_function_call(swi_hle_div);                                    \
-    }                                                                         \
-    break;                                                                    \
-  }                                                                           \
-}                                                                             \
+#define arm_hle_div_arm(cpu_mode)                                             \
+  generate_load_reg(a0, 1);                                                   \
+  generate_load_reg(a2, 0);                                                   \
+  x86_emit_cdq();                                                             \
+  x86_emit_idiv_eax_reg(ecx);                                                 \
+  generate_store_reg(a0, 0);                                                  \
+  generate_store_reg(a1, 1);                                                  \
+  generate_mov(a1, a0);                                                       \
+  generate_shift_right(a1, 31);                                               \
+  generate_xor(a1, a0);                                                       \
+  generate_shift_right_arithmetic(a0, 31);                                    \
+  generate_add(a0, a1);                                                       \
+  generate_store_reg(a0, 3);                                                  \
 
 #define generate_translation_gate(type)                                       \
   generate_update_pc(pc);                                                     \
@@ -2330,7 +2278,7 @@ void init_emitter(void) {
 
 u32 function_cc execute_arm_translate_internal(u32 cycles, void *regptr);
 
-u32 function_cc execute_arm_translate(u32 cycles) {
+u32 execute_arm_translate(u32 cycles) {
   return execute_arm_translate_internal(cycles, &reg[0]);
 }
 

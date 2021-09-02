@@ -441,6 +441,8 @@ defsymbl(execute_swi_hle_##swi_function##_##mode)                            ;\
 
 execute_swi_function_builder(div, arm)
 execute_swi_function_builder(div, thumb)
+execute_swi_function_builder(divarm, arm)
+execute_swi_function_builder(divarm, thumb)
 
 
 @ Start program execution. Normally the mode should be Thumb and the

@@ -2304,7 +2304,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_indirect_branch_dual()                                             \
 
 #define arm_swi()                                                             \
-  generate_swi_hle_handler((opcode >> 16) & 0xFF);                            \
   generate_load_pc(reg_a0, (pc + 4));                                         \
   generate_function_call_swap_delay(execute_swi);                             \
   generate_branch()                                                           \
@@ -2369,7 +2368,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #endif
 
 #define thumb_swi()                                                           \
-  generate_swi_hle_handler(opcode & 0xFF);                                    \
   generate_load_pc(reg_a0, (pc + 2));                                         \
   generate_function_call_swap_delay(execute_swi);                             \
   generate_branch_cycle_update(                                               \
@@ -2377,71 +2375,22 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
    block_exits[block_exit_position].branch_target);                           \
   block_exit_position++                                                       \
 
-u8 swi_hle_handle[256] =
-{
-  0x0,    // SWI 0:  SoftReset
-  0x0,    // SWI 1:  RegisterRAMReset
-  0x0,    // SWI 2:  Halt
-  0x0,    // SWI 3:  Stop/Sleep
-  0x0,    // SWI 4:  IntrWait
-  0x0,    // SWI 5:  VBlankIntrWait
-  0x1,    // SWI 6:  Div
-  0x0,    // SWI 7:  DivArm
-  0x0,    // SWI 8:  Sqrt
-  0x0,    // SWI 9:  ArcTan
-  0x0,    // SWI A:  ArcTan2
-  0x0,    // SWI B:  CpuSet
-  0x0,    // SWI C:  CpuFastSet
-  0x0,    // SWI D:  GetBIOSCheckSum
-  0x0,    // SWI E:  BgAffineSet
-  0x0,    // SWI F:  ObjAffineSet
-  0x0,    // SWI 10: BitUnpack
-  0x0,    // SWI 11: LZ77UnCompWram
-  0x0,    // SWI 12: LZ77UnCompVram
-  0x0,    // SWI 13: HuffUnComp
-  0x0,    // SWI 14: RLUnCompWram
-  0x0,    // SWI 15: RLUnCompVram
-  0x0,    // SWI 16: Diff8bitUnFilterWram
-  0x0,    // SWI 17: Diff8bitUnFilterVram
-  0x0,    // SWI 18: Diff16bitUnFilter
-  0x0,    // SWI 19: SoundBias
-  0x0,    // SWI 1A: SoundDriverInit
-  0x0,    // SWI 1B: SoundDriverMode
-  0x0,    // SWI 1C: SoundDriverMain
-  0x0,    // SWI 1D: SoundDriverVSync
-  0x0,    // SWI 1E: SoundChannelClear
-  0x0,    // SWI 1F: MidiKey2Freq
-  0x0,    // SWI 20: SoundWhatever0
-  0x0,    // SWI 21: SoundWhatever1
-  0x0,    // SWI 22: SoundWhatever2
-  0x0,    // SWI 23: SoundWhatever3
-  0x0,    // SWI 24: SoundWhatever4
-  0x0,    // SWI 25: MultiBoot
-  0x0,    // SWI 26: HardReset
-  0x0,    // SWI 27: CustomHalt
-  0x0,    // SWI 28: SoundDriverVSyncOff
-  0x0,    // SWI 29: SoundDriverVSyncOn
-  0x0     // SWI 2A: SoundGetJumpList
-};
+#define arm_hle_div(cpu_mode)                                                 \
+  mips_emit_div(reg_r0, reg_r1);                                              \
+  mips_emit_mflo(reg_r0);                                                     \
+  mips_emit_mfhi(reg_r1);                                                     \
+  mips_emit_sra(reg_a0, reg_r0, 31);                                          \
+  mips_emit_xor(reg_r3, reg_r0, reg_a0);                                      \
+  mips_emit_subu(reg_r3, reg_r3, reg_a0);                                     \
 
-#define generate_swi_hle_handler(_swi_number)                                 \
-{                                                                             \
-  u32 swi_number = _swi_number;                                               \
-  if(swi_hle_handle[swi_number])                                              \
-  {                                                                           \
-    /* Div */                                                                 \
-    if(swi_number == 0x06)                                                    \
-    {                                                                         \
-      mips_emit_div(reg_r0, reg_r1);                                          \
-      mips_emit_mflo(reg_r0);                                                 \
-      mips_emit_mfhi(reg_r1);                                                 \
-      mips_emit_sra(reg_a0, reg_r0, 31);                                      \
-      mips_emit_xor(reg_r3, reg_r0, reg_a0);                                  \
-      mips_emit_subu(reg_r3, reg_r3, reg_a0);                                 \
-    }                                                                         \
-    break;                                                                    \
-  }                                                                           \
-}                                                                             \
+#define arm_hle_div_arm(cpu_mode)                                             \
+  mips_emit_div(reg_r1, reg_r0);                                              \
+  mips_emit_mflo(reg_r0);                                                     \
+  mips_emit_mfhi(reg_r1);                                                     \
+  mips_emit_sra(reg_a0, reg_r0, 31);                                          \
+  mips_emit_xor(reg_r3, reg_r0, reg_a0);                                      \
+  mips_emit_subu(reg_r3, reg_r3, reg_a0);                                     \
+
 
 #define generate_translation_gate(type)                                       \
   generate_load_pc(reg_a0, pc);                                               \
@@ -3343,7 +3292,7 @@ void init_emitter() {
 }
 
 u32 execute_arm_translate_internal(u32 cycles, void *regptr);
-u32 function_cc execute_arm_translate(u32 cycles) {
+u32 execute_arm_translate(u32 cycles) {
   return execute_arm_translate_internal(cycles, &reg[0]);
 }
 
