@@ -219,7 +219,6 @@ ext_store_ewram8:
 
 ext_store_io8:
   and $0x3FF, %eax            # wrap around address
-  and $0xFF, %edx
   call _write_io_register8    # perform 8bit I/O register write
   jmp write_epilogue          # see if it requires any system update
 
@@ -261,8 +260,7 @@ defsymbl(execute_store_u8)
   cmp $15, %ecx
   ja ext_store_ignore
   # ecx = ext_store_u8_jtable[address >> 24]
-  mov ESTORE_U8_TBL(%ebx, %ecx, 4), %ecx
-  jmp *%ecx                   # jump to table index
+  jmp *ESTORE_U8_TBL(%ebx, %ecx, 4)
 
 # 16bit ext memory routines
 
@@ -283,7 +281,6 @@ ext_store_ewram16:
 
 ext_store_io16:
   and $0x3FF, %eax            # wrap around address
-  and $0xFFFF, %edx
   call _write_io_register16   # perform 16bit I/O register write
   jmp write_epilogue          # see if it requires any system update
 
@@ -332,8 +329,7 @@ defsymbl(execute_store_u16)
   cmp $15, %ecx
   ja ext_store_ignore
   # ecx = ext_store_u16_jtable[address >> 24]
-  mov ESTORE_U16_TBL(%ebx, %ecx, 4), %ecx
-  jmp *%ecx                   # jump to table index
+  jmp *ESTORE_U16_TBL(%ebx, %ecx, 4)
 
 # 32bit ext memory routines
 
@@ -388,8 +384,7 @@ defsymbl(execute_store_u32)
   cmp $15, %ecx
   ja ext_store_ignore
   # ecx = ext_store_u32_jtable[address >> 24]
-  movl ESTORE_U32_TBL(%ebx, %ecx, 4), %ecx
-  jmp *%ecx
+  jmp *ESTORE_U32_TBL(%ebx, %ecx, 4)
 
 # %eax = new_cpsr
 # %edx = store_mask
