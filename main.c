@@ -252,8 +252,8 @@ u32 update_gba(void)
 
 void reset_gba(void)
 {
-  init_main();
   init_memory();
+  init_main();
   init_cpu();
   reset_sound();
 }

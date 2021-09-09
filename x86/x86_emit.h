@@ -2274,6 +2274,9 @@ extern u32 x86_table_info[3][16];
 
 void init_emitter(void) {
   memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));
+
+  rom_cache_watermark = 0;
+  init_bios_hooks();
 }
 
 u32 function_cc execute_arm_translate_internal(u32 cycles, void *regptr);

@@ -60,6 +60,7 @@ u32 ewram_code_min = ~0U;
 u32 ewram_code_max =  0U;
 u32 rom_cache_watermark = 0;
 
+u8 *bios_swi_entrypoint = NULL;
 u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 
 typedef struct
@@ -2779,7 +2780,10 @@ block_lookup_address_builder(dual);
   }                                                                           \
 
 #define arm_link_block()                                                      \
-  translation_target = block_lookup_address_arm(branch_target)                \
+  if(branch_target == 0x00000008)                                             \
+    translation_target = bios_swi_entrypoint;                                 \
+  else                                                                        \
+    translation_target = block_lookup_address_arm(branch_target);             \
 
 #define arm_instruction_width 4
 
@@ -2851,10 +2855,11 @@ block_lookup_address_builder(dual);
 #define thumb_set_condition(_condition)                                       \
 
 #define thumb_link_block()                                                    \
-  if(branch_target != 0x00000008)                                             \
-    translation_target = block_lookup_address_thumb(branch_target);           \
+  /* Speed hack to make SWI calls direct jumps */                             \
+  if(branch_target == 0x00000008)                                             \
+    translation_target = bios_swi_entrypoint;                                 \
   else                                                                        \
-    translation_target = block_lookup_address_arm(branch_target)              \
+    translation_target = block_lookup_address_thumb(branch_target);           \
 
 #define thumb_instruction_width 2
 
@@ -2959,8 +2964,8 @@ block_exit_type block_exits[MAX_EXITS];
         no_direct_branch:;                                                    \
       }                                                                       \
                                                                               \
-      /* SWI branches to the BIOS, this will likely change when               \
-         some HLE BIOS is implemented. */                                     \
+      /* SWI branches to the BIOS, unless it's an HLE call, then it is        \
+         not parsed as an exit_point but rather an "instruction" of sorts. */ \
       if(type##_opcode_swi)                                                   \
       {                                                                       \
         block_exits[block_exit_position].branch_target = 0x00000008;          \
@@ -3402,6 +3407,15 @@ s32 translate_block_thumb(u32 pc, translation_region_type
      external_block_exits[i].branch_source, translation_target);
   }
   return 0;
+}
+
+void init_bios_hooks(void)
+{
+  // Pre-generate this entry point so that we can safely invoke fast
+  // SWI calls from ROM and RAM regardless of cache flushes.
+  rom_translation_ptr = &rom_translation_cache[rom_cache_watermark];
+  bios_swi_entrypoint = block_lookup_address_arm(0x8);
+  rom_cache_watermark = (u32)(rom_translation_ptr - rom_translation_cache);
 }
 
 void flush_translation_cache_ram(void)

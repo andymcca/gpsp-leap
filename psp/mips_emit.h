@@ -3292,6 +3292,8 @@ void init_emitter() {
 
   // Ensure rom flushes do not wipe this area
   rom_cache_watermark = (u32)(translation_ptr - rom_translation_cache);
+
+  init_bios_hooks();
 }
 
 u32 execute_arm_translate_internal(u32 cycles, void *regptr);

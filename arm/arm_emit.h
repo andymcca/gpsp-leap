@@ -1937,6 +1937,9 @@ extern u32 ldst_lookup_tables[9][16];
 
 void init_emitter(void) {
   memcpy(ldst_lookup_tables, ldst_handler_functions, sizeof(ldst_lookup_tables));
+
+  rom_cache_watermark = 0;
+  init_bios_hooks();
 }
 
 u32 execute_arm_translate_internal(u32 cycles, void *regptr);
