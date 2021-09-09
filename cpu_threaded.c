@@ -58,7 +58,7 @@ u32 iwram_code_min = ~0U;
 u32 iwram_code_max =  0U;
 u32 ewram_code_min = ~0U;
 u32 ewram_code_max =  0U;
-
+u32 rom_cache_watermark = 0;
 
 u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 
@@ -3430,8 +3430,8 @@ void flush_translation_cache_ram(void)
 
 void flush_translation_cache_rom(void)
 {
-  last_rom_translation_ptr = rom_translation_cache;
-  rom_translation_ptr      = rom_translation_cache;
+  last_rom_translation_ptr = &rom_translation_cache[rom_cache_watermark];
+  rom_translation_ptr      = &rom_translation_cache[rom_cache_watermark];
 
   memset(rom_branch_hash, 0, sizeof(rom_branch_hash));
 }

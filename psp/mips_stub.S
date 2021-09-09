@@ -679,8 +679,6 @@ fnptrs:
 #endif
 .align 2
 
-defsymbl(stub_arena)
-  .space STUB_ARENA_SIZE
 defsymbl(rom_translation_cache)
   .space ROM_TRANSLATION_CACHE_SIZE
 defsymbl(ram_translation_cache)

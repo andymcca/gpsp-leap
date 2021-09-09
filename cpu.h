@@ -146,7 +146,6 @@ extern int sceBlock;
 extern u8 rom_translation_cache[ROM_TRANSLATION_CACHE_SIZE];
 extern u8 ram_translation_cache[RAM_TRANSLATION_CACHE_SIZE];
 #endif
-extern u32 stub_arena[STUB_ARENA_SIZE / 4];
 extern u8 *rom_translation_ptr;
 extern u8 *ram_translation_ptr;
 

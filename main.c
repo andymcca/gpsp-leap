@@ -101,8 +101,8 @@ void init_main(void)
   video_count = 960;
 
 #ifdef HAVE_DYNAREC
-  init_caches();
   init_emitter();
+  init_caches();
 #endif
 }
 

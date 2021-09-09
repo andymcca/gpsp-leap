@@ -2529,13 +2529,13 @@ u32* openld_core_ptrs[11];
 const u8 ldopmap[6][2] = { {0, 1}, {1, 2}, {2, 4}, {4, 6}, {6, 10}, {10, 11} };
 const u8 ldhldrtbl[11] = {0, 1, 2, 2, 3, 3, 4, 4, 4, 4, 5};
 #define ld_phndlr_branch(memop) \
-  (((u32*)&stub_arena[ldhldrtbl[(memop)] * 16]) - ((u32*)translation_ptr + 1))
+  (((u32*)&rom_translation_cache[ldhldrtbl[(memop)]*16*4]) - ((u32*)translation_ptr + 1))
 
 #define st_phndlr_branch(memop) \
-  (((u32*)&stub_arena[((memop) + 6) * 16]) - ((u32*)translation_ptr + 1))
+  (((u32*)&rom_translation_cache[((memop) + 6)*16*4]) - ((u32*)translation_ptr + 1))
 
 #define branch_handlerid(phndlrid) \
-  (((u32*)&stub_arena[(phndlrid) * 16]) - ((u32*)translation_ptr + 1))
+  (((u32*)&rom_translation_cache[(phndlrid)*16*4]) - ((u32*)translation_ptr + 1))
 
 #define branch_offset(ptr) \
   (((u32*)ptr) - ((u32*)translation_ptr + 1))
@@ -2579,7 +2579,7 @@ static void emit_mem_access_loadop(
   #define genccall(fn) mips_emit_jal(((u32)fn) >> 2);
 #endif
 
-#define SMC_WRITE_OFF32    (10*16)   /* 10 handlers (16 insts) */
+#define SMC_WRITE_OFF    (10*16*4)   /* 10 handlers (16 insts) */
 
 // Describes a "plain" memory are, that is, an area that is just accessed
 // as normal memory (with some caveats tho).
@@ -2823,7 +2823,7 @@ static void emit_pmemst_stub(
     }
     // If the data is non zero, we just wrote over code
     // Local-jump to the smc_write (which lives at offset:0)
-    mips_emit_b(bne, reg_zero, reg_temp, branch_offset(&stub_arena[SMC_WRITE_OFF32]));
+    mips_emit_b(bne, reg_zero, reg_temp, branch_offset(&rom_translation_cache[SMC_WRITE_OFF]));
   }
 
   // Store the data (delay slot from the SMC branch)
@@ -3187,10 +3187,10 @@ static void emit_phand(
 void init_emitter() {
   int i;
   // Initialize memory to a debuggable state
-  memset(stub_arena, 0, sizeof(stub_arena));   // nop
+  rom_cache_watermark = 0;
 
   // Generates the trampoline and helper stubs that we need
-  u8 *translation_ptr = (u8*)&stub_arena[0];
+  u8 *translation_ptr = (u8*)&rom_translation_cache[0];
 
   // Generate first the patch handlers
   // We have 6+4 patchers, one per mem type (6 or 4)
@@ -3289,6 +3289,9 @@ void init_emitter() {
   u32 *tmemptr = &tmemld[0][0];
   for (i = 0; i < 15*16; i++)
     thnjal[i] = ((tmemptr[i] >> 2) & 0x3FFFFFF) | (mips_opcode_jal << 26);
+
+  // Ensure rom flushes do not wipe this area
+  rom_cache_watermark = (u32)(translation_ptr - rom_translation_cache);
 }
 
 u32 execute_arm_translate_internal(u32 cycles, void *regptr);

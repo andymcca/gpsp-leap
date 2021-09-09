@@ -21,9 +21,6 @@
 /* Please note that RAM_TRANSLATION_CACHE_SIZE is limited to 512KB
    Check cpu_threaded.c for "memory tagging" for more info. */
 
-/* This is MIPS specific for now */
-#define STUB_ARENA_SIZE  (16*1024)
-
 /* Hash table size for ROM trans cache lookups */
 #define ROM_BRANCH_HASH_SIZE (1024 * 64)
 
