@@ -395,16 +395,6 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
     cycle_count = 0;                                                          \
   }                                                                           \
 
-#define generate_cycle_update_flag_set()                                      \
-  if(cycle_count >> 8)                                                        \
-  {                                                                           \
-    ARM_ADD_REG_IMM(0, reg_cycles, reg_cycles, (cycle_count >> 8) & 0xFF,     \
-     arm_imm_lsl_to_rot(8));                                                  \
-  }                                                                           \
-  generate_save_flags();                                                      \
-  ARM_ADDS_REG_IMM(0, reg_cycles, reg_cycles, (cycle_count & 0xFF), 0);       \
-  cycle_count = 0                                                             \
-
 #define generate_branch_patch_conditional(dest, offset)                       \
   *((u32 *)(dest)) = (*((u32 *)dest) & 0xFF000000) |                          \
    arm_relative_offset(dest, offset)                                          \
@@ -692,19 +682,11 @@ u32 execute_spsr_restore_body(u32 pc)
   return pc;
 }
 
-
-#define generate_load_flags()                                                 \
-/*  ARM_MSR_REG(0, ARM_PSR_F, reg_flags, ARM_CPSR) */                         \
-
-#define generate_store_flags()                                                \
-/*  ARM_MRS_CPSR(0, reg_flags) */                                             \
-
 #define generate_save_flags()                                                 \
   ARM_MRS_CPSR(0, reg_flags)                                                  \
 
 #define generate_restore_flags()                                              \
   ARM_MSR_REG(0, ARM_PSR_F, reg_flags, ARM_CPSR)                              \
-
 
 #define condition_opposite_eq ARMCOND_NE
 #define condition_opposite_ne ARMCOND_EQ
@@ -939,9 +921,7 @@ u32 execute_spsr_restore_body(u32 pc)
 }                                                                             \
 
 #define generate_op_muls_reg_immshift(_rd, _rn, _rm, shift_type, shift)       \
-  generate_load_flags();                                                      \
   ARM_MULS(0, _rd, _rn, _rm);                                                 \
-  generate_store_flags()                                                      \
 
 #define generate_op_cmp_reg_immshift(_rd, _rn, _rm, shift_type, shift)        \
   generate_op_reg_immshift_tflags(CMP, _rn, _rm, shift_type, shift)           \
@@ -1129,15 +1109,11 @@ u32 execute_spsr_restore_body(u32 pc)
   ARM_MLA(0, _rd, _rm, _rs, _rn)                                              \
 
 #define arm_multiply_add_no_flags_yes()                                       \
-  generate_load_flags();                                                      \
   ARM_MULS(0, reg_a0, reg_a0, reg_a1)                                         \
-  generate_store_flags()                                                      \
 
 #define arm_multiply_add_yes_flags_yes()                                      \
   u32 _rn = arm_prepare_load_reg(&translation_ptr, reg_a2, rn);               \
-  generate_load_flags();                                                      \
   ARM_MLAS(0, _rd, _rm, _rs, _rn);                                            \
-  generate_store_flags()
 
 
 #define arm_multiply(add_op, flags)                                           \
@@ -1161,9 +1137,7 @@ u32 execute_spsr_restore_body(u32 pc)
   ARM_##name(0, _rdlo, _rdhi, _rm, _rs)                                       \
 
 #define arm_multiply_long_flags_yes(name)                                     \
-  generate_load_flags();                                                      \
   ARM_##name##S(0, _rdlo, _rdhi, _rm, _rs);                                   \
-  generate_store_flags()                                                      \
 
 
 #define arm_multiply_long_add_no(name)                                        \
@@ -1820,7 +1794,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_conditional_branch(condition)                                   \
 {                                                                             \
   generate_cycle_update();                                                    \
-  generate_load_flags();                                                      \
   generate_branch_filler(condition_opposite_##condition, backpatch_address);  \
   generate_branch_no_cycle_update(                                            \
    block_exits[block_exit_position].branch_source,                            \
@@ -1832,7 +1805,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_conditional_block_header()                                        \
   generate_cycle_update();                                                    \
-  generate_load_flags();                                                      \
   /* This will choose the opposite condition */                               \
   condition ^= 0x01;                                                          \
   generate_branch_filler(condition, backpatch_address)                        \

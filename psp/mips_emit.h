@@ -497,14 +497,12 @@ u32 arm_to_mips_reg[] =
   reg_r14,
   reg_a0,
   reg_a1,
-  reg_a2,
-  reg_temp
+  reg_a2
 };
 
 #define arm_reg_a0   15
 #define arm_reg_a1   16
 #define arm_reg_a2   17
-#define arm_reg_temp 18
 
 #define generate_load_reg(ireg, reg_index)                                    \
   mips_emit_addu(ireg, arm_to_mips_reg[reg_index], reg_zero)                  \
@@ -667,9 +665,6 @@ u32 arm_to_mips_reg[] =
 #define generate_branch_cycle_update(writeback_location, new_pc)              \
   generate_cycle_update();                                                    \
   generate_branch_no_cycle_update(writeback_location, new_pc)                 \
-
-#define generate_conditional_branch(ireg_a, ireg_b, type, writeback_location) \
-  generate_branch_filler_##type(ireg_a, ireg_b, writeback_location)           \
 
 // a0 holds the destination
 
