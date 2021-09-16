@@ -2238,8 +2238,12 @@ static void function_cc execute_swi(u32 pc)
   block_exit_position++                                                       \
 
 #define arm_hle_div(cpu_mode)                                                 \
+{                                                                             \
+  u8 *jmpinst;                                                                \
   generate_load_reg(a0, 0);                                                   \
   generate_load_reg(a2, 1);                                                   \
+  generate_cmp_imm(a2, 0);                                                    \
+  x86_emit_j_filler(x86_condition_code_z, jmpinst);                           \
   x86_emit_cdq();                                                             \
   x86_emit_idiv_eax_reg(ecx);                                                 \
   generate_store_reg(a0, 0);                                                  \
@@ -2250,10 +2254,16 @@ static void function_cc execute_swi(u32 pc)
   generate_shift_right_arithmetic(a0, 31);                                    \
   generate_add(a0, a1);                                                       \
   generate_store_reg(a0, 3);                                                  \
+  generate_branch_patch_conditional(jmpinst, translation_ptr);                \
+}
 
 #define arm_hle_div_arm(cpu_mode)                                             \
+{                                                                             \
+  u8 *jmpinst;                                                                \
   generate_load_reg(a0, 1);                                                   \
   generate_load_reg(a2, 0);                                                   \
+  generate_cmp_imm(a2, 0);                                                    \
+  x86_emit_j_filler(x86_condition_code_z, jmpinst);                           \
   x86_emit_cdq();                                                             \
   x86_emit_idiv_eax_reg(ecx);                                                 \
   generate_store_reg(a0, 0);                                                  \
@@ -2264,6 +2274,8 @@ static void function_cc execute_swi(u32 pc)
   generate_shift_right_arithmetic(a0, 31);                                    \
   generate_add(a0, a1);                                                       \
   generate_store_reg(a0, 3);                                                  \
+  generate_branch_patch_conditional(jmpinst, translation_ptr);                \
+}
 
 #define generate_translation_gate(type)                                       \
   generate_update_pc(pc);                                                     \
