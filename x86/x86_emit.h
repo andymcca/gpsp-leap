@@ -2179,7 +2179,8 @@ static void function_cc execute_swi(u32 pc)
   bios_read_protect = 0xe3a02004;
   reg_mode[MODE_SUPERVISOR][6] = pc;
   spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
-  reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13;
+  // Move to ARM mode, supervisor mode, disable IRQs
+  reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13 | 0x80;
   set_cpu_mode(MODE_SUPERVISOR);
 }
 

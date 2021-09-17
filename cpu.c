@@ -3197,7 +3197,8 @@ arm_loop:
                       spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
                       reg[REG_PC] = 0x00000008;
                       arm_update_pc();
-                      reg[REG_CPSR] = (reg[REG_CPSR] & ~0x1F) | 0x13;
+                      // Move to ARM mode, Supervisor mode and disable IRQs
+                      reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13 | 0x80;
                       set_cpu_mode(MODE_SUPERVISOR);
                       break;
                 }
@@ -3682,7 +3683,8 @@ thumb_loop:
                       spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
                       reg[REG_PC] = 0x00000008;
                       thumb_update_pc();
-                      reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13;
+                      // Move to ARM mode, Supervisor mode and disable IRQs
+                      reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13 | 0x80;
                       set_cpu_mode(MODE_SUPERVISOR);
                       collapse_flags();
                       goto arm_loop;

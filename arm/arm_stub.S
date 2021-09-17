@@ -410,7 +410,7 @@ defsymbl(execute_swi_##mode)                                                 ;\
   add r1, reg_base, #SPSR_RAM_OFF         /* r1 = spsr                     */;\
   str r0, [r1, #(MODE_SUPERVISOR * 4)]    /* spsr[MODE_SUPERVISOR] = cpsr  */;\
   bic r0, r0, #0x3F                       /* clear mode flag in r0         */;\
-  orr r0, r0, #0x13                       /* set to supervisor mode        */;\
+  orr r0, r0, #(0x13 | 0x80)              /* supervisor mode + disable IRQ */;\
   str r0, [reg_base, #REG_CPSR]           /* update cpsr                   */;\
                                                                              ;\
   mov r0, #MODE_SUPERVISOR                                                   ;\

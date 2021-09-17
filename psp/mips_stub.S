@@ -409,7 +409,7 @@ defsymbl(execute_swi)
   sw $2, SUPERVISOR_SPSR($16)     # save cpsr in SUPERVISOR_CPSR
   srl $2, $2, 6                   # zero out bottom 6 bits of CPSR
   sll $2, $2, 6
-  ori $2, 0x13                    # set mode to supervisor
+  ori $2, (0x13 | 0x80)           # mode supervisor + disable IRQs
   sw $2, REG_CPSR($16)            # write back CPSR
   save_registers
   li $4, 3                        # 3 is supervisor mode
