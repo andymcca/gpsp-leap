@@ -345,7 +345,7 @@ void print_register_usage(void)
 
 
 #define get_shift_register(dest)                                              \
-  u32 shift = reg[(opcode >> 8) & 0x0F];                                      \
+  u32 shift = reg[(opcode >> 8) & 0x0F] & 0xFF;                               \
   using_register(arm, ((opcode >> 8) & 0x0F), op_shift);                      \
   dest = reg[rm];                                                             \
   if(rm == 15)                                                                \
