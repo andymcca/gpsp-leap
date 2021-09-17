@@ -1419,7 +1419,7 @@ void function_cc execute_store_spsr(u32 new_spsr, u32 store_mask)
   if(((address & aligned_address_mask##size) == 0) &&                         \
    (map = memory_map_read[address >> 15]))                                    \
   {                                                                           \
-    dest = *((type *)((u8 *)map + (address & 0x7FFF)));                       \
+    dest = (type)readaddress##size(map, (address & 0x7FFF));                  \
   }                                                                           \
   else                                                                        \
   {                                                                           \
@@ -1449,18 +1449,18 @@ void function_cc execute_store_spsr(u32 new_spsr, u32 store_mask)
   }                                                                           \
 }                                                                             \
 
-#define access_memory_generate_read_function(mem_size, mem_type)              \
-u32 function_cc execute_load_##mem_type(u32 address)                          \
+#define access_memory_generate_read_function(mem_size, name, mem_type)        \
+u32 function_cc execute_load_##name(u32 address)                              \
 {                                                                             \
   u32 dest;                                                                   \
   read_memory(mem_size, mem_type, address, dest);                             \
   return dest;                                                                \
 }                                                                             \
 
-access_memory_generate_read_function(8, u8);
-access_memory_generate_read_function(8, s8);
-access_memory_generate_read_function(16, u16);
-access_memory_generate_read_function(32, u32);
+access_memory_generate_read_function(8, u8, u8);
+access_memory_generate_read_function(8, s8, s8);
+access_memory_generate_read_function(16, u16, u32);
+access_memory_generate_read_function(32, u32, u32);
 
 u32 function_cc execute_load_s16(u32 address)
 {
@@ -2175,6 +2175,8 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 static void function_cc execute_swi(u32 pc)
 {
+  // Open bus value after SWI
+  bios_read_protect = 0xe3a02004;
   reg_mode[MODE_SUPERVISOR][6] = pc;
   spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
   reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13;

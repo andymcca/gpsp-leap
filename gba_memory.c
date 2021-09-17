@@ -1428,6 +1428,12 @@ cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
 }
 
 #define write_palette8(address, value)                                        \
+{                                                                             \
+  u32 aladdr = address & ~1U;                                                 \
+  u16 val16 = (value << 8) | value;                                           \
+  address16(palette_ram, aladdr) = eswap16(val16);                            \
+  address16(palette_ram_converted, aladdr) = convert_palette(val16);          \
+}
 
 #define write_palette16(address, value)                                       \
 {                                                                             \
@@ -1891,8 +1897,10 @@ void function_cc write_rtc(u32 address, u32 value)
                                                                               \
     case 0x07:                                                                \
       /* OAM RAM */                                                           \
-      reg[OAM_UPDATED] = 1;                                                   \
-      address##type(oam_ram, address & 0x3FF) = eswap##type(value);           \
+      if (type != 8) {                                                        \
+        reg[OAM_UPDATED] = 1;                                                 \
+        address##type(oam_ram, address & 0x3FF) = eswap##type(value);         \
+      }                                                                       \
       break;                                                                  \
                                                                               \
     case 0x08:                                                                \

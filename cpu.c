@@ -1036,7 +1036,7 @@ const u32 psr_masks[16] =
   fast_read_memory(8, u8, address, dest)                                      \
 
 #define load_memory_u16(address, dest)                                        \
-  fast_read_memory(16, u16, address, dest)                                    \
+  fast_read_memory(16, u32, address, dest)                                    \
 
 #define load_memory_u32(address, dest)                                        \
   fast_read_memory(32, u32, address, dest)                                    \
@@ -1570,6 +1570,7 @@ void raise_interrupt(irq_type irq_raised)
   if((read_ioreg(REG_IE) & irq_raised) && read_ioreg(REG_IME) &&
    ((reg[REG_CPSR] & 0x80) == 0))
   {
+    // Value after the FIQ returns, should be improved
     bios_read_protect = 0xe55ec002;
 
     // Interrupt handler in BIOS
@@ -3189,6 +3190,8 @@ arm_loop:
                 {
                    /* Jump to BIOS SWI handler */
                    default:
+                      // After SWI, we read bios[0xE4]
+                      bios_read_protect = 0xe3a02004;
                       reg_mode[MODE_SUPERVISOR][6] = pc + 4;
                       collapse_flags();
                       spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
@@ -3673,6 +3676,8 @@ thumb_loop:
                 switch(swi_comment)
                 {
                    default:
+                      // After SWI, we read bios[0xE4]
+                      bios_read_protect = 0xe3a02004;
                       reg_mode[MODE_SUPERVISOR][6] = pc + 2;
                       spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
                       reg[REG_PC] = 0x00000008;
