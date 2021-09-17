@@ -201,6 +201,18 @@ typedef enum
 #define x86_emit_add_reg_mem(dst, base, offset)                               \
   x86_emit_opcode_1b_mem(add_reg_rm, dst, base, offset);                      \
 
+#define x86_emit_or_reg_mem(dst, base, offset)                                \
+  x86_emit_opcode_1b_mem(or_reg_rm, dst, base, offset);                       \
+
+#define x86_emit_xor_reg_mem(dst, base, offset)                               \
+  x86_emit_opcode_1b_mem(xor_reg_rm, dst, base, offset);                      \
+
+#define x86_emit_cmp_reg_mem(rega, base, offset)                              \
+  x86_emit_opcode_1b_mem(cmp_reg_rm, rega, base, offset);                     \
+
+#define x86_emit_test_reg_mem(rega, base, offset)                             \
+  x86_emit_opcode_1b_mem(test_reg_rm, rega, base, offset);                    \
+
 #define x86_emit_mov_reg_reg(dest, source)                                    \
   if(x86_unequal_operands(dest, source))                                      \
   {                                                                           \
@@ -362,8 +374,17 @@ typedef enum
 #define generate_test_imm(ireg, imm)                                          \
   x86_emit_test_reg_imm(reg_##ireg, imm);                                     \
 
+#define generate_test_memreg(ireg_ref, arm_reg_src)                           \
+  x86_emit_test_reg_mem(reg_##ireg_ref, reg_base, arm_reg_src * 4)            \
+
+#define generate_cmp_memreg(ireg_ref, arm_reg_src)                            \
+  x86_emit_cmp_reg_mem(reg_##ireg_ref, reg_base, arm_reg_src * 4)             \
+
 #define generate_cmp_imm(ireg, imm)                                           \
   x86_emit_cmp_reg_imm(reg_##ireg, imm)                                       \
+
+#define generate_cmp_reg(ireg, ireg2)                                         \
+  x86_emit_cmp_reg_reg(reg_##ireg, reg_##ireg2)                               \
 
 #define generate_update_flag(condcode, regnum)                                \
   x86_emit_setcc_mem(condcode, reg_base, regnum * 4)                          \
@@ -431,8 +452,14 @@ typedef enum
 #define generate_or(ireg_dest, ireg_src)                                      \
   x86_emit_or_reg_reg(reg_##ireg_dest, reg_##ireg_src)                        \
 
+#define generate_or_mem(ireg_dest, arm_reg_src)                               \
+  x86_emit_or_reg_mem(reg_##ireg_dest, reg_base, arm_reg_src * 4)             \
+
 #define generate_xor(ireg_dest, ireg_src)                                     \
   x86_emit_xor_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
+
+#define generate_xor_mem(ireg_dest, arm_reg_src)                              \
+  x86_emit_xor_reg_mem(reg_##ireg_dest, reg_base, arm_reg_src * 4)            \
 
 #define generate_add_imm(ireg, imm)                                           \
   x86_emit_add_reg_imm(reg_##ireg, imm)                                       \
@@ -482,23 +509,6 @@ typedef enum
 #define generate_exit_block()                                                 \
   x86_emit_ret();                                                             \
 
-#define generate_branch_filler_true(ireg_dest, ireg_src, writeback_location)  \
-  x86_emit_test_reg_imm(reg_##ireg_dest, 1);                                  \
-  x86_emit_j_filler(x86_condition_code_z, writeback_location)                 \
-
-#define generate_branch_filler_false(ireg_dest, ireg_src, writeback_location) \
-  x86_emit_test_reg_imm(reg_##ireg_dest, 1);                                  \
-  x86_emit_j_filler(x86_condition_code_nz, writeback_location)                \
-
-#define generate_branch_filler_equal(ireg_dest, ireg_src, writeback_location) \
-  x86_emit_cmp_reg_reg(reg_##ireg_dest, reg_##ireg_src);                      \
-  x86_emit_j_filler(x86_condition_code_nz, writeback_location)                \
-
-#define generate_branch_filler_not_equal(ireg_dest, ireg_src,                 \
- writeback_location)                                                          \
-  x86_emit_cmp_reg_reg(reg_##ireg_dest, reg_##ireg_src);                      \
-  x86_emit_j_filler(x86_condition_code_z, writeback_location)                 \
-
 #define generate_update_pc(new_pc)                                            \
   x86_emit_mov_reg_imm(eax, new_pc)                                           \
 
@@ -535,9 +545,6 @@ typedef enum
 #define generate_branch_cycle_update(writeback_location, new_pc)              \
   generate_cycle_update();                                                    \
   generate_branch_no_cycle_update(writeback_location, new_pc)                 \
-
-#define generate_conditional_branch(ireg_a, ireg_b, type, writeback_location) \
-  generate_branch_filler_##type(ireg_a, ireg_b, writeback_location)           \
 
 // a0 holds the destination
 
@@ -1017,145 +1024,138 @@ u32 function_cc execute_spsr_restore(u32 address)
     generate_indirect_branch_dual();                                          \
   }                                                                           \
 
-typedef enum
-{
-  CONDITION_TRUE,
-  CONDITION_FALSE,
-  CONDITION_EQUAL,
-  CONDITION_NOT_EQUAL
-} condition_check_type;
+#define generate_condition_eq(ireg)                                           \
+  generate_load_reg(ireg, REG_Z_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
+
+#define generate_condition_ne(ireg)                                           \
+  generate_load_reg(ireg, REG_Z_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_cs(ireg)                                           \
+  generate_load_reg(ireg, REG_C_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
+
+#define generate_condition_cc(ireg)                                           \
+  generate_load_reg(ireg, REG_C_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_mi(ireg)                                           \
+  generate_load_reg(ireg, REG_N_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
+
+#define generate_condition_pl(ireg)                                           \
+  generate_load_reg(ireg, REG_N_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_vs(ireg)                                           \
+  generate_load_reg(ireg, REG_V_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
+
+#define generate_condition_vc(ireg)                                           \
+  generate_load_reg(ireg, REG_V_FLAG);                                        \
+  generate_test_imm(ireg, 1);                                                 \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_hi(ireg)                                           \
+  generate_load_reg(ireg, REG_C_FLAG);                                        \
+  generate_xor_imm(ireg, 1);                                                  \
+  generate_or_mem(ireg, REG_Z_FLAG);                                          \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_ls(ireg)                                           \
+  generate_load_reg(ireg, REG_C_FLAG);                                        \
+  generate_xor_imm(ireg, 1);                                                  \
+  generate_or_mem(ireg, REG_Z_FLAG);                                          \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
+
+#define generate_condition_ge(ireg)                                           \
+  generate_load_reg(ireg, REG_N_FLAG);                                        \
+  generate_cmp_memreg(ireg, REG_V_FLAG);                                      \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_lt(ireg)                                           \
+  generate_load_reg(ireg, REG_N_FLAG);                                        \
+  generate_cmp_memreg(ireg, REG_V_FLAG);                                      \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
+
+#define generate_condition_gt(ireg)                                           \
+  generate_load_reg(ireg, REG_N_FLAG);                                        \
+  generate_xor_mem(ireg, REG_V_FLAG);                                         \
+  generate_or_mem(ireg, REG_Z_FLAG);                                          \
+  x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
+
+#define generate_condition_le(ireg)                                           \
+  generate_load_reg(ireg, REG_N_FLAG);                                        \
+  generate_xor_mem(ireg, REG_V_FLAG);                                         \
+  generate_or_mem(ireg, REG_Z_FLAG);                                          \
+  x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
 
 
-#define generate_condition_eq(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_Z_FLAG);                                      \
-  condition_check = CONDITION_TRUE                                            \
-
-#define generate_condition_ne(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_Z_FLAG);                                      \
-  condition_check = CONDITION_FALSE                                           \
-
-#define generate_condition_cs(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_C_FLAG);                                      \
-  condition_check = CONDITION_TRUE                                            \
-
-#define generate_condition_cc(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_C_FLAG);                                      \
-  condition_check = CONDITION_FALSE                                           \
-
-#define generate_condition_mi(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_N_FLAG);                                      \
-  condition_check = CONDITION_TRUE                                            \
-
-#define generate_condition_pl(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_N_FLAG);                                      \
-  condition_check = CONDITION_FALSE                                           \
-
-#define generate_condition_vs(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_V_FLAG);                                      \
-  condition_check = CONDITION_TRUE                                            \
-
-#define generate_condition_vc(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_V_FLAG);                                      \
-  condition_check = CONDITION_FALSE                                           \
-
-#define generate_condition_hi(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_C_FLAG);                                      \
-  generate_xor_imm(ireg_a, 1);                                                \
-  generate_load_reg(ireg_b, REG_Z_FLAG);                                      \
-  generate_or(ireg_a, ireg_b);                                                \
-  condition_check = CONDITION_FALSE                                           \
-
-#define generate_condition_ls(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_C_FLAG);                                      \
-  generate_xor_imm(ireg_a, 1);                                                \
-  generate_load_reg(ireg_b, REG_Z_FLAG);                                      \
-  generate_or(ireg_a, ireg_b);                                                \
-  condition_check = CONDITION_TRUE                                            \
-
-#define generate_condition_ge(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_N_FLAG);                                      \
-  generate_load_reg(ireg_b, REG_V_FLAG);                                      \
-  condition_check = CONDITION_EQUAL                                           \
-
-#define generate_condition_lt(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_N_FLAG);                                      \
-  generate_load_reg(ireg_b, REG_V_FLAG);                                      \
-  condition_check = CONDITION_NOT_EQUAL                                       \
-
-#define generate_condition_gt(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_N_FLAG);                                      \
-  generate_load_reg(ireg_b, REG_V_FLAG);                                      \
-  generate_xor(ireg_b, ireg_a);                                               \
-  generate_load_reg(a0, REG_Z_FLAG);                                          \
-  generate_or(ireg_a, ireg_b);                                                \
-  condition_check = CONDITION_FALSE                                           \
-
-#define generate_condition_le(ireg_a, ireg_b)                                 \
-  generate_load_reg(ireg_a, REG_N_FLAG);                                      \
-  generate_load_reg(ireg_b, REG_V_FLAG);                                      \
-  generate_xor(ireg_b, ireg_a);                                               \
-  generate_load_reg(a0, REG_Z_FLAG);                                          \
-  generate_or(ireg_a, ireg_b);                                                \
-  condition_check = CONDITION_TRUE                                            \
-
-
-#define generate_condition(ireg_a, ireg_b)                                    \
+#define generate_condition(ireg)                                              \
   switch(condition)                                                           \
   {                                                                           \
     case 0x0:                                                                 \
-      generate_condition_eq(ireg_a, ireg_b);                                  \
+      generate_condition_eq(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x1:                                                                 \
-      generate_condition_ne(ireg_a, ireg_b);                                  \
+      generate_condition_ne(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x2:                                                                 \
-      generate_condition_cs(ireg_a, ireg_b);                                  \
+      generate_condition_cs(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x3:                                                                 \
-      generate_condition_cc(ireg_a, ireg_b);                                  \
+      generate_condition_cc(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x4:                                                                 \
-      generate_condition_mi(ireg_a, ireg_b);                                  \
+      generate_condition_mi(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x5:                                                                 \
-      generate_condition_pl(ireg_a, ireg_b);                                  \
+      generate_condition_pl(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x6:                                                                 \
-      generate_condition_vs(ireg_a, ireg_b);                                  \
+      generate_condition_vs(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x7:                                                                 \
-      generate_condition_vc(ireg_a, ireg_b);                                  \
+      generate_condition_vc(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x8:                                                                 \
-      generate_condition_hi(ireg_a, ireg_b);                                  \
+      generate_condition_hi(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0x9:                                                                 \
-      generate_condition_ls(ireg_a, ireg_b);                                  \
+      generate_condition_ls(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0xA:                                                                 \
-      generate_condition_ge(ireg_a, ireg_b);                                  \
+      generate_condition_ge(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0xB:                                                                 \
-      generate_condition_lt(ireg_a, ireg_b);                                  \
+      generate_condition_lt(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0xC:                                                                 \
-      generate_condition_gt(ireg_a, ireg_b);                                  \
+      generate_condition_gt(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0xD:                                                                 \
-      generate_condition_le(ireg_a, ireg_b);                                  \
+      generate_condition_le(ireg);                                            \
       break;                                                                  \
                                                                               \
     case 0xE:                                                                 \
@@ -1164,28 +1164,6 @@ typedef enum
                                                                               \
     case 0xF:                                                                 \
       /* Reserved */                                                          \
-      break;                                                                  \
-  }                                                                           \
-  generate_cycle_update()                                                     \
-
-#define generate_conditional_branch_type(ireg_a, ireg_b)                      \
-  switch(condition_check)                                                     \
-  {                                                                           \
-    case CONDITION_TRUE:                                                      \
-      generate_conditional_branch(ireg_a, ireg_b, true, backpatch_address);   \
-      break;                                                                  \
-                                                                              \
-    case CONDITION_FALSE:                                                     \
-      generate_conditional_branch(ireg_a, ireg_b, false, backpatch_address);  \
-      break;                                                                  \
-                                                                              \
-    case CONDITION_EQUAL:                                                     \
-      generate_conditional_branch(ireg_a, ireg_b, equal, backpatch_address);  \
-      break;                                                                  \
-                                                                              \
-    case CONDITION_NOT_EQUAL:                                                 \
-      generate_conditional_branch(ireg_a, ireg_b, not_equal,                  \
-       backpatch_address);                                                    \
       break;                                                                  \
   }                                                                           \
 
@@ -1990,10 +1968,8 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define thumb_conditional_branch(condition)                                   \
 {                                                                             \
-  condition_check_type condition_check = CONDITION_TRUE;                      \
   generate_cycle_update();                                                    \
-  generate_condition_##condition(a0, a1);                                     \
-  generate_conditional_branch_type(a0, a1);                                   \
+  generate_condition_##condition(a0);                                         \
   generate_branch_no_cycle_update(                                            \
    block_exits[block_exit_position].branch_source,                            \
    block_exits[block_exit_position].branch_target);                           \
@@ -2167,11 +2143,8 @@ static void function_cc execute_swi(u32 pc)
 }
 
 #define arm_conditional_block_header()                                        \
-{                                                                             \
-  condition_check_type condition_check = CONDITION_TRUE;                      \
-  generate_condition(a0, a1);                                                 \
-  generate_conditional_branch_type(a0, a1);                                   \
-}
+  generate_cycle_update();                                                    \
+  generate_condition(a0);                                                     \
 
 #define arm_b()                                                               \
   generate_branch()                                                           \
