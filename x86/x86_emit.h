@@ -61,14 +61,15 @@ typedef enum
 #define x86_emit_mod_rm(mod, rm, spare)                                       \
   x86_emit_byte((mod << 6) | (spare << 3) | rm)                               \
 
+#define x86_emit_sib(scale, ridx, rbase)                                      \
+  x86_emit_byte(((scale) << 6) | ((ridx) << 3) | (rbase))                     \
+
 #define x86_emit_mem_op(dest, base, offset)                                   \
   if(offset == 0)                                                             \
   {                                                                           \
     x86_emit_mod_rm(x86_mod_mem, base, dest);                                 \
   }                                                                           \
-  else                                                                        \
-                                                                              \
-  if(((s32)offset < 127) && ((s32)offset > -128))                             \
+  else if(((s32)offset < 127) && ((s32)offset > -128))                        \
   {                                                                           \
     x86_emit_mod_rm(x86_mod_mem_disp8, base, dest);                           \
     x86_emit_byte((s8)offset);                                                \
@@ -76,6 +77,25 @@ typedef enum
   else                                                                        \
   {                                                                           \
     x86_emit_mod_rm(x86_mod_mem_disp32, base, dest);                          \
+    x86_emit_dword(offset);                                                   \
+  }                                                                           \
+
+#define x86_emit_mem_sib_op(dest, base, ridx, scale, offset)                  \
+  if(offset == 0)                                                             \
+  {                                                                           \
+    x86_emit_mod_rm(x86_mod_mem, 0x4, dest);                                  \
+    x86_emit_sib(scale, ridx, base);                                          \
+  }                                                                           \
+  else if(((s32)offset < 127) && ((s32)offset > -128))                        \
+  {                                                                           \
+    x86_emit_mod_rm(x86_mod_mem_disp8, 0x4, dest);                            \
+    x86_emit_sib(scale, ridx, base);                                          \
+    x86_emit_byte((s8)offset);                                                \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    x86_emit_mod_rm(x86_mod_mem_disp32, 0x4, dest);                           \
+    x86_emit_sib(scale, ridx, base);                                          \
     x86_emit_dword(offset);                                                   \
   }                                                                           \
 
@@ -177,6 +197,13 @@ typedef enum
   x86_emit_mem_op(x86_reg_number_##dest, x86_reg_number_##base, offset);      \
 }                                                                             \
 
+#define x86_emit_opcode_1b_mem_sib(opcode, dest, base, ridx, scale, offset)   \
+{                                                                             \
+  x86_emit_byte(x86_opcode_##opcode);                                         \
+  x86_emit_mem_sib_op(x86_reg_number_##dest, x86_reg_number_##base,           \
+                      x86_reg_number_##ridx, scale, offset);                  \
+}                                                                             \
+
 #define x86_emit_opcode_1b(opcode, reg)                                       \
   x86_emit_byte(x86_opcode_##opcode | x86_reg_number_##reg)                   \
 
@@ -190,6 +217,9 @@ typedef enum
 
 #define x86_emit_mov_reg_mem(dest, base, offset)                              \
   x86_emit_opcode_1b_mem(mov_reg_rm, dest, base, offset)                      \
+
+#define x86_emit_mov_reg_mem_idx(dest, base, scale, index, offset)            \
+  x86_emit_opcode_1b_mem_sib(mov_reg_rm, dest, base, index, scale, offset)    \
 
 #define x86_emit_mov_mem_reg(source, base, offset)                            \
   x86_emit_opcode_1b_mem(mov_rm_reg, source, base, offset)                    \
@@ -371,6 +401,9 @@ typedef enum
 #define reg_rv      eax
 #define reg_s0      esi
 
+/* Offsets from reg_base, see stub.S */
+#define SPSR_BASE_OFF   0xA9100
+
 #define generate_test_imm(ireg, imm)                                          \
   x86_emit_test_reg_imm(reg_##ireg, imm);                                     \
 
@@ -388,6 +421,9 @@ typedef enum
 
 #define generate_update_flag(condcode, regnum)                                \
   x86_emit_setcc_mem(condcode, reg_base, regnum * 4)                          \
+
+#define generate_load_spsr(ireg, idxr)                                        \
+  x86_emit_mov_reg_mem_idx(reg_##ireg, reg_base, 2, reg_##idxr, SPSR_BASE_OFF);
 
 #define generate_load_reg(ireg, reg_index)                                    \
   x86_emit_mov_reg_mem(reg_##ireg, reg_base, reg_index * 4);                  \
@@ -950,20 +986,28 @@ typedef enum
     }                                                                         \
   }                                                                           \
 
-#define calculate_flags_logic(dest)                                           \
-  calculate_z_flag(dest);                                                     \
-  calculate_n_flag(dest)                                                      \
-
 #define extract_flags()                                                       \
   reg[REG_N_FLAG] = reg[REG_CPSR] >> 31;                                      \
   reg[REG_Z_FLAG] = (reg[REG_CPSR] >> 30) & 0x01;                             \
   reg[REG_C_FLAG] = (reg[REG_CPSR] >> 29) & 0x01;                             \
   reg[REG_V_FLAG] = (reg[REG_CPSR] >> 28) & 0x01;                             \
 
-#define collapse_flags()                                                      \
-  reg[REG_CPSR] = (reg[REG_N_FLAG] << 31) | (reg[REG_Z_FLAG] << 30) |         \
-   (reg[REG_C_FLAG] << 29) | (reg[REG_V_FLAG] << 28) |                        \
-   (reg[REG_CPSR] & 0xFF)                                                     \
+#define collapse_flags(ireg, tmpreg)                                          \
+  generate_load_reg(ireg, REG_V_FLAG);                                        \
+  generate_load_reg(tmpreg, REG_C_FLAG);                                      \
+  generate_shift_left(tmpreg, 1);                                             \
+  generate_or(ireg, tmpreg);                                                  \
+  generate_load_reg(tmpreg, REG_Z_FLAG);                                      \
+  generate_shift_left(tmpreg, 2);                                             \
+  generate_or(ireg, tmpreg);                                                  \
+  generate_load_reg(tmpreg, REG_N_FLAG);                                      \
+  generate_shift_left(tmpreg, 3);                                             \
+  generate_or(ireg, tmpreg);                                                  \
+  generate_load_reg(tmpreg, REG_CPSR);                                        \
+  generate_shift_left(ireg, 28);                                              \
+  generate_and_imm(tmpreg, 0xFF);                                             \
+  generate_or(ireg, tmpreg);                                                  \
+  generate_store_reg(ireg, REG_CPSR);                                         \
 
 // It should be okay to still generate result flags, spsr will overwrite them.
 // This is pretty infrequent (returning from interrupt handlers, et al) so
@@ -1296,20 +1340,16 @@ u32 function_cc execute_spsr_restore(u32 address)
   arm_multiply_long_flags_##flags();                                          \
 }                                                                             \
 
-u32 function_cc execute_read_cpsr(void)
-{
-  collapse_flags();
-  return reg[REG_CPSR];
-}
+#define execute_read_cpsr(oreg)                                               \
+  collapse_flags(oreg, a2)
 
-u32 function_cc execute_read_spsr(void)
-{
-  collapse_flags();
-  return spsr[reg[CPU_MODE]];
-}
+#define execute_read_spsr(oreg)                                               \
+  collapse_flags(oreg, a2);                                                   \
+  generate_load_reg(oreg, CPU_MODE);                                          \
+  generate_load_spsr(oreg, oreg);                                             \
 
 #define arm_psr_read(op_type, psr_reg)                                        \
-  generate_function_call(execute_read_##psr_reg);                             \
+  execute_read_##psr_reg(rv);                                                 \
   generate_store_reg(rv, rd)                                                  \
 
 // store_mask and address are stored in the SAVE slots, since there's no real
@@ -2136,7 +2176,6 @@ u32 function_cc execute_aligned_load32(u32 address)
 static void function_cc execute_swi(u32 pc)
 {
   reg_mode[MODE_SUPERVISOR][6] = pc;
-  collapse_flags();
   spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
   reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13;
   set_cpu_mode(MODE_SUPERVISOR);
@@ -2160,6 +2199,7 @@ static void function_cc execute_swi(u32 pc)
   generate_indirect_branch_dual();                                            \
 
 #define arm_swi()                                                             \
+  collapse_flags(a0, a1);                                                     \
   generate_update_pc((pc + 4));                                               \
   generate_function_call(execute_swi);                                        \
   generate_branch()                                                           \
@@ -2203,6 +2243,7 @@ static void function_cc execute_swi(u32 pc)
   generate_function_call(process_cheats);
 
 #define thumb_swi()                                                           \
+  collapse_flags(a0, a1);                                                     \
   generate_update_pc((pc + 2));                                               \
   generate_function_call(execute_swi);                                        \
   generate_branch_cycle_update(                                               \

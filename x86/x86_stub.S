@@ -73,6 +73,8 @@ _##symbol:
 .equ IWRAM_OFF,           0x0D00
 .equ VRAM_OFF,           0x10D00
 .equ EWRAM_OFF,          0x28D00
+.equ IORAM_OFF,          0xA8D00
+.equ SPSR_OFF,           0xA9100
 
 # destroys ecx and edx
 
@@ -551,7 +553,6 @@ defsymbl(ewram)
   .space 0x80000
 defsymbl(io_registers)
   .space 0x400
-
 defsymbl(spsr)
   .space 24
 defsymbl(reg_mode)
