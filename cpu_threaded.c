@@ -3157,14 +3157,9 @@ s32 translate_block_arm(u32 pc, translation_region_type
     generate_branch_patch_conditional(backpatch_address, translation_ptr);
   }
 
-  for(i = 0; i < translation_gate_targets; i++)
-  {
-    if(pc == translation_gate_target_pc[i])
-    {
-      generate_translation_gate(arm);
-      break;
-    }
-  }
+  /* Unconditionally generate translation targets. In case we hit one or
+     in the unlikely case that block was too big (and not finalized) */
+  generate_translation_gate(arm);
 
   for(i = 0; i < block_exit_position; i++)
   {
@@ -3346,14 +3341,10 @@ s32 translate_block_thumb(u32 pc, translation_region_type
       generate_cycle_update();
     }
   }
-  for(i = 0; i < translation_gate_targets; i++)
-  {
-    if(pc == translation_gate_target_pc[i])
-    {
-      generate_translation_gate(thumb);
-      break;
-    }
-  }
+
+  /* Unconditionally generate translation targets. In case we hit one or
+     in the unlikely case that block was too big (and not finalized) */
+  generate_translation_gate(thumb);
 
   for(i = 0; i < block_exit_position; i++)
   {
