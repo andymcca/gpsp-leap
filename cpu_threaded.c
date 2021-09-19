@@ -2678,6 +2678,7 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
       if(translation_recursion_level == 0)                                    \
       {                                                                       \
         printf("bad jump %x (%x)\n", pc, reg[REG_PC]);                        \
+        fflush(stdout);                                                       \
       }                                                                       \
       block_address = (u8 *)(-1);                                             \
       break;                                                                  \
