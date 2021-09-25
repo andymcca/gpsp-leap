@@ -53,11 +53,6 @@ void execute_store_spsr(u32 new_spsr, u32 store_mask);
 u32 execute_spsr_restore_body(u32 address);
 u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address);
 
-u32 execute_lsl_flags_reg(u32 value, u32 shift);
-u32 execute_lsr_flags_reg(u32 value, u32 shift);
-u32 execute_asr_flags_reg(u32 value, u32 shift);
-u32 execute_ror_flags_reg(u32 value, u32 shift);
-
 typedef enum
 {
   mips_reg_zero,
@@ -847,19 +842,55 @@ u32 arm_to_mips_reg[] =
                    reg_temp, arm_to_mips_reg[_rs])                            \
 
 #define generate_shift_reg_lsl_flags(_rm, _rs)                                \
+{                                                                             \
+  u32 shift_reg = _rs;                                                        \
+  check_load_reg_pc(arm_reg_a1, shift_reg, 8);                                \
   generate_load_reg_pc(reg_a0, _rm, 12);                                      \
-  generate_load_reg_pc(reg_a1, _rs, 8);                                       \
-  generate_function_call_swap_delay(execute_lsl_flags_reg)                    \
+  /* Only load the result on zero, no shift */                                \
+  mips_emit_b(beq, arm_to_mips_reg[shift_reg], reg_zero, 7);                  \
+  generate_swap_delay();                                                      \
+  mips_emit_addiu(reg_temp, arm_to_mips_reg[shift_reg], -1);                  \
+  mips_emit_sllv(reg_a0, reg_a0, reg_temp);                                   \
+  mips_emit_srl(reg_c_cache, reg_a0, 31);                                     \
+  mips_emit_sltiu(reg_temp, arm_to_mips_reg[shift_reg], 33);                  \
+  mips_emit_sll(reg_a0, reg_a0, 1);                                           \
+  /* Result and flag to be zero if shift is 33+ */                            \
+  mips_emit_movz(reg_c_cache, reg_zero, reg_temp);                            \
+  mips_emit_movz(reg_a0, reg_zero, reg_temp);                                 \
+}                                                                             \
 
 #define generate_shift_reg_lsr_flags(_rm, _rs)                                \
+{                                                                             \
+  u32 shift_reg = _rs;                                                        \
+  check_load_reg_pc(arm_reg_a1, shift_reg, 8);                                \
   generate_load_reg_pc(reg_a0, _rm, 12);                                      \
-  generate_load_reg_pc(reg_a1, _rs, 8)                                        \
-  generate_function_call_swap_delay(execute_lsr_flags_reg)                    \
+  /* Only load the result on zero, no shift */                                \
+  mips_emit_b(beq, arm_to_mips_reg[shift_reg], reg_zero, 7);                  \
+  generate_swap_delay();                                                      \
+  mips_emit_addiu(reg_temp, arm_to_mips_reg[shift_reg], -1);                  \
+  mips_emit_srlv(reg_a0, reg_a0, reg_temp);                                   \
+  mips_emit_andi(reg_c_cache, reg_a0, 1);                                     \
+  mips_emit_sltiu(reg_temp, arm_to_mips_reg[shift_reg], 33);                  \
+  mips_emit_srl(reg_a0, reg_a0, 1);                                           \
+  /* Result and flag to be zero if shift is 33+ */                            \
+  mips_emit_movz(reg_c_cache, reg_zero, reg_temp);                            \
+  mips_emit_movz(reg_a0, reg_zero, reg_temp);                                 \
+}                                                                             \
 
 #define generate_shift_reg_asr_flags(_rm, _rs)                                \
+  generate_load_reg_pc(reg_a1, _rs, 8);                                       \
   generate_load_reg_pc(reg_a0, _rm, 12);                                      \
-  generate_load_reg_pc(reg_a1, _rs, 8)                                        \
-  generate_function_call_swap_delay(execute_asr_flags_reg)                    \
+  /* Only load the result on zero, no shift */                                \
+  mips_emit_b(beq, reg_a1, reg_zero, 7);                                      \
+  generate_swap_delay();                                                      \
+  /* Cap shift at 32, since it's equivalent */                                \
+  mips_emit_addiu(reg_temp, reg_zero, 32);                                    \
+  mips_emit_srl(reg_rv, reg_a1, 5);                                           \
+  mips_emit_movn(reg_a1, reg_temp, reg_rv);                                   \
+  mips_emit_addiu(reg_temp, reg_a1, -1);                                      \
+  mips_emit_srav(reg_a0, reg_a0, reg_temp);                                   \
+  mips_emit_andi(reg_c_cache, reg_a0, 1);                                     \
+  mips_emit_sra(reg_a0, reg_a0, 1);                                           \
 
 #define generate_shift_reg_ror_flags(_rm, _rs)                                \
   mips_emit_b(beq, arm_to_mips_reg[_rs], reg_zero, 3);                        \
