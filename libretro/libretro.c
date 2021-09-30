@@ -6,6 +6,7 @@
 #include "common.h"
 #include "libretro.h"
 #include "libretro_core_options.h"
+#include "streams/file_stream.h"
 #include "memmap.h"
 
 #include "gba_memory.h"
@@ -604,6 +605,7 @@ static void retro_perf_dummy_counter(struct retro_perf_counter *counter) {};
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_log_callback log;
+   struct retro_vfs_interface_info vfs_iface_info;
 
    environ_cb = cb;
 
@@ -622,6 +624,11 @@ void retro_set_environment(retro_environment_t cb)
       retro_perf_dummy_log,
    };
    environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb);
+
+   vfs_iface_info.required_interface_version = 1;
+   vfs_iface_info.iface                      = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
+      filestream_vfs_init(&vfs_iface_info);
 
    libretro_set_core_options(environ_cb);
 }

@@ -3453,19 +3453,3 @@ void init_caches(void)
   flush_translation_cache_ram();
 }
 
-#define cache_dump_prefix ""
-
-void dump_translation_cache(void)
-{
-  FILE *fd = fopen(cache_dump_prefix "ram_cache.bin", "wb");
-  fwrite(ram_translation_cache, 1,
-   ram_translation_ptr - ram_translation_cache, fd);
-  fclose(fd);
-
-  fd = fopen(cache_dump_prefix "rom_cache.bin", "wb");
-  fwrite(rom_translation_cache, 1,
-   rom_translation_ptr - rom_translation_cache, fd);
-  fclose(fd);
-}
-
-

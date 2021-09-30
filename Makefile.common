@@ -1,17 +1,29 @@
-INCFLAGS   := -I$(CORE_DIR)/libretro -I$(CORE_DIR)/src
+
+LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro/libretro-common/
+INCFLAGS   := -I$(CORE_DIR)/libretro -I$(LIBRETRO_COMM_DIR)/include  -I$(CORE_DIR)/
 
 SOURCES_ASM := $(CORE_DIR)/bios_data.S
 
 SOURCES_C := $(CORE_DIR)/main.c \
-				 $(CORE_DIR)/cpu.c \
-				 $(CORE_DIR)/gba_memory.c \
-				 $(CORE_DIR)/savestate.c \
-				 $(CORE_DIR)/video.c \
-				 $(CORE_DIR)/input.c \
-				 $(CORE_DIR)/sound.c \
-				 $(CORE_DIR)/cheats.c \
-				 $(CORE_DIR)/libretro.c \
-				 $(CORE_DIR)/gba_cc_lut.c
+             $(CORE_DIR)/cpu.c \
+             $(CORE_DIR)/gba_memory.c \
+             $(CORE_DIR)/savestate.c \
+             $(CORE_DIR)/video.c \
+             $(CORE_DIR)/input.c \
+             $(CORE_DIR)/sound.c \
+             $(CORE_DIR)/cheats.c \
+             $(CORE_DIR)/libretro/libretro.c \
+             $(CORE_DIR)/gba_cc_lut.c \
+             $(LIBRETRO_COMM_DIR)/compat/compat_posix_string.c \
+             $(LIBRETRO_COMM_DIR)/compat/compat_strl.c \
+             $(LIBRETRO_COMM_DIR)/compat/fopen_utf8.c \
+             $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
+             $(LIBRETRO_COMM_DIR)/file/file_path.c \
+             $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
+             $(LIBRETRO_COMM_DIR)/streams/file_stream.c \
+             $(LIBRETRO_COMM_DIR)/string/stdstring.c \
+             $(LIBRETRO_COMM_DIR)/time/rtime.c \
+             $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c
 
 ifeq ($(HAVE_DYNAREC), 1)
 SOURCES_C += $(CORE_DIR)/cpu_threaded.c
@@ -43,4 +55,3 @@ ifeq ($(HAVE_MMAP_WIN32),1)
 SOURCES_C += $(CORE_DIR)/memmap_win32.c
 endif
 
-INCFLAGS := -I$(CORE_DIR)

@@ -475,10 +475,8 @@ endif
 
 # Add -DTRACE_INSTRUCTIONS to trace instruction execution
 ifeq ($(DEBUG), 1)
-	OPTIMIZE_SAFE := -O0 -g
 	OPTIMIZE      := -O0 -g
 else
-	OPTIMIZE_SAFE := -O2 -DNDEBUG
 	OPTIMIZE      := -O3 -DNDEBUG
 endif
 
@@ -542,7 +540,7 @@ else
 endif
 
 cpu_threaded.o: cpu_threaded.c
-	$(CC) $(CFLAGS) -Wno-unused-variable -Wno-unused-label $(OPTIMIZE_SAFE) $(INCDIRS) -c -o $@ $<
+	$(CC) $(INCFLAGS) $(CFLAGS) $(OPTIMIZE) -Wno-unused-variable -Wno-unused-label -c  -o $@ $<
 
 %.o: %.S
 	$(CC) $(ASFLAGS) $(CFLAGS) $(OPTIMIZE) -c -o $@ $<

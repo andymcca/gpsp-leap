@@ -18,6 +18,7 @@
  */
 
 #include "common.h"
+#include "streams/file_stream.h"
 
 /* Sound */
 #define gbc_sound_tone_control_low(channel, regn)                             \
@@ -342,7 +343,7 @@ u32 gamepak_sticky_bit[1024/32];
 // This is global so that it can be kept open for large ROMs to swap
 // pages from, so there's no slowdown with opening and closing the file
 // a lot.
-FILE *gamepak_file_large = NULL;
+RFILE *gamepak_file_large = NULL;
 
 // Writes to these respective locations should trigger an update
 // so the related subsystem may react to it.
@@ -1999,14 +2000,15 @@ char backup_filename[512];
 
 u32 load_backup(char *name)
 {
-  FILE *fd = fopen(name, "rb");
+  RFILE *fd = filestream_open(name, RETRO_VFS_FILE_ACCESS_READ,
+                              RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
   if(fd)
   {
-    u32 backup_size = file_length(fd);
+    int64_t backup_size = filestream_get_size(fd);
 
-    fread(gamepak_backup, 1, backup_size, fd);
-    fclose(fd);
+    filestream_read(fd, gamepak_backup, backup_size);
+    filestream_close(fd);
 
     // The size might give away what kind of backup it is.
     switch(backup_size)
@@ -2052,7 +2054,8 @@ u32 save_backup(char *name)
 {
   if(backup_type != BACKUP_NONE)
   {
-    FILE *fd = fopen(name, "wb");
+    RFILE *fd = filestream_open(name, RETRO_VFS_FILE_ACCESS_WRITE,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
     if(fd)
     {
@@ -2085,8 +2088,8 @@ u32 save_backup(char *name)
           break;
       }
 
-      fwrite(gamepak_backup, 1, backup_size, fd);
-      fclose(fd);
+      filestream_write(fd, gamepak_backup, backup_size);
+      filestream_close(fd);
       return 1;
     }
   }
@@ -2232,17 +2235,18 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
   char current_variable[256];
   char current_value[256];
   char config_path[512];
-  FILE *config_file;
+  RFILE *config_file;
 
   sprintf(config_path, "%s" PATH_SEPARATOR "%s", main_path, CONFIG_FILENAME);
 
   printf("config_path is : %s\n", config_path);
 
-  config_file = fopen(config_path, "rb");
+  config_file = filestream_open(config_path, RETRO_VFS_FILE_ACCESS_READ,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
   if(config_file)
   {
-    while(fgets(current_line, 256, config_file))
+    while(filestream_gets(config_file, current_line, 256))
     {
       if(parse_config_line(current_line, current_variable, current_value)
        != -1)
@@ -2251,28 +2255,28 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
          strcmp(current_value, gpinfo->gamepak_title))
           continue;
 
-        if(!fgets(current_line, 256, config_file) ||
+        if(!filestream_gets(config_file, current_line, 256) ||
          (parse_config_line(current_line, current_variable,
            current_value) == -1) ||
          strcmp(current_variable, "game_code") ||
          strcmp(current_value, gpinfo->gamepak_code))
           continue;
 
-        if(!fgets(current_line, 256, config_file) ||
+        if(!filestream_gets(config_file, current_line, 256) ||
          (parse_config_line(current_line, current_variable,
            current_value) == -1) ||
          strcmp(current_variable, "vender_code") ||
           strcmp(current_value, gpinfo->gamepak_maker))
           continue;
 
-        while(fgets(current_line, 256, config_file))
+        while(filestream_gets(config_file, current_line, 256))
         {
           if(parse_config_line(current_line, current_variable, current_value)
            != -1)
           {
             if(!strcmp(current_variable, "game_name"))
             {
-              fclose(config_file);
+              filestream_close(config_file);
               return 0;
             }
 
@@ -2299,12 +2303,12 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
           }
         }
 
-        fclose(config_file);
+        filestream_close(config_file);
         return 0;
       }
     }
 
-    fclose(config_file);
+    filestream_close(config_file);
   }
 
   printf("game config missing\n");
@@ -2969,8 +2973,8 @@ u8 *load_gamepak_page(u32 physical_index)
   // Fill in the entry
   gamepak_blk_queue[entry].phy_rom = physical_index;
 
-  fseek(gamepak_file_large, physical_index * (32 * 1024), SEEK_SET);
-  fread(swap_location, 1, (32 * 1024), gamepak_file_large);
+  filestream_seek(gamepak_file_large, physical_index * (32 * 1024), SEEK_SET);
+  filestream_read(gamepak_file_large, swap_location, (32 * 1024));
 
   // Map it to the read handlers now
   map_rom_entry(read, physical_index, swap_location, gamepak_size >> 15);
@@ -3063,7 +3067,7 @@ void memory_term(void)
 {
   if (gamepak_file_large)
   {
-    fclose(gamepak_file_large);
+    filestream_close(gamepak_file_large);
     gamepak_file_large = NULL;
   }
 
@@ -3202,11 +3206,12 @@ unsigned memory_write_savestate(u8 *dst)
 static s32 load_gamepak_raw(const char *name)
 {
   unsigned i, j;
-  gamepak_file_large = fopen(name, "rb");
+  gamepak_file_large = filestream_open(name, RETRO_VFS_FILE_ACCESS_READ,
+                                       RETRO_VFS_FILE_ACCESS_HINT_NONE);
   if(gamepak_file_large)
   {
     // Round size to 32KB pages
-    gamepak_size = file_length(gamepak_file_large);
+    gamepak_size = (u32)filestream_get_size(gamepak_file_large);
     gamepak_size = (gamepak_size + 0x7FFF) & ~0x7FFF;
 
     // Load stuff in 1MB chunks
@@ -3222,7 +3227,7 @@ static s32 load_gamepak_raw(const char *name)
     for (i = 0; i < ldblks; i++)
     {
       // Load 1MB chunk and map it
-      fread(gamepak_buffers[i], 1, 1024*1024, gamepak_file_large);
+      filestream_read(gamepak_file_large, gamepak_buffers[i], 1024*1024);
       for (j = 0; j < 32 && i*32 + j < rom_blocks; j++)
       {
         u32 phyn = i*32 + j;
@@ -3286,13 +3291,14 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
 
 s32 load_bios(char *name)
 {
-  FILE *fd = fopen(name, "rb");
+  RFILE *fd = filestream_open(name, RETRO_VFS_FILE_ACCESS_READ,
+                              RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
   if(!fd)
     return -1;
 
-  fread(bios_rom, 1, 0x4000, fd);
-  fclose(fd);
+  filestream_read(fd, bios_rom, 0x4000);
+  filestream_close(fd);
   return 0;
 }
 
