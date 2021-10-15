@@ -58,7 +58,7 @@ static void update_timers(irq_type *irq_raised)
          continue;
 
       /* irq_raised value range: IRQ_TIMER0, IRQ_TIMER1, IRQ_TIMER2, IRQ_TIMER3 */
-      if(timer[i].irq == TIMER_TRIGGER_IRQ)
+      if(timer[i].irq)
          *irq_raised |= (8 << i);
 
       if((i != 3) && (timer[i + 1].status == TIMER_CASCADE))

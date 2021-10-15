@@ -27,19 +27,10 @@
 
 #define GBC_BASE_RATE ((float)(16 * 1024 * 1024))
 
-typedef enum
-{
-   DIRECT_SOUND_INACTIVE  = 0,
-   DIRECT_SOUND_RIGHT     = 1,
-   DIRECT_SOUND_LEFT      = 2,
-   DIRECT_SOUND_LEFTRIGHT = 3
-} direct_sound_status_type;
-
-typedef enum
-{
-   DIRECT_SOUND_VOLUME_50  = 0,
-   DIRECT_SOUND_VOLUME_100 = 1
-} direct_sound_volume_type;
+#define DIRECT_SOUND_INACTIVE         0
+#define DIRECT_SOUND_RIGHT            1
+#define DIRECT_SOUND_LEFT             2
+#define DIRECT_SOUND_LEFTRIGHT        3
 
 typedef struct
 {
@@ -50,17 +41,14 @@ typedef struct
    // The + 1 is to give some extra room for linear interpolation
    // when wrapping around.
    u32 buffer_index;
-   direct_sound_status_type status;
-   direct_sound_volume_type volume;
+   u32 status;
+   u32 volume_halve;
 } direct_sound_struct;
 
-typedef enum
-{
-   GBC_SOUND_INACTIVE  = 0,
-   GBC_SOUND_RIGHT     = 1,
-   GBC_SOUND_LEFT      = 2,
-   GBC_SOUND_LEFTRIGHT = 3
-} gbc_sound_status_type;
+#define GBC_SOUND_INACTIVE            0
+#define GBC_SOUND_RIGHT               1
+#define GBC_SOUND_LEFT                2
+#define GBC_SOUND_LEFTRIGHT           3
 
 
 typedef struct
@@ -88,7 +76,7 @@ typedef struct
    u32 wave_type;
    u32 wave_bank;
    u32 wave_volume;
-   gbc_sound_status_type status;
+   u32 status;
    u32 active_flag;
    u32 master_enable;
    u32 sample_table_idx;

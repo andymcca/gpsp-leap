@@ -35,6 +35,10 @@ typedef u32 cpu_mode_type;
 #define MODE_UNDEFINED    0x5
 #define MODE_INVALID      0x6
 
+#define CPU_ACTIVE          0
+#define CPU_HALT            1
+#define CPU_STOP            2
+
 typedef enum
 {
   CPU_ALERT_NONE = 0,
@@ -42,13 +46,6 @@ typedef enum
   CPU_ALERT_SMC  = 2,
   CPU_ALERT_IRQ  = 3
 } cpu_alert_type;
-
-typedef enum
-{
-  CPU_ACTIVE,
-  CPU_HALT,
-  CPU_STOP
-} cpu_halt_type;
 
 typedef u16 irq_type;
 

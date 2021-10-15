@@ -153,7 +153,7 @@ static void gbc_trigger_sound(u32 value)
    {
       gbc_sound_master_volume_right = value & 0x07;
       gbc_sound_master_volume_left = (value >> 4) & 0x07;
-      gbc_sound_channel[channel].status = (gbc_sound_status_type)
+      gbc_sound_channel[channel].status =
         (((value >> (channel + 8)) & 0x1) | ((value >> (channel + 11)) & 0x3));
    }
    write_ioreg(REG_SOUNDCNT_L, value);
@@ -161,18 +161,14 @@ static void gbc_trigger_sound(u32 value)
 
 #define trigger_sound()                                                       \
 {                                                                             \
-  timer[0].direct_sound_channels = (timer_ds_channel_type)                    \
+  timer[0].direct_sound_channels =                                            \
       ((((value >> 10) & 0x01) == 0) | ((((value >> 14) & 0x01) == 0) << 1)); \
-  timer[1].direct_sound_channels = (timer_ds_channel_type)                    \
+  timer[1].direct_sound_channels =                                            \
       ((((value >> 10) & 0x01) == 1) | ((((value >> 14) & 0x01) == 1) << 1)); \
-  direct_sound_channel[0].volume = (direct_sound_volume_type)                 \
-                                   ((value >> 2) & 0x01);                     \
-  direct_sound_channel[0].status = (direct_sound_status_type)                 \
-                                   ((value >> 8) & 0x03);                     \
-  direct_sound_channel[1].volume = (direct_sound_volume_type)                 \
-                                   ((value >> 3) & 0x01);                     \
-  direct_sound_channel[1].status = (direct_sound_status_type)                 \
-                                   ((value >> 12) & 0x03);                    \
+  direct_sound_channel[0].volume_halve = ((~(value >> 2)) & 0x01);            \
+  direct_sound_channel[0].status = ((value >> 8) & 0x03);                     \
+  direct_sound_channel[1].volume_halve = ((~(value >> 3)) & 0x01);            \
+  direct_sound_channel[1].status = ((value >> 12) & 0x03);                    \
   gbc_sound_master_volume = value & 0x03;                                     \
                                                                               \
   if((value >> 11) & 0x01)                                                    \
@@ -240,7 +236,7 @@ static void trigger_timer(u32 timer_number, u32 value)
             timer[timer_number].status = TIMER_PRESCALE;
 
          timer[timer_number].prescale = prescale;
-         timer[timer_number].irq = (timer_irq_type)((value >> 6) & 0x1);
+         timer[timer_number].irq = ((value >> 6) & 0x1);
 
          write_ioreg(REG_TM0D + (timer_number * 2), (u32)(-timer_reload));
 
@@ -356,17 +352,15 @@ u32 gbc_sound_wave_update = 0;
 
 // Keep it 32KB until the upper 64KB is accessed, then make it 64KB.
 
-backup_type_type backup_type = BACKUP_NONE;
-sram_size_type sram_size = SRAM_SIZE_32KB;
+u32 backup_type = BACKUP_NONE;
+u32 sram_bankcount = SRAM_SIZE_32KB;
 
-flash_mode_type flash_mode = FLASH_BASE_MODE;
+u32 flash_mode = FLASH_BASE_MODE;
 u32 flash_command_position = 0;
 u32 flash_bank_num;  // 0 or 1
+u32 flash_bank_cnt;
 
-flash_device_id_type flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
-flash_manufacturer_id_type flash_manufacturer_id =
- FLASH_MANUFACTURER_MACRONIX;
-flash_size_type flash_size = FLASH_SIZE_64KB;
+u32 flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
 
 u8 read_backup(u32 address)
 {
@@ -379,7 +373,7 @@ u8 read_backup(u32 address)
     value = gamepak_backup[address];
   else if(flash_mode == FLASH_ID_MODE)
   {
-    if (flash_size == FLASH_SIZE_128KB)
+    if (flash_bank_cnt == FLASH_SIZE_128KB)
     {
       /* ID manufacturer type */
       if(address == 0x0000)
@@ -420,8 +414,8 @@ u8 read_backup(u32 address)
 // EEPROM is 512 bytes by default; it is autodetecte as 8KB if
 // 14bit address DMAs are made (this is done in the DMA handler).
 
-eeprom_size_type eeprom_size = EEPROM_512_BYTE;
-eeprom_mode_type eeprom_mode = EEPROM_BASE_MODE;
+u32 eeprom_size = EEPROM_512_BYTE;
+u32 eeprom_mode = EEPROM_BASE_MODE;
 u32 eeprom_address = 0;
 u32 eeprom_counter = 0;
 
@@ -654,7 +648,7 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
   {
     if(dma[dma_number].start_type == DMA_INACTIVE)
     {
-      dma_start_type start_type = (dma_start_type)((value >> 12) & 0x03);
+      u32 start_type = ((value >> 12) & 0x03);
       u32 src_address = 0xFFFFFFF & (read_dmareg(REG_DMA0SAD, dma_number) |
                          (read_dmareg(REG_DMA0SAD + 1, dma_number) << 16));
       u32 dst_address = 0xFFFFFFF & (read_dmareg(REG_DMA0DAD, dma_number) |
@@ -662,10 +656,10 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
 
       dma[dma_number].source_address = src_address;
       dma[dma_number].dest_address = dst_address;
-      dma[dma_number].source_direction = (dma_increment_type)((value >>  7) & 3);
-      dma[dma_number].repeat_type = (dma_repeat_type)((value >> 9) & 0x01);
+      dma[dma_number].source_direction = ((value >>  7) & 3);
+      dma[dma_number].repeat_type = ((value >> 9) & 0x01);
       dma[dma_number].start_type = start_type;
-      dma[dma_number].irq = (dma_irq_type)((value >> 14) & 0x1);
+      dma[dma_number].irq = ((value >> 14) & 0x1);
 
       /* If it is sound FIFO DMA make sure the settings are a certain way */
       if((dma_number >= 1) && (dma_number <= 2) &&
@@ -699,8 +693,8 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
         }
 
         dma[dma_number].length = length;
-        dma[dma_number].length_type = (dma_length_type)((value >> 10) & 0x01);
-        dma[dma_number].dest_direction = (dma_increment_type)((value >> 5) & 3);
+        dma[dma_number].length_type = ((value >> 10) & 0x01);
+        dma[dma_number].dest_direction = ((value >> 5) & 3);
       }
 
       write_dmareg(REG_DMA0CNT_H, dma_number, value);
@@ -1508,7 +1502,7 @@ void function_cc write_backup(u32 address, u32 value)
         case 0xB0:
           // Bank switch
           // Here the chip is now officially 128KB.
-          flash_size = FLASH_SIZE_128KB;
+          flash_bank_cnt = FLASH_SIZE_128KB;
           if(flash_mode == FLASH_BASE_MODE)
             flash_mode = FLASH_BANKSWITCH_MODE;
           break;
@@ -1517,10 +1511,7 @@ void function_cc write_backup(u32 address, u32 value)
           // Erase chip
           if(flash_mode == FLASH_ERASE_MODE)
           {
-            if(flash_size == FLASH_SIZE_64KB)
-              memset(gamepak_backup, 0xFF, 1024 * 64);
-            else
-              memset(gamepak_backup, 0xFF, 1024 * 128);
+            memset(gamepak_backup, 0xFF, 1024 * 64 * flash_bank_cnt);
             flash_mode = FLASH_BASE_MODE;
           }
           break;
@@ -1553,7 +1544,7 @@ void function_cc write_backup(u32 address, u32 value)
 
     if((flash_command_position == 0) &&
      (flash_mode == FLASH_BANKSWITCH_MODE) && (address == 0x0000) &&
-     (flash_size == FLASH_SIZE_128KB))
+     (flash_bank_cnt == FLASH_SIZE_128KB))
     {
       flash_bank_num = value & 1;
       flash_mode = FLASH_BASE_MODE;
@@ -1574,7 +1565,7 @@ void function_cc write_backup(u32 address, u32 value)
       // Write value to SRAM
       // Hit 64KB territory?
       if(address >= 0x8000)
-        sram_size = SRAM_SIZE_64KB;
+        sram_bankcount = SRAM_SIZE_64KB;
       gamepak_backup[address] = value;
     }
   }
@@ -1600,14 +1591,11 @@ void function_cc write_backup(u32 address, u32 value)
 // RTC code derived from VBA's (due to lack of any real publically available
 // documentation...)
 
-typedef enum
-{
-  RTC_DISABLED,
-  RTC_IDLE,
-  RTC_COMMAND,
-  RTC_OUTPUT_DATA,
-  RTC_INPUT_DATA
-} rtc_state_type;
+#define RTC_DISABLED                  0
+#define RTC_IDLE                      1
+#define RTC_COMMAND                   2
+#define RTC_OUTPUT_DATA               3
+#define RTC_INPUT_DATA                4
 
 typedef enum
 {
@@ -1618,15 +1606,12 @@ typedef enum
   RTC_COMMAND_OUTPUT_TIME      = 0x67
 } rtc_command_type;
 
-typedef enum
-{
-  RTC_WRITE_TIME,
-  RTC_WRITE_TIME_FULL,
-  RTC_WRITE_STATUS
-} rtc_write_mode_type;
+#define RTC_WRITE_TIME                0
+#define RTC_WRITE_TIME_FULL           1
+#define RTC_WRITE_STATUS              2
 
-rtc_state_type rtc_state = RTC_DISABLED;
-rtc_write_mode_type rtc_write_mode;
+u32 rtc_state = RTC_DISABLED;
+u32 rtc_write_mode;
 u8 rtc_registers[3];
 u32 rtc_command;
 u32 rtc_data[12];
@@ -2025,18 +2010,18 @@ u32 load_backup(char *name)
 
       case 0x8000:
         backup_type = BACKUP_SRAM;
-        sram_size = SRAM_SIZE_32KB;
+        sram_bankcount = SRAM_SIZE_32KB;
         break;
 
       // Could be either flash or SRAM, go with flash
       case 0x10000:
         backup_type = BACKUP_FLASH;
-        sram_size = (sram_size_type)FLASH_SIZE_64KB;
+        sram_bankcount = SRAM_SIZE_64KB;
         break;
 
       case 0x20000:
         backup_type = BACKUP_FLASH;
-        flash_size = FLASH_SIZE_128KB;
+        flash_bank_cnt = FLASH_SIZE_128KB;
         break;
     }
     return 1;
@@ -2064,24 +2049,15 @@ u32 save_backup(char *name)
       switch(backup_type)
       {
         case BACKUP_SRAM:
-          if(sram_size == SRAM_SIZE_32KB)
-            backup_size = 0x8000;
-          else
-            backup_size = 0x10000;
+          backup_size = 0x8000 * sram_bankcount;
           break;
 
         case BACKUP_FLASH:
-          if(flash_size == FLASH_SIZE_64KB)
-            backup_size = 0x10000;
-          else
-            backup_size = 0x20000;
+          backup_size = 0x10000 * flash_bank_cnt;
           break;
 
         case BACKUP_EEPROM:
-          if(eeprom_size == EEPROM_512_BYTE)
-            backup_size = 0x200;
-          else
-            backup_size = 0x2000;
+          backup_size = 0x200 * eeprom_size;
           break;
 
         default:
@@ -2153,7 +2129,7 @@ typedef struct
    char gamepak_code[5];
    char gamepak_maker[3];
    int flash_size;
-   flash_device_id_type flash_device_id;
+   u32 flash_device_id;
    int save_type;
    int rtc_enabled;
    int mirroring_enabled;
@@ -2201,7 +2177,7 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
      
      flash_device_id      = gbaover[i].flash_device_id;
      if (flash_device_id == FLASH_DEVICE_MACRONIX_128KB)
-      flash_size = FLASH_SIZE_128KB;
+       flash_bank_cnt = FLASH_SIZE_128KB;
 
      if (gbaover[i].translation_gate_target_1 != 0)
      {
@@ -2820,13 +2796,9 @@ static cpu_alert_type dma_transfer_copy(
     bool dst_wb = dmach->dest_direction < 3;
 
     if(dmach->length_type == DMA_16BIT)
-    {
        return dma_tf_loop16(src_ptr, dest_ptr, 2 * src_stride, 2 * dst_stride, dst_wb, length, dmach);
-    }
     else
-    {
        return dma_tf_loop32(src_ptr, dest_ptr, 4 * src_stride, 4 * dst_stride, dst_wb, length, dmach);
-    }
   }
 
   return CPU_ALERT_NONE;
@@ -3046,7 +3018,7 @@ void init_memory(void)
 
   backup_type = BACKUP_NONE;
 
-  sram_size = SRAM_SIZE_32KB;
+  sram_bankcount = SRAM_SIZE_32KB;
   //flash_size = FLASH_SIZE_64KB;
 
   flash_bank_num = 0;
@@ -3095,14 +3067,13 @@ bool memory_read_savestate(const u8 *src)
     bson_read_bytes(memdoc, "ioregs", io_registers, sizeof(io_registers)) &&
 
     bson_read_int32(bakdoc, "backup-type", &backup_type) &&
-    bson_read_int32(bakdoc, "sram-size", &sram_size) &&
+    bson_read_int32(bakdoc, "sram-size", &sram_bankcount) &&
 
     bson_read_int32(bakdoc, "flash-mode", &flash_mode) &&
     bson_read_int32(bakdoc, "flash-cmd-pos", &flash_command_position) &&
     bson_read_int32(bakdoc, "flash-bank-num", &flash_bank_num) &&
     bson_read_int32(bakdoc, "flash-dev-id", &flash_device_id) &&
-    bson_read_int32(bakdoc, "flash-man-id", &flash_manufacturer_id) &&
-    bson_read_int32(bakdoc, "flash-size", &flash_size) &&
+    bson_read_int32(bakdoc, "flash-size", &flash_bank_cnt) &&
 
     bson_read_int32(bakdoc, "eeprom-size", &eeprom_size) &&
     bson_read_int32(bakdoc, "eeprom-mode", &eeprom_mode) &&
@@ -3155,15 +3126,14 @@ unsigned memory_write_savestate(u8 *dst)
   bson_finish_document(dst, wbptr);
 
   bson_start_document(dst, "backup", wbptr);
-  bson_write_int32(dst, "backup-type", backup_type);
-  bson_write_int32(dst, "sram-size", sram_size);
+  bson_write_int32(dst, "backup-type", (u32)backup_type);
+  bson_write_int32(dst, "sram-size", sram_bankcount);
 
   bson_write_int32(dst, "flash-mode", flash_mode);
   bson_write_int32(dst, "flash-cmd-pos", flash_command_position);
   bson_write_int32(dst, "flash-bank-num", flash_bank_num);
   bson_write_int32(dst, "flash-dev-id", flash_device_id);
-  bson_write_int32(dst, "flash-man-id", flash_manufacturer_id);
-  bson_write_int32(dst, "flash-size", flash_size);
+  bson_write_int32(dst, "flash-size", flash_bank_cnt);
 
   bson_write_int32(dst, "eeprom-size", eeprom_size);
   bson_write_int32(dst, "eeprom-mode", eeprom_mode);
@@ -3281,7 +3251,7 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
    iwram_stack_optimize = 1;
    translation_gate_targets = 0;
    flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
-   flash_size = FLASH_SIZE_64KB;
+   flash_bank_cnt = FLASH_SIZE_64KB;
 
    if ((load_game_config_over(&gpinfo)) < 0)
       load_game_config(&gpinfo);

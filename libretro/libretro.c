@@ -1048,25 +1048,14 @@ size_t retro_get_memory_size(unsigned id)
          switch(backup_type)
          {
          case BACKUP_SRAM:
-            if(sram_size == SRAM_SIZE_32KB)
-               return 0x8000;
-            else
-               return 0x10000;
-            break;
+            return sram_bankcount * 0x8000;
 
          case BACKUP_FLASH:
-            if(flash_size == FLASH_SIZE_64KB)
-               return 0x10000;
-            else
-               return 0x20000;
-            break;
+            return 0x10000 * flash_bank_cnt;
 
          case BACKUP_EEPROM:
-            if(eeprom_size == EEPROM_512_BYTE)
-               return 0x200;
-            else
-               return 0x2000;
-            break;
+            return 0x200 * eeprom_size;
+
          // assume 128KB save, regardless if rom supports battery saves
          // this is needed because gba cannot provide initially the backup save size 
          // until a few cycles has passed (unless provided by a database)

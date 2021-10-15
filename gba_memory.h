@@ -25,60 +25,42 @@ extern int use_libretro_save_method;
 
 #define DMA_CHAN_CNT   4
 
-typedef enum
-{
-  DMA_START_IMMEDIATELY = 0,
-  DMA_START_VBLANK      = 1,
-  DMA_START_HBLANK      = 2,
-  DMA_START_SPECIAL     = 3,
-  DMA_INACTIVE          = 4
-} dma_start_type;
+#define DMA_START_IMMEDIATELY         0
+#define DMA_START_VBLANK              1
+#define DMA_START_HBLANK              2
+#define DMA_START_SPECIAL             3
+#define DMA_INACTIVE                  4
 
-typedef enum
-{
-  DMA_16BIT = 0,
-  DMA_32BIT = 1
-} dma_length_type;
+#define DMA_16BIT                     0
+#define DMA_32BIT                     1
 
-typedef enum
-{
-  DMA_NO_REPEAT = 0,
-  DMA_REPEAT    = 1
-} dma_repeat_type;
+#define DMA_NO_REPEAT                 0
+#define DMA_REPEAT                    1
 
-typedef enum
-{
-  DMA_INCREMENT = 0,
-  DMA_DECREMENT = 1,
-  DMA_FIXED     = 2,
-  DMA_RELOAD    = 3
-} dma_increment_type;
+#define DMA_INCREMENT                 0
+#define DMA_DECREMENT                 1
+#define DMA_FIXED                     2
+#define DMA_RELOAD                    3
 
-typedef enum
-{
-  DMA_NO_IRQ      = 0,
-  DMA_TRIGGER_IRQ = 1
-} dma_irq_type;
+#define DMA_NO_IRQ                    0
+#define DMA_TRIGGER_IRQ               1
 
-typedef enum
-{
-  DMA_DIRECT_SOUND_A,
-  DMA_DIRECT_SOUND_B,
-  DMA_NO_DIRECT_SOUND
-} dma_ds_type;
+#define DMA_DIRECT_SOUND_A            0
+#define DMA_DIRECT_SOUND_B            1
+#define DMA_NO_DIRECT_SOUND           2
 
 typedef struct
 {
   u32 source_address;
   u32 dest_address;
   u32 length;
-  dma_repeat_type repeat_type;
-  dma_ds_type direct_sound_channel;
-  dma_increment_type source_direction;
-  dma_increment_type dest_direction;
-  dma_length_type length_type;
-  dma_start_type start_type;
-  dma_irq_type irq;
+  u32 repeat_type;
+  u32 direct_sound_channel;
+  u32 source_direction;
+  u32 dest_direction;
+  u32 length_type;
+  u32 start_type;
+  u32 irq;
 } dma_transfer_type;
 
 typedef enum
@@ -172,23 +154,18 @@ typedef enum
   REG_HALTCNT = 0x180
 } hardware_register;
 
-typedef enum
-{
-  FLASH_DEVICE_UNDEFINED       = 0x00,
-  FLASH_DEVICE_MACRONIX_64KB   = 0x1C,
-  FLASH_DEVICE_AMTEL_64KB      = 0x3D,
-  FLASH_DEVICE_SST_64K         = 0xD4,
-  FLASH_DEVICE_PANASONIC_64KB  = 0x1B,
-  FLASH_DEVICE_MACRONIX_128KB  = 0x09
-} flash_device_id_type;
+#define FLASH_DEVICE_UNDEFINED       0x00
+#define FLASH_DEVICE_MACRONIX_64KB   0x1C
+#define FLASH_DEVICE_AMTEL_64KB      0x3D
+#define FLASH_DEVICE_SST_64K         0xD4
+#define FLASH_DEVICE_PANASONIC_64KB  0x1B
+#define FLASH_DEVICE_MACRONIX_128KB  0x09
 
-typedef enum
-{
-  FLASH_MANUFACTURER_MACRONIX  = 0xC2,
-  FLASH_MANUFACTURER_AMTEL     = 0x1F,
-  FLASH_MANUFACTURER_PANASONIC = 0x32,
-  FLASH_MANUFACTURER_SST       = 0xBF
-} flash_manufacturer_id_type;
+
+#define FLASH_MANUFACTURER_MACRONIX  0xC2
+#define FLASH_MANUFACTURER_AMTEL     0x1F
+#define FLASH_MANUFACTURER_PANASONIC 0x32
+#define FLASH_MANUFACTURER_SST       0xBF
 
 u8 function_cc read_memory8(u32 address);
 u32 read_memory8s(u32 address);
@@ -246,61 +223,39 @@ extern u8 *memory_map_read[8 * 1024];
 
 extern u32 reg[64];
 
-extern flash_device_id_type flash_device_id;
+#define BACKUP_SRAM       0
+#define BACKUP_FLASH      1
+#define BACKUP_EEPROM     2
+#define BACKUP_NONE       3
 
-typedef enum
-{
-  BACKUP_SRAM,
-  BACKUP_FLASH,
-  BACKUP_EEPROM,
-  BACKUP_NONE
-} backup_type_type;
+#define SRAM_SIZE_32KB    1
+#define SRAM_SIZE_64KB    2
 
-typedef enum
-{
-  SRAM_SIZE_32KB,
-  SRAM_SIZE_64KB
-} sram_size_type;
+#define FLASH_SIZE_64KB   1
+#define FLASH_SIZE_128KB  2
 
-typedef enum
-{
-  FLASH_BASE_MODE,
-  FLASH_ERASE_MODE,
-  FLASH_ID_MODE,
-  FLASH_WRITE_MODE,
-  FLASH_BANKSWITCH_MODE
-} flash_mode_type;
+#define EEPROM_512_BYTE   1
+#define EEPROM_8_KBYTE   16
 
-typedef enum
-{
-  FLASH_SIZE_64KB,
-  FLASH_SIZE_128KB
-} flash_size_type;
+#define EEPROM_BASE_MODE              0
+#define EEPROM_READ_MODE              1
+#define EEPROM_READ_HEADER_MODE       2
+#define EEPROM_ADDRESS_MODE           3
+#define EEPROM_WRITE_MODE             4
+#define EEPROM_WRITE_ADDRESS_MODE     5
+#define EEPROM_ADDRESS_FOOTER_MODE    6
+#define EEPROM_WRITE_FOOTER_MODE      7
 
+#define FLASH_BASE_MODE               0
+#define FLASH_ERASE_MODE              1
+#define FLASH_ID_MODE                 2
+#define FLASH_WRITE_MODE              3
+#define FLASH_BANKSWITCH_MODE         4
 
-extern backup_type_type backup_type;
-extern sram_size_type sram_size;
-extern flash_size_type flash_size;
-
-typedef enum
-{
-  EEPROM_512_BYTE,
-  EEPROM_8_KBYTE
-} eeprom_size_type;
-
-typedef enum
-{
-  EEPROM_BASE_MODE,
-  EEPROM_READ_MODE,
-  EEPROM_READ_HEADER_MODE,
-  EEPROM_ADDRESS_MODE,
-  EEPROM_WRITE_MODE,
-  EEPROM_WRITE_ADDRESS_MODE,
-  EEPROM_ADDRESS_FOOTER_MODE,
-  EEPROM_WRITE_FOOTER_MODE
-} eeprom_mode_type;
-
-extern eeprom_size_type eeprom_size;
+extern u32 backup_type;
+extern u32 sram_bankcount;
+extern u32 flash_bank_cnt;
+extern u32 eeprom_size;
 
 extern u8 gamepak_backup[1024 * 128];
 

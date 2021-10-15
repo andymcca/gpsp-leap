@@ -22,27 +22,17 @@
 
 #include <stdio.h>
 
-typedef enum
-{
-  TIMER_INACTIVE,
-  TIMER_PRESCALE,
-  TIMER_CASCADE
-} timer_status_type;
+#define TIMER_INACTIVE                0
+#define TIMER_PRESCALE                1
+#define TIMER_CASCADE                 2
 
-typedef enum
-{
-  TIMER_NO_IRQ      = 0,
-  TIMER_TRIGGER_IRQ = 1
-} timer_irq_type;
+#define TIMER_NO_IRQ                  0
+#define TIMER_TRIGGER_IRQ             1
 
-
-typedef enum
-{
-  TIMER_DS_CHANNEL_NONE,
-  TIMER_DS_CHANNEL_A,
-  TIMER_DS_CHANNEL_B,
-  TIMER_DS_CHANNEL_BOTH
-} timer_ds_channel_type;
+#define TIMER_DS_CHANNEL_NONE         0
+#define TIMER_DS_CHANNEL_A            1
+#define TIMER_DS_CHANNEL_B            2
+#define TIMER_DS_CHANNEL_BOTH         3
 
 typedef struct
 {
@@ -50,9 +40,9 @@ typedef struct
   u32 reload;
   u32 prescale;
   fixed8_24 frequency_step;
-  timer_ds_channel_type direct_sound_channels;
-  timer_irq_type irq;
-  timer_status_type status;
+  u32 direct_sound_channels;
+  u32 irq;
+  u32 status;
 } timer_type;
 
 typedef enum

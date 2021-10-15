@@ -76,7 +76,7 @@ void sound_timer_queue32(u32 channel, u32 value)
 
 void sound_timer(fixed8_24 frequency_step, u32 channel)
 {
-  direct_sound_status_type sample_status = DIRECT_SOUND_INACTIVE;
+  u32 sample_status = DIRECT_SOUND_INACTIVE;
   direct_sound_struct *ds = &direct_sound_channel[channel];
 
   fixed8_24 fifo_fractional = ds->fifo_fractional;
@@ -89,11 +89,8 @@ void sound_timer(fixed8_24 frequency_step, u32 channel)
 
   if(sound_on == 1)
   {
-    if(ds->volume == DIRECT_SOUND_VOLUME_50)
-    {
-      current_sample >>= 1;
-      next_sample >>= 1;
-    }
+    current_sample >>= ds->volume_halve;
+    next_sample >>= ds->volume_halve;
 
     sample_status = ds->status;
   }
@@ -629,7 +626,7 @@ bool sound_read_savestate(const u8 *src)
     const u8 *sndchan = bson_find_key(snddoc, tn);
     if (!(
       bson_read_int32(sndchan, "status", &ds->status) &&
-      bson_read_int32(sndchan, "volume", &ds->volume) &&
+      bson_read_int32(sndchan, "volume", &ds->volume_halve) &&
       bson_read_int32(sndchan, "fifo-base", &ds->fifo_base) &&
       bson_read_int32(sndchan, "fifo-top", &ds->fifo_top) &&
       bson_read_int32(sndchan, "fifo-frac", &ds->fifo_fractional) &&
@@ -700,7 +697,7 @@ unsigned sound_write_savestate(u8 *dst)
     char tn[4] = {'d', 's', '0' + i, 0};
     bson_start_document(dst, tn, wbptr2);
     bson_write_int32(dst, "status", direct_sound_channel[i].status);
-    bson_write_int32(dst, "volume", direct_sound_channel[i].volume);
+    bson_write_int32(dst, "volume", direct_sound_channel[i].volume_halve);
     bson_write_int32(dst, "fifo-base", direct_sound_channel[i].fifo_base);
     bson_write_int32(dst, "fifo-top", direct_sound_channel[i].fifo_top);
     bson_write_int32(dst, "fifo-frac", direct_sound_channel[i].fifo_fractional);
