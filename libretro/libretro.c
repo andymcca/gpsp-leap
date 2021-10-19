@@ -51,7 +51,7 @@ static int translation_caches_inited = 0;
 #define MAX_PATH (512)
 #endif
 
-// 59.72750057 hz
+// Usually 59.72750057 Hz, unless GBC_RATE is overclocked (for 60FPS)
 #define GBA_FPS ((float) GBC_BASE_RATE) / (308 * 228 * 4)
 
 /* Maximum number of consecutive frames that

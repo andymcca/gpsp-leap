@@ -222,7 +222,7 @@ else ifeq ($(platform), vita)
 	TARGET := $(TARGET_NAME)_libretro_$(platform).a
 	CC = arm-vita-eabi-gcc$(EXE_EXT)
 	AR = arm-vita-eabi-ar$(EXE_EXT)
-	CFLAGS += -DVITA
+	CFLAGS += -DVITA -DOVERCLOCK_60FPS
 	CFLAGS += -marm -mcpu=cortex-a9 -mfloat-abi=hard
 	CFLAGS += -Wall -mword-relocations
 	CFLAGS += -fomit-frame-pointer -ffast-math

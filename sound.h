@@ -25,7 +25,11 @@
 
 #define GBA_SOUND_FREQUENCY   (64 * 1024)
 
-#define GBC_BASE_RATE ((float)(16 * 1024 * 1024))
+#ifdef OVERCLOCK_60FPS
+  #define GBC_BASE_RATE ((float)(60 * 228 * (272+960)))
+#else
+  #define GBC_BASE_RATE ((float)(16 * 1024 * 1024))
+#endif
 
 #define DIRECT_SOUND_INACTIVE         0
 #define DIRECT_SOUND_RIGHT            1
