@@ -46,8 +46,6 @@ void arm_indirect_branch_dual_thumb(u32 address);
 
 void execute_store_cpsr(u32 new_cpsr, u32 store_mask, u32 address);
 u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address);
-void execute_store_spsr(u32 new_cpsr, u32 store_mask);
-u32 execute_read_spsr(void);
 u32 execute_spsr_restore(u32 address);
 
 void execute_swi_arm(u32 pc);
@@ -55,9 +53,12 @@ void execute_swi_thumb(u32 pc);
 
 void execute_store_u32_safe(u32 address, u32 source);
 
+#define STORE_TBL_OFF     0x1DC
+#define SPSR_RAM_OFF      0x100
+
 #define write32(value)                                                        \
   *((u32 *)translation_ptr) = value;                                          \
-  translation_ptr += 4                                                       \
+  translation_ptr += 4                                                        \
   
 #define arm_relative_offset(source, offset)                                   \
   (((((u32)offset - (u32)source) - 8) >> 2) & 0xFFFFFF)                       \
@@ -370,9 +371,6 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
 
 #define generate_function_call(function_location)                             \
   ARM_BL(0, arm_relative_offset(translation_ptr, function_location))          \
-
-#define generate_exit_block()                                                 \
-  ARM_BX(0, ARMREG_LR)                                                        \
 
 /* The branch target is to be filled in later (thus a 0 for now) */
 
@@ -1175,8 +1173,13 @@ u32 execute_spsr_restore_body(u32 pc)
 }
 
 #define arm_psr_read_spsr()                                                   \
-  generate_function_call(execute_read_spsr)                                   \
-  arm_generate_store_reg(reg_a0, rd)                                          \
+{                                                                             \
+  u32 _rd = arm_prepare_store_reg(reg_a0, rd);                                \
+  ARM_ADD_REG_IMM(0, reg_a0, reg_base, SPSR_RAM_OFF >> 2, 30);                \
+  ARM_LDR_IMM(0, reg_a1, reg_base, CPU_MODE * 4);                             \
+  ARM_LDR_REG_REG_SHIFT(0, _rd, reg_a0, reg_a1, ARMSHIFT_LSL, 2);             \
+  arm_complete_store_reg(_rd, rd);                                            \
+}
 
 #define arm_psr_read(op_type, psr_reg)                                        \
   arm_psr_read_##psr_reg()                                                    \
@@ -1244,7 +1247,13 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_psr_store_spsr()                                                  \
   arm_load_imm_32bit(reg_a1, psr_masks[psr_field]);                           \
-  generate_function_call(execute_store_spsr)                                  \
+  ARM_LDR_IMM(0, reg_a2, reg_base, (CPU_MODE * 4));                           \
+  ARM_ADD_REG_IMMSHIFT(0, ARMREG_LR, reg_base, reg_a2, ARMSHIFT_LSL, 2);      \
+  ARM_AND_REG_IMMSHIFT(0, reg_a0, reg_a0, reg_a1, ARMSHIFT_LSL, 0);           \
+  ARM_LDR_IMM(0, reg_a2, ARMREG_LR, SPSR_RAM_OFF);                            \
+  ARM_BIC_REG_IMMSHIFT(0, reg_a2, reg_a2, reg_a1, ARMSHIFT_LSL, 0);           \
+  ARM_ORR_REG_IMMSHIFT(0, reg_a0, reg_a0, reg_a2, ARMSHIFT_LSL, 0);           \
+  ARM_STR_IMM(0, reg_a0, ARMREG_LR, SPSR_RAM_OFF);                            \
 
 #define arm_psr_store(op_type, psr_reg)                                       \
   arm_psr_load_new_##op_type();                                               \

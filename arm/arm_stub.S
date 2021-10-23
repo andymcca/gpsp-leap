@@ -335,38 +335,6 @@ defsymbl(execute_store_cpsr)
   bx r0                                   @ return to PC ARM address
 .size execute_store_cpsr, .-execute_store_cpsr
 
-@ Update the current spsr.
-
-@ Input:
-@ r0: new cpsr value
-@ r1: bitmask of which bits in spsr to update
-
-defsymbl(execute_store_spsr)
-  str lr, [reg_base, #REG_SAVE3]          @ Save lr
-  ldr r2, [reg_base, #CPU_MODE]           @ r2 = CPU_MODE
-  add lr, reg_base, r2, lsl #2            @ Access table * 4 + base
-
-  and r0, r0, r1                          @ r0 = cpsr & mask
-  ldr r2, [lr, #SPSR_RAM_OFF]             @ Read old cpsr
-  bic r2, r2, r1                          @ r2 = old_cprs & ~mask
-  orr r0, r0, r2                          @ new cpsr
-
-  str r0, [lr, #SPSR_RAM_OFF]             @ spsr[CPU_MODE] = new_spsr
-  ldr pc, [reg_base, #REG_SAVE3]          @ return to saved LR
-.size execute_store_spsr, .-execute_store_spsr
-
-@ Read the current spsr.
-
-@ Output:
-@ r0: spsr
-
-defsymbl(execute_read_spsr)
-  add r0, reg_base, #SPSR_RAM_OFF         @ r0 = spsr
-  ldr r1, [reg_base, #CPU_MODE]           @ r1 = CPU_MODE
-  ldr r0, [r0, r1, lsl #2]                @ r0 = spsr[CPU_MODE]
-  bx lr                                   @ return
-.size execute_read_spsr, .-execute_read_spsr
-
 @ Restore the cpsr from the mode spsr and mode shift.
 
 @ Input:
