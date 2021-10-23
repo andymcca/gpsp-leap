@@ -1164,12 +1164,15 @@ u32 execute_spsr_restore_body(u32 pc)
 }                                                                             \
 
 #define arm_psr_read_cpsr()                                                   \
+{                                                                             \
   u32 _rd = arm_prepare_store_reg(reg_a0, rd);                                \
   arm_generate_load_reg(_rd, REG_CPSR);                                       \
+  generate_save_flags();                                                      \
   ARM_BIC_REG_IMM(0, _rd, _rd, 0xF0, arm_imm_lsl_to_rot(24));                 \
   ARM_AND_REG_IMM(0, reg_flags, reg_flags, 0xF0, arm_imm_lsl_to_rot(24));     \
   ARM_ORR_REG_REG(0, _rd, _rd, reg_flags);                                    \
   arm_complete_store_reg(_rd, rd)                                             \
+}
 
 #define arm_psr_read_spsr()                                                   \
   generate_function_call(execute_read_spsr)                                   \
