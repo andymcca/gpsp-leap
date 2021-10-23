@@ -51,7 +51,7 @@ u32 execute_spsr_restore(u32 address);
 void execute_swi_arm(u32 pc);
 void execute_swi_thumb(u32 pc);
 
-#define STORE_TBL_OFF     0x1DC
+#define STORE_TBL_OFF     0x118
 #define SPSR_RAM_OFF      0x100
 
 #define write32(value)                                                        \
@@ -1264,29 +1264,48 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   arm_psr_##transfer_type(op_type, psr_reg);                                  \
 }                                                                             \
 
-/* TODO: loads will need the PC passed as well for open address, however can
- * eventually be rectified with a hash table on the memory accesses
- * (same with the stores)
- */
+/* We use USAT + ROR to map addresses to the handler table. For ARMv5 we use
+   the table -1 entry to map any out of range/unaligned access, and some fun
+   math/logical tricks to avoid using USAT */
+
+#if __ARM_ARCH >= 6
+  #define mem_calc_region(abits)                                              \
+    if (abits) {                                                              \
+      ARM_MOV_REG_IMMSHIFT(0, reg_a2, reg_a0, ARMSHIFT_ROR, abits)            \
+      ARM_USAT_ASR(0, reg_a2, 4, reg_a2, 24-abits, ARMCOND_AL);               \
+    } else {                                                                  \
+      ARM_USAT_ASR(0, reg_a2, 4, reg_a0, 24, ARMCOND_AL);                     \
+    }
+#else
+  #define mem_calc_region(abits)                                              \
+    if (abits) {                                                              \
+      ARM_ORR_REG_IMMSHIFT(0, reg_a2, reg_a0, reg_a0, ARMSHIFT_LSL, 32-abits);\
+      ARM_MOV_REG_IMMSHIFT(0, reg_a2, reg_a2, ARMSHIFT_LSR, 24);              \
+    } else {                                                                  \
+      ARM_MOV_REG_IMMSHIFT(0, reg_a2, reg_a0, ARMSHIFT_LSR, 24);              \
+    }                                                                         \
+    ARM_RSB_REG_IMM(0, ARMREG_LR, reg_a2, 15, 0);                             \
+    ARM_ORR_REG_IMMSHIFT(0, reg_a2, reg_a2, ARMREG_LR, ARMSHIFT_ASR, 31);
+#endif
 
 #define generate_load_call_byte(tblnum)                                       \
-  ARM_USAT_ASR(0, reg_a1, 4, reg_a0, 24, ARMCOND_AL);                         \
-  generate_add_imm(reg_a1, (STORE_TBL_OFF + 64*tblnum) >> 2, 0);              \
-  ARM_LDR_REG_REG_SHIFT(0, reg_a1, reg_base, reg_a1, 0, 2);                   \
-  ARM_BLX(0, reg_a1);                                                         \
-
-#define generate_load_call_mbyte(tblnum, abits)                               \
-  ARM_MOV_REG_IMMSHIFT(0, reg_a1, reg_a0, ARMSHIFT_ROR, abits)                \
-  ARM_USAT_ASR(0, reg_a1, 4, reg_a1, 24-abits, ARMCOND_AL);                   \
-  generate_add_imm(reg_a1, (STORE_TBL_OFF + 64*tblnum) >> 2, 0);              \
-  ARM_LDR_REG_REG_SHIFT(0, reg_a1, reg_base, reg_a1, 0, 2);                   \
-  ARM_BLX(0, reg_a1);                                                         \
-
-#define generate_store_call(tblnum)                                           \
-  ARM_USAT_ASR(0, reg_a2, 4, reg_a0, 24, ARMCOND_AL);                         \
-  generate_add_imm(reg_a2, (STORE_TBL_OFF + 64*tblnum) >> 2, 0);              \
+  mem_calc_region(0);                                                         \
+  generate_add_imm(reg_a2, (STORE_TBL_OFF + 68*tblnum + 4) >> 2, 0);          \
   ARM_LDR_REG_REG_SHIFT(0, reg_a2, reg_base, reg_a2, 0, 2);                   \
   ARM_BLX(0, reg_a2);                                                         \
+
+#define generate_load_call_mbyte(tblnum, abits)                               \
+  mem_calc_region(abits);                                                     \
+  generate_add_imm(reg_a2, (STORE_TBL_OFF + 68*tblnum + 4) >> 2, 0);          \
+  ARM_LDR_REG_REG_SHIFT(0, reg_a2, reg_base, reg_a2, 0, 2);                   \
+  ARM_BLX(0, reg_a2);                                                         \
+
+#define generate_store_call(tblnum)                                           \
+  mem_calc_region(0);                                                         \
+  generate_add_imm(reg_a2, (STORE_TBL_OFF + 68*tblnum + 4) >> 2, 0);          \
+  ARM_LDR_REG_REG_SHIFT(0, reg_a2, reg_base, reg_a2, 0, 2);                   \
+  ARM_BLX(0, reg_a2);                                                         \
+
 
 #define generate_store_call_u8()        generate_store_call(0)
 #define generate_store_call_u16()       generate_store_call(1)
@@ -1945,8 +1964,8 @@ void execute_swi_hle_divarm_c(void)
   generate_indirect_branch_no_cycle_update(type)                              \
 
 
-extern u32 ldst_handler_functions[9][16];
-extern u32 ldst_lookup_tables[9][16];
+extern u32 ldst_handler_functions[9][17];
+extern u32 ldst_lookup_tables[9][17];
 
 void init_emitter(void) {
   memcpy(ldst_lookup_tables, ldst_handler_functions, sizeof(ldst_lookup_tables));
