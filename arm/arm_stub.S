@@ -342,10 +342,17 @@ defsymbl(execute_store_cpsr)
 @ r1: bitmask of which bits in spsr to update
 
 defsymbl(execute_store_spsr)
-  add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
+  str lr, [reg_base, #REG_SAVE3]          @ Save lr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = CPU_MODE
-  str r0, [r1, r2, lsl #2]                @ spsr[CPU_MODE] = new_spsr
-  bx lr
+  add lr, reg_base, r2, lsl #2            @ Access table * 4 + base
+
+  and r0, r0, r1                          @ r0 = cpsr & mask
+  ldr r2, [lr, #SPSR_RAM_OFF]             @ Read old cpsr
+  bic r2, r2, r1                          @ r2 = old_cprs & ~mask
+  orr r0, r0, r2                          @ new cpsr
+
+  str r0, [lr, #SPSR_RAM_OFF]             @ spsr[CPU_MODE] = new_spsr
+  ldr pc, [reg_base, #REG_SAVE3]          @ return to saved LR
 .size execute_store_spsr, .-execute_store_spsr
 
 @ Read the current spsr.

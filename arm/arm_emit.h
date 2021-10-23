@@ -1240,6 +1240,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   write32(pc)                                                                 \
 
 #define arm_psr_store_spsr()                                                  \
+  arm_load_imm_32bit(reg_a1, psr_masks[psr_field]);                           \
   generate_function_call(execute_store_spsr)                                  \
 
 #define arm_psr_store(op_type, psr_reg)                                       \
