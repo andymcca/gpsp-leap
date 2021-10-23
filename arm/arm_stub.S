@@ -94,12 +94,7 @@ _##symbol:
   ldr reg_x5, [reg_base, #REG_R14]                                           ;\
 
 #define load_registers_thumb()                                               ;\
-  ldr reg_x0, [reg_base, #REG_R0]                                            ;\
-  ldr reg_x1, [reg_base, #REG_R1]                                            ;\
-  ldr reg_x2, [reg_base, #REG_R2]                                            ;\
-  ldr reg_x3, [reg_base, #REG_R3]                                            ;\
-  ldr reg_x4, [reg_base, #REG_R4]                                            ;\
-  ldr reg_x5, [reg_base, #REG_R5]                                            ;\
+  ldm reg_base, {reg_x0, reg_x1, reg_x2, reg_x3, reg_x4, reg_x5}
 
 
 @ Will store the register set from cached registers back to memory.
@@ -113,12 +108,7 @@ _##symbol:
   str reg_x5, [reg_base, #REG_R14]                                           ;\
 
 #define store_registers_thumb()                                              ;\
-  str reg_x0, [reg_base, #REG_R0]                                            ;\
-  str reg_x1, [reg_base, #REG_R1]                                            ;\
-  str reg_x2, [reg_base, #REG_R2]                                            ;\
-  str reg_x3, [reg_base, #REG_R3]                                            ;\
-  str reg_x4, [reg_base, #REG_R4]                                            ;\
-  str reg_x5, [reg_base, #REG_R5]                                            ;\
+  stm reg_base, {reg_x0, reg_x1, reg_x2, reg_x3, reg_x4, reg_x5}
 
 
 @ Returns an updated persistent cpsr with the cached flags register.
@@ -512,12 +502,6 @@ return_to_main:
 
 #define execute_store_builder(store_type, str_op, str_op16, load_op, tnum)   ;\
                                                                              ;\
-defsymbl(execute_store_u##store_type)                                        ;\
-  usat r2, #4, r0, asr #24                /* r2 contains [0-15]            */;\
-  add r2, r2, #((STORE_TBL_OFF + 16*4*tnum) >> 2)    /* add table offset   */;\
-  ldr pc, [reg_base, r2, lsl #2]          /* load handler addr             */;\
-  nop                                                                        ;\
-                                                                             ;\
 ext_store_u##store_type:                                                     ;\
   save_flags()                                                               ;\
   ldr r2, [lr]                            /* load PC                       */;\
@@ -571,7 +555,6 @@ ext_store_oam_ram_u##store_type:                                             ;\
   ldr r0, [lr]                            /* load PC                       */;\
   str r0, [reg_base, #REG_PC]             /* write out PC                  */;\
   b smc_write                             /* perform smc write             */;\
-.size execute_store_u##store_type, .-execute_store_u##store_type
 
 @ for ignored areas, just return
 ext_store_ignore:
@@ -600,12 +583,6 @@ execute_store_builder(16, strh, strh, ldrh, 1)
 execute_store_builder(32, str,  str,  ldr,  2)
 
 @ This is a store that is executed in a strm case (so no SMC checks in-between)
-
-defsymbl(execute_store_u32_safe)
-  usat r2, #4, r0, asr #24
-  add r2, r2, #((STORE_TBL_OFF + 16*4*3) >> 2)
-  ldr pc, [reg_base, r2, lsl #2]
-  nop
 
 ext_store_u32_safe:
   str lr, [reg_base, #REG_SAVE3]          @ Restore lr
@@ -642,7 +619,6 @@ ext_store_oam_ram_u32_safe:
   str r1, [r0, r2]                        @ store data
   str r2, [reg_base, #OAM_UPDATED]        @ store anything non zero here
   bx lr                                   @ Return
-.size execute_store_u32_safe, .-execute_store_u32_safe
 
 
 write_epilogue:
@@ -744,17 +720,6 @@ lookup_pc_arm:
 
 #define execute_load_builder(load_type, albits, load_function, tnum)         ;\
                                                                              ;\
-defsymbl(execute_load_##load_type)                                           ;\
-.if albits >= 1                                                              ;\
-  ror r1, r0, #(albits)                   /* move alignment bits to MSB    */;\
-  usat r1, #4, r1, asr #(24-albits)       /* r1 contains [0-15]            */;\
-.else                                                                        ;\
-  usat r1, #4, r0, asr #24                /* r1 contains [0-15]            */;\
-.endif                                                                       ;\
-  add r1, r1, #((STORE_TBL_OFF + 16*4*tnum) >> 2)    /* add table offset   */;\
-  ldr pc, [reg_base, r1, lsl #2]          /* load handler addr             */;\
-  nop                                                                        ;\
-                                                                             ;\
 ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
   save_flags()                                                               ;\
   ldr r1, [lr]                            /* r1 = PC                       */;\
@@ -809,8 +774,7 @@ ld_slow_##load_type:                                                         ;\
   call_c_function(load_function)                                             ;\
   restore_flags()                                                            ;\
   add pc, lr, #4                          /* return                        */;\
-                                                                             ;\
-.size execute_load_##load_type, .-execute_load_##load_type
+
 
 #define load_table_gen(load_type)                                            ;\
   .long ld_bios_##load_type               /* 0 BIOS                        */;\

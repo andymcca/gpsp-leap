@@ -51,8 +51,6 @@ u32 execute_spsr_restore(u32 address);
 void execute_swi_arm(u32 pc);
 void execute_swi_thumb(u32 pc);
 
-void execute_store_u32_safe(u32 address, u32 source);
-
 #define STORE_TBL_OFF     0x1DC
 #define SPSR_RAM_OFF      0x100
 
@@ -1271,16 +1269,46 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
  * (same with the stores)
  */
 
+#define generate_load_call_byte(tblnum)                                       \
+  ARM_USAT_ASR(0, reg_a1, 4, reg_a0, 24, ARMCOND_AL);                         \
+  generate_add_imm(reg_a1, (STORE_TBL_OFF + 64*tblnum) >> 2, 0);              \
+  ARM_LDR_REG_REG_SHIFT(0, reg_a1, reg_base, reg_a1, 0, 2);                   \
+  ARM_BLX(0, reg_a1);                                                         \
+
+#define generate_load_call_mbyte(tblnum, abits)                               \
+  ARM_MOV_REG_IMMSHIFT(0, reg_a1, reg_a0, ARMSHIFT_ROR, abits)                \
+  ARM_USAT_ASR(0, reg_a1, 4, reg_a1, 24-abits, ARMCOND_AL);                   \
+  generate_add_imm(reg_a1, (STORE_TBL_OFF + 64*tblnum) >> 2, 0);              \
+  ARM_LDR_REG_REG_SHIFT(0, reg_a1, reg_base, reg_a1, 0, 2);                   \
+  ARM_BLX(0, reg_a1);                                                         \
+
+#define generate_store_call(tblnum)                                           \
+  ARM_USAT_ASR(0, reg_a2, 4, reg_a0, 24, ARMCOND_AL);                         \
+  generate_add_imm(reg_a2, (STORE_TBL_OFF + 64*tblnum) >> 2, 0);              \
+  ARM_LDR_REG_REG_SHIFT(0, reg_a2, reg_base, reg_a2, 0, 2);                   \
+  ARM_BLX(0, reg_a2);                                                         \
+
+#define generate_store_call_u8()        generate_store_call(0)
+#define generate_store_call_u16()       generate_store_call(1)
+#define generate_store_call_u32()       generate_store_call(2)
+#define generate_store_call_u32_safe()  generate_store_call(3)
+#define generate_load_call_u8()         generate_load_call_byte(4)
+#define generate_load_call_s8()         generate_load_call_byte(5)
+#define generate_load_call_u16()        generate_load_call_mbyte(6, 1)
+#define generate_load_call_s16()        generate_load_call_mbyte(7, 1)
+#define generate_load_call_u32()        generate_load_call_mbyte(8, 2)
+
+
 #define arm_access_memory_load(mem_type)                                      \
   cycle_count += 2;                                                           \
-  generate_function_call(execute_load_##mem_type);                            \
+  generate_load_call_##mem_type();                                            \
   write32((pc + 8));                                                          \
   arm_generate_store_reg_pc_no_flags(reg_rv, rd)                              \
 
 #define arm_access_memory_store(mem_type)                                     \
   cycle_count++;                                                              \
   arm_generate_load_reg_pc(reg_a1, rd, 12);                                   \
-  generate_function_call(execute_store_##mem_type);                           \
+  generate_store_call_##mem_type();                                           \
   write32((pc + 4))                                                           \
 
 /* Calculate the address into a0 from _rn, _rm */
@@ -1384,20 +1412,20 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 /* TODO: Make these use cached registers. Implement iwram_stack_optimize. */
 
 #define arm_block_memory_load()                                               \
-  generate_function_call(execute_load_u32);                                   \
+  generate_load_call_u32();                                                   \
   write32((pc + 8));                                                          \
   arm_generate_store_reg(reg_rv, i)                                           \
 
 #define arm_block_memory_store()                                              \
   arm_generate_load_reg_pc(reg_a1, i, 8);                                     \
-  generate_function_call(execute_store_u32_safe)                              \
+  generate_store_call_u32_safe()                                              \
 
 #define arm_block_memory_final_load()                                         \
   arm_block_memory_load()                                                     \
 
 #define arm_block_memory_final_store()                                        \
   arm_generate_load_reg_pc(reg_a1, i, 12);                                    \
-  generate_function_call(execute_store_u32);                                  \
+  generate_store_call_u32();                                                  \
   write32((pc + 4))                                                           \
 
 #define arm_block_memory_adjust_pc_store()                                    \
@@ -1482,13 +1510,13 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   arm_decode_swap();                                                          \
   cycle_count += 3;                                                           \
   arm_generate_load_reg(reg_a0, rn);                                          \
-  generate_function_call(execute_load_##type);                                \
+  generate_load_call_##type();                                                \
   write32((pc + 8));                                                          \
   generate_mov(reg_a2, reg_rv);                                               \
   arm_generate_load_reg(reg_a0, rn);                                          \
   arm_generate_load_reg(reg_a1, rm);                                          \
   arm_generate_store_reg(reg_a2, rd);                                         \
-  generate_function_call(execute_store_##type);                               \
+  generate_store_call_##type();                                               \
   write32((pc + 4));                                                          \
 }                                                                             \
 
@@ -1651,14 +1679,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define thumb_access_memory_load(mem_type, _rd)                               \
   cycle_count += 2;                                                           \
-  generate_function_call(execute_load_##mem_type);                            \
+  generate_load_call_##mem_type();                                            \
   write32((pc + 4));                                                          \
   thumb_generate_store_reg(reg_rv, _rd)                                       \
 
 #define thumb_access_memory_store(mem_type, _rd)                              \
   cycle_count++;                                                              \
   thumb_generate_load_reg(reg_a1, _rd);                                       \
-  generate_function_call(execute_store_##mem_type);                           \
+  generate_store_call_##mem_type();                                           \
   write32((pc + 2))                                                           \
 
 #define thumb_access_memory_generate_address_pc_relative(offset, _rb, _ro)    \
@@ -1727,7 +1755,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_block_memory_extra_pop_pc()                                     \
   thumb_generate_load_reg(reg_s0, REG_SAVE);                                  \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
-  generate_function_call(execute_load_u32);                                   \
+  generate_load_call_u32();                                                   \
   write32((pc + 4));                                                          \
   generate_indirect_branch_cycle_update(thumb)                                \
 
@@ -1735,23 +1763,23 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   thumb_generate_load_reg(reg_s0, REG_SAVE);                                  \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
   thumb_generate_load_reg(reg_a1, REG_LR);                                    \
-  generate_function_call(execute_store_u32_safe)                              \
+  generate_store_call_u32_safe()
 
 #define thumb_block_memory_load()                                             \
-  generate_function_call(execute_load_u32);                                   \
+  generate_load_call_u32();                                                   \
   write32((pc + 4));                                                          \
   thumb_generate_store_reg(reg_rv, i)                                         \
 
 #define thumb_block_memory_store()                                            \
   thumb_generate_load_reg(reg_a1, i);                                         \
-  generate_function_call(execute_store_u32_safe)                              \
+  generate_store_call_u32_safe()
 
 #define thumb_block_memory_final_load()                                       \
   thumb_block_memory_load()                                                   \
 
 #define thumb_block_memory_final_store()                                      \
   thumb_generate_load_reg(reg_a1, i);                                         \
-  generate_function_call(execute_store_u32);                                  \
+  generate_store_call_u32();                                                  \
   write32((pc + 2))                                                           \
 
 #define thumb_block_memory_final_no(access_type)                              \

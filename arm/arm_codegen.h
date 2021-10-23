@@ -1378,6 +1378,12 @@ typedef struct {
   (1 << 25)            | \
   ARM_DEF_COND(cond)
 
+#define ARM_USAT_ASR(p, rd, sat, rm, sa, cond) \
+  ARM_EMIT(p, ARM_DEF_DPI_REG_IMMSHIFT_COND((rm) | 0x10, 2, sa, rd, sat, 0, 0x37, cond))
+
+#define ARM_USAT_LSL(p, rd, sat, rm, sa, cond) \
+  ARM_EMIT(p, ARM_DEF_DPI_REG_IMMSHIFT_COND((rm) | 0x10, 0, sa, rd, sat, 0, 0x37, cond))
+
 
 typedef union {
   ARMInstrBR    br;
