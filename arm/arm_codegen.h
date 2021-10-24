@@ -249,6 +249,9 @@ typedef enum {
   ARMOP_MUL   = 0x0, /* Rd := Rm*Rs */
   ARMOP_MLA   = 0x1, /* Rd := (Rm*Rs)+Rn */
 
+  /* ARM7+ */
+  ARMOP_MLS   = 0x3, /* Rd := Rn-(Rm*Rs) */
+
   /* ARM3M+ */
   ARMOP_UMULL = 0x4,
   ARMOP_UMLAL = 0x5,
@@ -648,6 +651,11 @@ typedef struct {
 #define ARM_IASM_MLAS(rd, rm, rs, rn) \
   ARM_IASM_MLAS_COND(rd, rm, rs, rn, ARMCOND_AL)
 
+/* Rd := Rn - (Rm * Rs); 32x32+32->32 */
+#define ARM_MLS_COND(p, rd, rm, rs, rn, cond) \
+  ARM_EMIT(p, ARM_DEF_MUL_COND(ARMOP_MLS, rd, rm, rs, rn, 0, cond))
+#define ARM_MLS(p, rd, rm, rs, rn) \
+  ARM_MLS_COND(p, rd, rm, rs, rn, ARMCOND_AL)
 
 #define ARM_SMULL_COND(p, rn, rd, rm, rs, cond) \
   ARM_EMIT(p, ARM_DEF_MUL_COND(ARMOP_SMULL, rd, rm, rs, rn, 0, cond))
@@ -1404,6 +1412,19 @@ typedef union {
   ARMInstrGeneric generic;
   arminstr_t      raw;
 } ARMInstr;
+
+/* ARMv7VE and others */
+
+#define ARM_SDIV_COND(p, rd, rm, rn, cond) \
+  ARM_DEF_DPI_REG_REGSHIFT_COND(rm, 0, rn, 31, rd, 1, 0x38, cond)
+#define ARM_SDIV(p, rd, rm, rn) \
+  ARM_SDIV_COND(p, rd, rm, rn, ARMCOND_AL)
+
+#define ARM_UDIV_COND(p, rd, rm, rn, cond) \
+  ARM_DEF_DPI_REG_REGSHIFT_COND(rm, 0, rn, 31, rd, 1, 0x39, cond)
+#define ARM_UDIV(p, rd, rm, rn) \
+  ARM_UDIV_COND(p, rd, rm, rn, ARMCOND_AL)
+
 
 #endif /* ARM_CG_H */
 

@@ -397,25 +397,6 @@ execute_swi_builder(arm)
 execute_swi_builder(thumb)
 
 
-@ Wrapper for calling SWI functions in C (or can implement some in ASM if
-@ desired)
-
-#define execute_swi_function_builder(swi_function, mode)                     ;\
-                                                                             ;\
-defsymbl(execute_swi_hle_##swi_function##_##mode)                            ;\
-  save_flags()                                                               ;\
-  store_registers_##mode()                                                   ;\
-  call_c_function(execute_swi_hle_##swi_function##_c)                        ;\
-  load_registers_##mode()                                                    ;\
-  restore_flags()                                                            ;\
-  bx lr                                                                      ;\
-
-execute_swi_function_builder(div, arm)
-execute_swi_function_builder(div, thumb)
-execute_swi_function_builder(divarm, arm)
-execute_swi_function_builder(divarm, thumb)
-
-
 @ Start program execution. Normally the mode should be Thumb and the
 @ PC should be 0x8000000, however if a save state is preloaded this
 @ will be different.

@@ -1924,40 +1924,14 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   /* We're in ARM mode now */                                                 \
   generate_branch(arm)                                                        \
 
-void execute_swi_hle_div_arm(void);
-void execute_swi_hle_div_thumb(void);
-void execute_swi_hle_divarm_arm(void);
-void execute_swi_hle_divarm_thumb(void);
-
-void execute_swi_hle_div_c(void)
-{
-   /* real BIOS supposedly locks up, but game can recover on interrupt */
-   if (reg[1] == 0)
-      return;
-   s32 result = (s32)reg[0] / (s32)reg[1];
-   reg[1] = (s32)reg[0] % (s32)reg[1];
-   reg[0] = result;
-
-   reg[3] = (result ^ (result >> 31)) - (result >> 31);
-}
-
-void execute_swi_hle_divarm_c(void)
-{
-   /* real BIOS supposedly locks up, but game can recover on interrupt */
-   if (reg[0] == 0)
-      return;
-   s32 result = (s32)reg[1] / (s32)reg[0];
-   reg[1] = (s32)reg[1] % (s32)reg[0];
-   reg[0] = result;
-
-   reg[3] = (result ^ (result >> 31)) - (result >> 31);
-}
-
+// Use software division
+void *div6, *divarm7;
 #define arm_hle_div(cpu_mode)                                                 \
-  generate_function_call(execute_swi_hle_div_##cpu_mode);
-
+  cycle_count += 11 + 32;                                                     \
+  generate_function_call(div6);
 #define arm_hle_div_arm(cpu_mode)                                             \
-  generate_function_call(execute_swi_hle_divarm_##cpu_mode);
+  cycle_count += 14 + 32;                                                     \
+  generate_function_call(divarm7);
 
 #define generate_translation_gate(type)                                       \
   generate_update_pc(pc);                                                     \
@@ -1968,9 +1942,71 @@ extern u32 ldst_handler_functions[9][17];
 extern u32 ldst_lookup_tables[9][17];
 
 void init_emitter(void) {
+  int i;
+
+  // Generate handler table
   memcpy(ldst_lookup_tables, ldst_handler_functions, sizeof(ldst_lookup_tables));
 
   rom_cache_watermark = 0;
+  u8 *translation_ptr = (u8*)&rom_translation_cache[0];
+
+  // Generate ARMv5+ division code, uses a mix of libgcc and some open bioses.
+  // This is meant for ARMv5 or higher, uses CLZ
+
+  // Invert operands for SWI 7 (divarm)
+  divarm7 = translation_ptr;
+  ARM_MOV_REG_REG(0, reg_a2, reg_x0);
+  ARM_MOV_REG_REG(0, reg_x0, reg_x1);
+  ARM_MOV_REG_REG(0, reg_x1, reg_a2);
+
+  div6 = translation_ptr;
+  // Save flags before using them
+  generate_save_flags();
+  // Stores result and remainder signs 
+  ARM_ANDS_REG_IMM(0, reg_a2, reg_x1, 0x80, arm_imm_lsl_to_rot(24));
+  ARM_EOR_REG_IMMSHIFT(0, reg_a2, reg_a2, reg_x0, ARMSHIFT_ASR, 1);
+
+  // Make numbers positive if they are negative
+  ARM_RSB_REG_IMM_COND(0, reg_x1, reg_x1, 0, 0, ARMCOND_MI);
+  ARM_TST_REG_REG(0, reg_x0, reg_x0);
+  ARM_RSB_REG_IMM_COND(0, reg_x0, reg_x0, 0, 0, ARMCOND_MI);
+
+  // Calculates the number of iterations to division, and jumps to unrolled code
+  ARM_CLZ(0, reg_a0, reg_x0);
+  ARM_CLZ(0, reg_a1, reg_x1);
+  ARM_SUBS_REG_REG(0, reg_a0, reg_a1, reg_a0);          // Align and check if a<b
+  ARM_RSB_REG_IMM(0, reg_a0, reg_a0, 31, 0);
+  ARM_MOV_REG_IMM_COND(0, reg_a0, 32, 0, ARMCOND_MI);   // Cap to 32 (skip division)
+  ARM_ADD_REG_IMMSHIFT(0, reg_a0, reg_a0, reg_a0, ARMSHIFT_LSL, 1);
+  ARM_MOV_REG_IMM(0, reg_a1, 0, 0);
+  ARM_ADD_REG_IMMSHIFT(0, ARMREG_PC, ARMREG_PC, reg_a0, ARMSHIFT_LSL, 2);
+  ARM_NOP(0);
+
+  for (i = 31; i >= 0; i--) {
+    ARM_CMP_REG_IMMSHIFT(0, reg_x0, reg_x1, ARMSHIFT_LSL, i);
+    ARM_ADC_REG_REG(0, reg_a1, reg_a1, reg_a1);
+    ARM_SUB_REG_IMMSHIFT_COND(0, reg_x0, reg_x0, reg_x1, ARMSHIFT_LSL, i, ARMCOND_HS);
+  }
+
+  ARM_MOV_REG_REG(0, reg_x1, reg_x0);
+  ARM_MOV_REG_REG(0, reg_x0, reg_a1);
+  // Negate result if sign is negative
+  ARM_SHLS_IMM(0, reg_a2, reg_a2, 1);
+  ARM_RSB_REG_IMM_COND(0, reg_x0, reg_x0, 0, 0, ARMCOND_HS);
+  ARM_RSB_REG_IMM_COND(0, reg_x1, reg_x1, 0, 0, ARMCOND_MI);
+
+  // Register R3 stores the abs(r0/r1), store it in the right reg/mem-reg
+  arm_generate_load_reg(reg_a2, REG_CPSR);
+  ARM_TST_REG_IMM8(0, reg_a2, 0x20);
+  arm_generate_store_reg(reg_a1, 3 /* r3 */);
+  ARM_MOV_REG_REG_COND(0, reg_x3, reg_a1, ARMCOND_NE);
+
+  // Return and continue regular emulation
+  generate_restore_flags();
+  ARM_BX(0, ARMREG_LR);
+
+  // Now generate BIOS hooks
+  rom_cache_watermark = (u32)(translation_ptr - rom_translation_cache);
   init_bios_hooks();
 }
 
