@@ -459,10 +459,9 @@ void retro_init(void)
 {
 #if defined(HAVE_DYNAREC)
   #if defined(HAVE_MMAP)
-   rom_translation_cache = mmap(NULL, ROM_TRANSLATION_CACHE_SIZE,
+   rom_translation_cache = mmap(NULL, ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE,
                                 PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
-   ram_translation_cache = mmap(NULL, RAM_TRANSLATION_CACHE_SIZE,
-                                PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+   ram_translation_cache = &rom_translation_cache[ROM_TRANSLATION_CACHE_SIZE];
   #elif defined(_3DS)
    if (__ctr_svchax && !translation_caches_inited)
    {
@@ -550,8 +549,7 @@ void retro_deinit(void)
    memory_term();
 
 #if defined(HAVE_MMAP) && defined(HAVE_DYNAREC)
-   munmap(rom_translation_cache, ROM_TRANSLATION_CACHE_SIZE);
-   munmap(ram_translation_cache, RAM_TRANSLATION_CACHE_SIZE);
+   munmap(rom_translation_cache, ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE);
 #endif
 #if defined(_3DS) && defined(HAVE_DYNAREC)
 

@@ -257,6 +257,7 @@ else ifeq ($(platform), rpi3)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 	CPU_ARCH := arm
+	HAVE_MMAP = 1
 	HAVE_DYNAREC = 1
 
 # Raspberry Pi 2
@@ -268,6 +269,7 @@ else ifeq ($(platform), rpi2)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 	CPU_ARCH := arm
+	HAVE_MMAP = 1
 	HAVE_DYNAREC = 1
 
 # Raspberry Pi 1
@@ -280,6 +282,7 @@ else ifeq ($(platform), rpi1)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 	CPU_ARCH := arm
+	HAVE_MMAP = 1
 	HAVE_DYNAREC = 1
 
 # Classic Platforms ####################
@@ -307,6 +310,7 @@ else ifeq ($(platform), classic_armv7_a7)
 	ARCH = arm
 	BUILTIN_GPU = neon
 	CPU_ARCH := arm
+	HAVE_MMAP = 1
 	HAVE_DYNAREC = 1
 	ifeq ($(shell echo `$(CC) -dumpversion` "< 4.9" | bc -l), 1)
 	  CFLAGS += -march=armv7-a
@@ -348,6 +352,7 @@ else ifneq (,$(findstring armv,$(platform)))
 	TARGET := $(TARGET_NAME)_libretro.so
 	SHARED := -shared -Wl,--version-script=link.T
 	CPU_ARCH := arm
+	HAVE_MMAP = 1
 	fpic := -fPIC
 	ifneq (,$(findstring cortexa5,$(platform)))
 		CFLAGS += -marm -mcpu=cortex-a5

@@ -844,13 +844,7 @@ defsymbl(palette_ram_converted)
 
 @ Make this section executable!
 .text
-#ifdef __ANDROID__
-@ Unfortunately Android builds don't like nobits, so we ship a ton of zeros
-@ TODO: Revisit this whenever we upgrade to the latest clang NDK
-.section .jit,"awx",%progbits
-#else
 .section .jit,"awx",%nobits
-#endif
 .align 4
 defsymbl(rom_translation_cache)
   .space ROM_TRANSLATION_CACHE_SIZE
