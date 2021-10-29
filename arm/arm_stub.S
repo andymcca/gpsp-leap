@@ -169,7 +169,7 @@ _##symbol:
   add pc, lr, #4                                                             ;\
 
 #define load_pc_straight()                                                   ;\
-  ldr r0, [lr, #-8]                                                          ;\
+  ldr r0, [lr, #-12]                                                         ;\
 
 #define load_pc_add()                                                        ;\
   ldr r0, [lr]                                                               ;\

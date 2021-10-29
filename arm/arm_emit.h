@@ -51,6 +51,22 @@ u32 execute_spsr_restore(u32 address);
 void execute_swi_arm(u32 pc);
 void execute_swi_thumb(u32 pc);
 
+#define armfn_gbaup_idle_arm       0
+#define armfn_gbaup_idle_thumb     1
+#define armfn_gbaup_arm            2
+#define armfn_gbaup_thumb          3
+#define armfn_swi_arm              4
+#define armfn_swi_thumb            5
+#define armfn_cheat_arm            6
+#define armfn_cheat_thumb          7
+#define armfn_store_cpsr           8
+#define armfn_spsr_restore         9
+#define armfn_indirect_arm        10
+#define armfn_indirect_thumb      11
+#define armfn_indirect_dual_arm   12
+#define armfn_indirect_dual_thumb 13
+#define armfn_debug_trace         14
+
 #define STORE_TBL_OFF     0x118
 #define SPSR_RAM_OFF      0x100
 
@@ -367,8 +383,14 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
     ARM_MOV_REG_REG(0, ireg_dest, ireg_src);                                  \
   }                                                                           \
 
+/* Calls functions present in the rom/ram cache (near) */
 #define generate_function_call(function_location)                             \
   ARM_BL(0, arm_relative_offset(translation_ptr, function_location))          \
+
+/* Calls functions that might be far, via the function table at reg_base */
+#define generate_function_far_call(function_number)                           \
+  generate_load_memreg(ARMREG_LR, function_number + (u32)REG_USERDEF);        \
+  ARM_BLX(0, ARMREG_LR)                                                       \
 
 /* The branch target is to be filled in later (thus a 0 for now) */
 
@@ -406,15 +428,16 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
  */
 
 #define generate_branch_idle_eliminate(writeback_location, new_pc, mode)      \
-  generate_function_call(arm_update_gba_idle_##mode);                         \
+  generate_function_far_call(armfn_gbaup_idle_##mode);                        \
   write32(new_pc);                                                            \
   generate_branch_filler(ARMCOND_AL, writeback_location)                      \
 
 #define generate_branch_update(writeback_location, new_pc, mode)              \
   ARM_MOV_REG_IMMSHIFT(0, reg_a0, reg_cycles, ARMSHIFT_LSR, 31);              \
-  ARM_ADD_REG_IMMSHIFT(0, ARMREG_PC, ARMREG_PC, reg_a0, ARMSHIFT_LSL, 2);     \
+  /* If counter is negative, skip the update call (2 insts) */                \
+  ARM_ADD_REG_IMMSHIFT(0, ARMREG_PC, ARMREG_PC, reg_a0, ARMSHIFT_LSL, 3);     \
   write32(new_pc);                                                            \
-  generate_function_call(arm_update_gba_##mode);                              \
+  generate_function_far_call(armfn_gbaup_##mode);   /* 2 instructions */      \
   generate_branch_filler(ARMCOND_AL, writeback_location)                      \
 
 
@@ -435,7 +458,7 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
 /* a0 holds the destination */
 
 #define generate_indirect_branch_no_cycle_update(type)                        \
-  ARM_B(0, arm_relative_offset(translation_ptr, arm_indirect_branch_##type))  \
+  ARM_LDR_IMM(0, ARMREG_PC, reg_base, 4*(REG_USERDEF + armfn_indirect_##type));
 
 #define generate_indirect_branch_cycle_update(type)                           \
   generate_cycle_update();                                                    \
@@ -483,7 +506,10 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
   {                                                                           \
     ARM_STR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
   }                                                                           \
-}                                                                             \
+}
+
+#define generate_load_memreg(ireg, reg_index)                                 \
+  ARM_LDR_IMM(0, ireg, reg_base, ((reg_index) * 4));                          \
 
 #define arm_generate_load_reg(ireg, reg_index)                                \
 {                                                                             \
@@ -494,7 +520,7 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    ARM_LDR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
+    ARM_LDR_IMM(0, ireg, reg_base, ((reg_index) * 4));                        \
   }                                                                           \
 }                                                                             \
 
@@ -507,7 +533,7 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    ARM_LDR_IMM(0, ireg, reg_base, (reg_index * 4));                          \
+    ARM_LDR_IMM(0, ireg, reg_base, ((reg_index) * 4));                        \
   }                                                                           \
 }                                                                             \
 
@@ -638,7 +664,7 @@ u32 thumb_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_
     {                                                                         \
       generate_cycle_update();                                                \
     }                                                                         \
-    generate_function_call(execute_spsr_restore);                             \
+    generate_function_far_call(armfn_spsr_restore);                           \
   }                                                                           \
   else                                                                        \
   {                                                                           \
@@ -1162,7 +1188,7 @@ u32 execute_spsr_restore_body(u32 pc)
 #define arm_psr_read_cpsr()                                                   \
 {                                                                             \
   u32 _rd = arm_prepare_store_reg(reg_a0, rd);                                \
-  arm_generate_load_reg(_rd, REG_CPSR);                                       \
+  generate_load_memreg(_rd, REG_CPSR);                                        \
   generate_save_flags();                                                      \
   ARM_BIC_REG_IMM(0, _rd, _rd, 0xF0, arm_imm_lsl_to_rot(24));                 \
   ARM_AND_REG_IMM(0, reg_flags, reg_flags, 0xF0, arm_imm_lsl_to_rot(24));     \
@@ -1206,21 +1232,21 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   return 0;
 }
 
-#ifdef TRACE_INSTRUCTIONS
-  void trace_instruction(u32 pc, u32 mode)
-  {
-    if (mode)
-      printf("Executed arm %x\n", pc);
-    else
-      printf("Executed thumb %x\n", pc);
-  }
+static void trace_instruction(u32 pc, u32 mode)
+{
+  if (mode)
+    printf("Executed arm %x\n", pc);
+  else
+    printf("Executed thumb %x\n", pc);
+}
 
+#ifdef TRACE_INSTRUCTIONS
   #define emit_trace_instruction(pc, mode)         \
     generate_save_flags();                         \
     ARM_STMDB_WB(0, ARMREG_SP, 0x500C);            \
     arm_load_imm_32bit(reg_a0, pc);                \
     arm_load_imm_32bit(reg_a1, mode);              \
-    generate_function_call(trace_instruction);     \
+    generate_function_far_call(armfn_debug_trace); \
     ARM_LDMIA_WB(0, ARMREG_SP, 0x500C);            \
     generate_restore_flags();
   #define emit_trace_thumb_instruction(pc)         \
@@ -1240,7 +1266,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_psr_store_cpsr()                                                  \
   arm_load_imm_32bit(reg_a1, psr_masks[psr_field]);                           \
-  generate_function_call(execute_store_cpsr);                                 \
+  generate_function_far_call(armfn_store_cpsr);                               \
   write32(pc)                                                                 \
 
 #define arm_psr_store_spsr()                                                  \
@@ -1883,7 +1909,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_indirect_branch_dual();                                            \
 
 #define arm_swi()                                                             \
-  generate_function_call(execute_swi_arm);                                    \
+  generate_function_far_call(armfn_swi_arm);                                  \
   write32((pc + 4));                                                          \
   generate_branch(arm)                                                        \
 
@@ -1913,13 +1939,13 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 }                                                                             \
 
 #define thumb_process_cheats()                                                \
-  generate_function_call(thumb_cheat_hook);
+  generate_function_far_call(armfn_cheat_thumb);
 
 #define arm_process_cheats()                                                  \
-  generate_function_call(arm_cheat_hook);
+  generate_function_far_call(armfn_cheat_arm);
 
 #define thumb_swi()                                                           \
-  generate_function_call(execute_swi_thumb);                                  \
+  generate_function_far_call(armfn_swi_thumb);                              \
   write32((pc + 2));                                                          \
   /* We're in ARM mode now */                                                 \
   generate_branch(arm)                                                        \
@@ -1996,7 +2022,7 @@ void init_emitter(void) {
   ARM_RSB_REG_IMM_COND(0, reg_x1, reg_x1, 0, 0, ARMCOND_MI);
 
   // Register R3 stores the abs(r0/r1), store it in the right reg/mem-reg
-  arm_generate_load_reg(reg_a2, REG_CPSR);
+  generate_load_memreg(reg_a2, REG_CPSR);
   ARM_TST_REG_IMM8(0, reg_a2, 0x20);
   arm_generate_store_reg(reg_a1, 3 /* r3 */);
   ARM_MOV_REG_REG_COND(0, reg_x3, reg_a1, ARMCOND_NE);
@@ -2008,6 +2034,23 @@ void init_emitter(void) {
   // Now generate BIOS hooks
   rom_cache_watermark = (u32)(translation_ptr - rom_translation_cache);
   init_bios_hooks();
+
+  // Intialize function table
+  reg[REG_USERDEF + armfn_gbaup_idle_arm]   = (u32)arm_update_gba_idle_arm;
+  reg[REG_USERDEF + armfn_gbaup_idle_thumb] = (u32)arm_update_gba_idle_thumb;
+  reg[REG_USERDEF + armfn_gbaup_arm]   = (u32)arm_update_gba_arm;
+  reg[REG_USERDEF + armfn_gbaup_thumb] = (u32)arm_update_gba_thumb;
+  reg[REG_USERDEF + armfn_swi_arm]   = (u32)execute_swi_arm;
+  reg[REG_USERDEF + armfn_swi_thumb] = (u32)execute_swi_thumb;
+  reg[REG_USERDEF + armfn_cheat_arm]   = (u32)arm_cheat_hook;
+  reg[REG_USERDEF + armfn_cheat_thumb] = (u32)thumb_cheat_hook;
+  reg[REG_USERDEF + armfn_store_cpsr]   = (u32)execute_store_cpsr;
+  reg[REG_USERDEF + armfn_spsr_restore] = (u32)execute_spsr_restore;
+  reg[REG_USERDEF + armfn_indirect_arm]   = (u32)arm_indirect_branch_arm;
+  reg[REG_USERDEF + armfn_indirect_thumb] = (u32)arm_indirect_branch_thumb;
+  reg[REG_USERDEF + armfn_indirect_dual_arm]   = (u32)arm_indirect_branch_dual_arm;
+  reg[REG_USERDEF + armfn_indirect_dual_thumb] = (u32)arm_indirect_branch_dual_thumb;
+  reg[REG_USERDEF + armfn_debug_trace] = (u32)trace_instruction;
 }
 
 u32 execute_arm_translate_internal(u32 cycles, void *regptr);

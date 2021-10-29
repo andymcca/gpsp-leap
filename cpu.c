@@ -3754,7 +3754,7 @@ thumb_loop:
 void init_cpu(void)
 {
   // Initialize CPU registers
-  memset(reg, 0, sizeof(reg));
+  memset(reg, 0, REG_USERDEF * sizeof(u32));
   memset(reg_mode, 0, sizeof(reg_mode));
   memset(spsr, 0, sizeof(spsr));
 

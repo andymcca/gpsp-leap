@@ -91,6 +91,9 @@ typedef enum
   REG_SAVE4         = 30,
   REG_SAVE5         = 31,
 
+  /* Machine defined storage */
+  REG_USERDEF       = 32,
+
   REG_MAX           = 64
 } ext_reg_numbers;
 
