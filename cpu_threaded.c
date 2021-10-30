@@ -215,7 +215,7 @@ extern u8 bit_count[256];
 
 /* Include the right emitter headers */
 #if defined(MIPS_ARCH)
-  #include "psp/mips_emit.h"
+  #include "mips/mips_emit.h"
 #elif defined(ARM_ARCH)
   #include "arm/arm_emit.h"
 #else

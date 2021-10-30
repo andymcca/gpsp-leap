@@ -38,7 +38,7 @@ ifeq ($(CPU_ARCH), arm)
 SOURCES_ASM += $(CORE_DIR)/arm/arm_stub.S
 endif
 ifeq ($(CPU_ARCH), mips)
-SOURCES_ASM += $(CORE_DIR)/psp/mips_stub.S
+SOURCES_ASM += $(CORE_DIR)/mips/mips_stub.S
 endif
 endif
 
