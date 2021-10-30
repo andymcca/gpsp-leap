@@ -1973,7 +1973,7 @@ void init_emitter(void) {
   // Generate handler table
   memcpy(ldst_lookup_tables, ldst_handler_functions, sizeof(ldst_lookup_tables));
 
-  rom_cache_watermark = 0;
+  rom_cache_watermark = INITIAL_ROM_WATERMARK;
   u8 *translation_ptr = (u8*)&rom_translation_cache[0];
 
   // Generate ARMv5+ division code, uses a mix of libgcc and some open bioses.

@@ -58,10 +58,24 @@ u32 iwram_code_min = ~0U;
 u32 iwram_code_max =  0U;
 u32 ewram_code_min = ~0U;
 u32 ewram_code_max =  0U;
-u32 rom_cache_watermark = 0;
+
+#define INITIAL_ROM_WATERMARK   16   // To avoid NULL aliasing
+u32 rom_cache_watermark = INITIAL_ROM_WATERMARK;
 
 u8 *bios_swi_entrypoint = NULL;
-u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
+
+// Contains an offset table to rom_translation cache area
+// It features a chaining linked list for collisions
+// The rom area has a small header section that contains:
+//  - PC value for the entry
+//  - Offset to the next entry (if any)
+typedef struct
+{
+  u32 pc_value;
+  u32 next_entry;
+} hashhdr_type;
+
+u32 rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 
 typedef struct
 {
@@ -2621,21 +2635,25 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
     case 0x0:                                                                 \
     case 0x8 ... 0xD:                                                         \
     {                                                                         \
-      u32 hash_target = ((pc * 2654435761U) >> 16) &                          \
-       (ROM_BRANCH_HASH_SIZE - 1);                                            \
-      u32 *block_ptr = rom_branch_hash[hash_target];                          \
-      u32 **block_ptr_address = rom_branch_hash + hash_target;                \
-      while(block_ptr)                                                        \
+      u32 hash_target = ((pc * 2654435761U) >> (32 - ROM_BRANCH_HASH_BITS))   \
+                                              & (ROM_BRANCH_HASH_SIZE - 1);   \
+                                                                              \
+      hashhdr_type *bhdr;                                                     \
+      u32 blk_offset = rom_branch_hash[hash_target];                          \
+      u32 *blk_offset_addr = &rom_branch_hash[hash_target];                   \
+      while(blk_offset)                                                       \
       {                                                                       \
-        if(block_ptr[0] == pc)                                                \
+        bhdr = (hashhdr_type*)&rom_translation_cache[blk_offset];             \
+        if(bhdr->pc_value == pc)                                              \
         {                                                                     \
-          block_address = (u8 *)(block_ptr + 2) + block_prologue_size;        \
+          block_address = &rom_translation_cache[blk_offset +                 \
+                              sizeof(hashhdr_type) + block_prologue_size];    \
           break;                                                              \
         }                                                                     \
-        block_ptr_address = (u32 **)(block_ptr + 1);                          \
-        block_ptr = (u32 *)block_ptr[1];                                      \
+        blk_offset = bhdr->next_entry;                                        \
+        blk_offset_addr = &bhdr->next_entry;                                  \
       }                                                                       \
-      if(!block_ptr)                                                          \
+      if(!blk_offset)                                                         \
       {                                                                       \
         __label__ redo;                                                       \
         s32 translation_result;                                               \
@@ -2643,10 +2661,11 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
         redo:                                                                 \
                                                                               \
         translation_recursion_level++;                                        \
-        ((u32 *)rom_translation_ptr)[0] = pc;                                 \
-        ((u32 **)rom_translation_ptr)[1] = NULL;                              \
-        *block_ptr_address = (u32 *)rom_translation_ptr;                      \
-        rom_translation_ptr += 8;                                             \
+        bhdr = (hashhdr_type*)rom_translation_ptr;                            \
+        bhdr->pc_value = pc;                                                  \
+        bhdr->next_entry = 0;                                                 \
+        *blk_offset_addr = (u32)(rom_translation_ptr - rom_translation_cache);\
+        rom_translation_ptr += sizeof(hashhdr_type);                          \
         block_address = rom_translation_ptr + block_prologue_size;            \
         block_lookup_translate_##type(rom, 0);                                \
         translation_recursion_level--;                                        \

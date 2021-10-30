@@ -2304,7 +2304,7 @@ extern u32 x86_table_info[3][16];
 void init_emitter(void) {
   memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));
 
-  rom_cache_watermark = 0;
+  rom_cache_watermark = INITIAL_ROM_WATERMARK;
   init_bios_hooks();
 }
 

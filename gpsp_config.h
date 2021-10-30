@@ -22,6 +22,7 @@
    Check cpu_threaded.c for "memory tagging" for more info. */
 
 /* Hash table size for ROM trans cache lookups */
-#define ROM_BRANCH_HASH_SIZE (1024 * 64)
+#define ROM_BRANCH_HASH_BITS                           16
+#define ROM_BRANCH_HASH_SIZE   (1 << ROM_BRANCH_HASH_BITS)
 
 #endif

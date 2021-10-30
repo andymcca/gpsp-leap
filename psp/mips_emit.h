@@ -3213,7 +3213,7 @@ static void emit_phand(
 void init_emitter() {
   int i;
   // Initialize memory to a debuggable state
-  rom_cache_watermark = 0;
+  rom_cache_watermark = INITIAL_ROM_WATERMARK;
 
   // Generates the trampoline and helper stubs that we need
   u8 *translation_ptr = (u8*)&rom_translation_cache[0];
