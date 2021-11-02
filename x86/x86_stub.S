@@ -76,6 +76,8 @@ _##symbol:
 .equ IORAM_OFF,          0xA8D00
 .equ SPSR_OFF,           0xA9100
 
+#define REG_CYCLES          %ebp
+
 # destroys ecx and edx
 
 .macro collapse_flag offset, shift
@@ -129,7 +131,7 @@ defsymbl(x86_update_gba)
 
   call _update_gba            # process the next event
 
-  mov %eax, %edi              # edi = new cycle count
+  mov %eax, REG_CYCLES        # new cycle count
 
   # did we just complete a frame? go back to main then
   cmpl $0, COMPLETED_FRAME(%ebx)
@@ -145,7 +147,6 @@ defsymbl(x86_update_gba)
 # for BX and data processing to PC with the S bit set.
 
 # eax: GBA address to branch to
-# edi: Cycle counter
 
 defsymbl(x86_indirect_branch_arm)
   call _block_lookup_address_arm
@@ -193,7 +194,7 @@ alert_loop:
   cmp $0, %edx                # 0 means it has
   jnz alert_loop              # if not go again
 
-  mov %eax, %edi              # edi = new cycle count
+  mov %eax, REG_CYCLES        # load new cycle count
   jmp lookup_pc               # pc has definitely changed
 
 no_alert:
@@ -445,7 +446,7 @@ defsymbl(execute_arm_translate_internal)
 
   movl %edx, %ebx             # load base register (arg1)
   extract_flags               # load flag variables
-  movl %eax, %edi             # load edi cycle counter (arg0)
+  movl %eax, REG_CYCLES       # load cycle counter (arg0)
 
   movl REG_PC(%ebx), %eax     # load PC
 

@@ -393,13 +393,13 @@ typedef enum
 #define x86_emit_jmp_reg(source)                                              \
   x86_emit_opcode_1b_ext_reg(jmp_reg, source)                                 \
 
-#define reg_base    ebx
-#define reg_cycles  edi
+#define reg_base    ebx        // Saved register
+#define reg_cycles  ebp        // Saved register
 #define reg_a0      eax
 #define reg_a1      edx
 #define reg_a2      ecx
 #define reg_rv      eax
-#define reg_s0      esi
+#define reg_s0      esi        // Any saved register
 
 /* Offsets from reg_base, see stub.S */
 #define SPSR_BASE_OFF   0xA9100
