@@ -221,6 +221,9 @@ typedef enum
 #define x86_emit_mov_reg_mem_idx(dest, base, scale, index, offset)            \
   x86_emit_opcode_1b_mem_sib(mov_reg_rm, dest, base, index, scale, offset)    \
 
+#define x86_emit_mov_mem_idx_reg(dest, base, scale, index, offset)            \
+  x86_emit_opcode_1b_mem_sib(mov_rm_reg, dest, base, index, scale, offset)    \
+
 #define x86_emit_mov_mem_reg(source, base, offset)                            \
   x86_emit_opcode_1b_mem(mov_rm_reg, source, base, offset)                    \
 
@@ -425,6 +428,9 @@ typedef enum
 #define generate_load_spsr(ireg, idxr)                                        \
   x86_emit_mov_reg_mem_idx(reg_##ireg, reg_base, 2, reg_##idxr, SPSR_BASE_OFF);
 
+#define generate_store_spsr(ireg, idxr)                                       \
+  x86_emit_mov_mem_idx_reg(reg_##ireg, reg_base, 2, reg_##idxr, SPSR_BASE_OFF);
+
 #define generate_load_reg(ireg, reg_index)                                    \
   x86_emit_mov_reg_mem(reg_##ireg, reg_base, reg_index * 4);                  \
 
@@ -435,7 +441,10 @@ typedef enum
   x86_emit_mov_reg_imm(reg_##ireg, imm)                                       \
 
 #define generate_store_reg(ireg, reg_index)                                   \
-  x86_emit_mov_mem_reg(reg_##ireg, reg_base, reg_index * 4)                   \
+  x86_emit_mov_mem_reg(reg_##ireg, reg_base, (reg_index) * 4)                 \
+
+#define generate_store_reg_i32(imm32, reg_index)                              \
+  x86_emit_mov_mem_imm((imm32), reg_base, (reg_index) * 4)                    \
 
 #define generate_shift_left(ireg, imm)                                        \
   x86_emit_shl_reg_imm(reg_##ireg, imm)                                       \
@@ -1376,12 +1385,6 @@ u32 function_cc execute_store_cpsr_body(u32 _cpsr)
 }
 
 
-void function_cc execute_store_spsr(u32 new_spsr, u32 store_mask)
-{
-  u32 _spsr = spsr[reg[CPU_MODE]];
-  spsr[reg[CPU_MODE]] = (new_spsr & store_mask) | (_spsr & (~store_mask));
-}
-
 #define arm_psr_load_new_reg()                                                \
   generate_load_reg(a0, rm)                                                   \
 
@@ -1389,11 +1392,23 @@ void function_cc execute_store_spsr(u32 new_spsr, u32 store_mask)
   ror(imm, imm, imm_ror);                                                     \
   generate_load_imm(a0, imm)                                                  \
 
+#define execute_store_cpsr()                                                  \
+  generate_load_imm(a1, psr_masks[psr_field]);                                \
+  generate_store_reg_i32(pc + 4, REG_SAVE2);                                  \
+  generate_function_call(execute_store_cpsr)                                  \
+
+/* spsr[reg[CPU_MODE]] = (new_spsr & store_mask) | (old_spsr & (~store_mask))*/
+#define execute_store_spsr()                                                  \
+  generate_load_reg(a2, CPU_MODE);                                            \
+  generate_load_spsr(a1, a2);                                                 \
+  generate_and_imm(a0,  psr_masks[psr_field]);                                \
+  generate_and_imm(a1, ~psr_masks[psr_field]);                                \
+  generate_or(a0, a1);                                                        \
+  generate_store_spsr(a0, a2);                                                \
+
 #define arm_psr_store(op_type, psr_reg)                                       \
   arm_psr_load_new_##op_type();                                               \
-  generate_load_imm(a1, psr_masks[psr_field]);                                \
-  generate_load_pc(a2, (pc + 4));                                             \
-  generate_function_call(execute_store_##psr_reg)                             \
+  execute_store_##psr_reg();                                                  \
 
 #define arm_psr(op_type, transfer_type, psr_reg)                              \
 {                                                                             \
@@ -1477,7 +1492,7 @@ u32 function_cc execute_load_s16(u32 address)
 #define arm_access_memory_store(mem_type)                                     \
   cycle_count++;                                                              \
   generate_load_reg_pc(a1, rd, 12);                                           \
-  generate_load_pc(a2, (pc + 4));                                             \
+  generate_store_reg_i32(pc + 4, REG_PC);                                     \
   generate_function_call(execute_store_##mem_type)                            \
 
 #define no_op                                                                 \
@@ -1556,11 +1571,6 @@ u32 function_cc execute_load_s16(u32 address)
 #define word_bit_count(word)                                                  \
   (bit_count[word >> 8] + bit_count[word & 0xFF])                             \
 
-#define sprint_no(access_type, pre_op, post_op, wb)                           \
-
-#define sprint_yes(access_type, pre_op, post_op, wb)                          \
-  printf("sbit on %s %s %s %s\n", #access_type, #pre_op, #post_op, #wb)       \
-
 u32 function_cc execute_aligned_load32(u32 address)
 {
   u8 *map;
@@ -1583,7 +1593,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define arm_block_memory_final_store()                                        \
   generate_load_reg_pc(a1, i, 12);                                            \
-  generate_load_pc(a2, (pc + 4));                                             \
+  generate_store_reg_i32(pc + 4, REG_PC);                                     \
   generate_function_call(execute_store_u32)                                   \
 
 #define arm_block_memory_adjust_pc_store()                                    \
@@ -1856,8 +1866,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 // Operation types: imm, mem_reg, mem_imm
 
 #define thumb_load_pc_pool_const(reg_rd, value)                               \
-  generate_load_pc(a0, (value));                                              \
-  generate_store_reg(a0, reg_rd)
+  generate_store_reg_i32(value, reg_rd)                                       \
 
 #define thumb_access_memory_load(mem_type, reg_rd)                            \
   cycle_count += 2;                                                           \
@@ -1867,7 +1876,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 #define thumb_access_memory_store(mem_type, reg_rd)                           \
   cycle_count++;                                                              \
   generate_load_reg(a1, reg_rd);                                              \
-  generate_load_pc(a2, (pc + 2));                                             \
+  generate_store_reg_i32(pc + 2, REG_PC);                                     \
   generate_function_call(execute_store_##mem_type)                            \
 
 #define thumb_access_memory_generate_address_pc_relative(offset, _rb, _ro)    \
@@ -1955,7 +1964,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define thumb_block_memory_final_store()                                      \
   generate_load_reg(a1, i);                                                   \
-  generate_load_pc(a2, (pc + 2));                                             \
+  generate_store_reg_i32(pc + 2, REG_PC);                                     \
   generate_function_call(execute_store_u32)                                   \
 
 #define thumb_block_memory_final_no(access_type)                              \

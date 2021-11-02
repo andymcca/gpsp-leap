@@ -254,10 +254,8 @@ ext_store_backup:
 
 # eax: address to write to
 # edx: value to write
-# ecx: current pc
 
 defsymbl(execute_store_u8)
-  mov %ecx, REG_PC(%ebx)      # write out the PC
   mov %eax, %ecx              # ecx = address
   shr $24, %ecx               # ecx = address >> 24
   cmp $15, %ecx
@@ -325,7 +323,6 @@ ext_store_rtc:
   jmp _write_rtc              # write out RTC register
 
 defsymbl(execute_store_u16)
-  mov %ecx, REG_PC(%ebx)      # write out the PC
   and $~0x01, %eax            # fix alignment
   mov %eax, %ecx              # ecx = address
   shr $24, %ecx               # ecx = address >> 24
@@ -380,7 +377,6 @@ ext_store_oam32:
   ret
 
 defsymbl(execute_store_u32)
-  mov %ecx, REG_PC(%ebx)      # write out the PC
   and $~0x03, %eax            # fix alignment
   mov %eax, %ecx              # ecx = address
   shr $24, %ecx               # ecx = address >> 24
@@ -394,7 +390,6 @@ defsymbl(execute_store_u32)
 
 defsymbl(execute_store_cpsr)
   mov %edx, REG_SAVE(%ebx)        # save store_mask
-  mov %ecx, REG_SAVE2(%ebx)       # save PC too
 
   mov %eax, %ecx                  # ecx = new_cpsr
   and %edx, %ecx                  # ecx = new_cpsr & store_mask
