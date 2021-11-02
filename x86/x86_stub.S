@@ -64,9 +64,10 @@ _##symbol:
 .equ REG_SAVE4,         (30 * 4)
 .equ REG_SAVE5,         (31 * 4)
 
-.equ ESTORE_U32_TBL,   -(16 * 4)
-.equ ESTORE_U16_TBL,   -(32 * 4)
-.equ ESTORE_U8_TBL,    -(48 * 4)
+.equ store_aligned_u32_tbl, -(16 * 4)
+.equ store_u32_tbl,         -(32 * 4)
+.equ store_u16_tbl,         -(48 * 4)
+.equ store_u8_tbl,          -(64 * 4)
 .equ PALETTE_RAM_OFF,     0x0100
 .equ PALETTE_RAM_CNV_OFF, 0x0500
 .equ OAM_RAM_OFF,         0x0900
@@ -173,6 +174,18 @@ defsymbl(x86_indirect_branch_dual)
 ext_store_ignore:
   ret                         # ignore these writes
 
+ext_store_rtc:
+  and $0xFFFF, %edx           # make value 16bit
+  and $0xFF, %eax             # mask address
+  jmp _write_rtc              # write out RTC register
+
+ext_store_backup:
+  and $0xFF, %edx             # make value 8bit
+  and $0xFFFF, %eax           # mask address
+  jmp _write_backup           # perform backup write
+
+
+
 write_epilogue:
   cmp $0, %eax                # 0 return means nothing happened
   jz no_alert                 # if so we can leave
@@ -204,90 +217,85 @@ ext_store_eeprom:
   jmp _write_eeprom           # perform eeprom write
 
 
-# 8bit ext memory routines
+# Register wrapping for various sizes
+#define reg32(n) %e##n##x
+#define reg16(n)  %##n##x
+#define reg8(n)   %##n##l
 
-ext_store_iwram8:
-  and $0x7FFF, %eax                  # wrap around address
-  mov %dl, (IWRAM_OFF+0x8000)(%ebx, %eax)  # perform store
-  cmpb $0, IWRAM_OFF(%ebx, %eax)     # Check SMC mirror
+# 16 bit bus results in duplicated 8bit accesses
+#define dup8()  mov %dl, %dh
+#define noop()
+
+# Writes to EWRAM and IWRAM must check for SMC
+#define smc_check_store_aligned(opsuf, addrexp)
+#define smc_check_store(opsuf, addrexp)                                      ;\
+  cmp##opsuf $0, addrexp                            /* Check SMC mirror */   ;\
   jne smc_write
-  ret
 
-ext_store_ewram8:
-  and $0x3FFFF, %eax                # wrap around address
-  mov %dl, EWRAM_OFF(%ebx, %eax)    # perform store
-  cmpb $0, (EWRAM_OFF+0x40000)(%ebx, %eax)   # Check SMC mirror
-  jne smc_write
-  ret
+# Memory write routines
 
-ext_store_io8:
-  and $0x3FF, %eax            # wrap around address
-  call _write_io_register8    # perform 8bit I/O register write
-  jmp write_epilogue          # see if it requires any system update
+#define write_stubs(fname, wsize, opsuf, regfn, regfn16, addrm, dup8fn)      ;\
+                                                                             ;\
+  /* eax: address to write to */                                             ;\
+  /* edx: value to write */                                                  ;\
+                                                                             ;\
+defsymbl(execute_##fname##_u##wsize)                                         ;\
+  mov %eax, %ecx                                 /* ecx = address */         ;\
+  shr $24, %ecx                                  /* ecx = address >> 24 */   ;\
+  cmp $15, %ecx                                                              ;\
+  ja ext_store_ignore                                                        ;\
+  /* ecx = ext_store_u*_jtable[address >> 24] */                             ;\
+  jmp *fname##_u##wsize##_tbl(%ebx, %ecx, 4)                                 ;\
+                                                                             ;\
+ext_##fname##_iwram##wsize:                                                  ;\
+  and $(0x7FFF & addrm), %eax                              /* Addr wrap */   ;\
+  mov regfn(d), (IWRAM_OFF+0x8000)(%ebx, %eax)          /* Actual write */   ;\
+  smc_check_##fname(opsuf, IWRAM_OFF(%ebx, %eax))                            ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_##fname##_ewram##wsize:                                                  ;\
+  and $(0x3FFFF & addrm), %eax                             /* Addr wrap */   ;\
+  mov regfn(d), EWRAM_OFF(%ebx, %eax)                   /* Actual write */   ;\
+  smc_check_##fname(opsuf, (EWRAM_OFF+0x40000)(%ebx, %eax))                  ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_##fname##_vram##wsize:                                                   ;\
+  and $(0x1FFFE & addrm), %eax                             /* Addr wrap */   ;\
+  dup8fn()                                 /* Double byte for 8b access */   ;\
+  cmp $0x18000, %eax                               /* Weird 96KB mirror */   ;\
+  jb 1f                                                                      ;\
+  sub $0x8000, %eax                                 /* Mirror last bank */   ;\
+1:                                                                           ;\
+  mov regfn16(d), VRAM_OFF(%ebx, %eax)                  /* Actual write */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_##fname##_oam##wsize:                                                    ;\
+  and $(0x3FE & addrm), %eax                               /* Addr wrap */   ;\
+  movl $1, OAM_UPDATED(%ebx)                         /* flag OAM update */   ;\
+  dup8fn()                                 /* Double byte for 8b access */   ;\
+  mov regfn16(d), OAM_RAM_OFF(%ebx, %eax)               /* Actual write */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_##fname##_io##wsize:                                                     ;\
+  and $(0x3FF & addrm), %eax                               /* Addr wrap */   ;\
+  call _write_io_register##wsize                         /* Call C code */   ;\
+  jmp write_epilogue                            /* Might need an update */   ;\
+
+
+write_stubs(store,         32, l, reg32, reg32, ~3, noop)
+write_stubs(store,         16, w, reg16, reg16, ~1, noop)
+write_stubs(store,          8, b,  reg8, reg16, ~0, dup8)
+write_stubs(store_aligned, 32, l, reg32, reg32, ~3, noop)
+
+# Palette routines are a bit special, due to 16bit bus + decoded palette
 
 ext_store_palette8:
   and $0x3FE, %eax            # wrap around address and align to 16bits
+  mov %dl, %dh                # duplicate the byte to be written
   jmp ext_store_palette16b    # perform 16bit palette write
-
-ext_store_vram8:
-  and $0x1FFFE, %eax          # wrap around address and align to 16bits
-  mov %dl, %dh                # copy lower 8bits of value into full 16bits
-  cmp $0x18000, %eax          # see if address is in upper region
-  jb ext_store_vram8b
-  sub $0x8000, %eax           # if so wrap down
-
-ext_store_vram8b:
-  mov %dx, VRAM_OFF(%ebx, %eax)  # perform 16bit store
-  ret
-
-ext_store_oam8:
-  movl $1, OAM_UPDATED(%ebx)  # flag OAM update
-  and $0x3FE, %eax            # wrap around address and align to 16bits
-  mov %dl, %dh                # copy lower 8bits of value into full 16bits
-  mov %dx, OAM_RAM_OFF(%ebx, %eax)  # perform 16bit store
-  ret
-
-ext_store_backup:
-  and $0xFF, %edx             # make value 8bit
-  and $0xFFFF, %eax           # mask address
-  jmp _write_backup           # perform backup write
-
-# eax: address to write to
-# edx: value to write
-
-defsymbl(execute_store_u8)
-  mov %eax, %ecx              # ecx = address
-  shr $24, %ecx               # ecx = address >> 24
-  cmp $15, %ecx
-  ja ext_store_ignore
-  # ecx = ext_store_u8_jtable[address >> 24]
-  jmp *ESTORE_U8_TBL(%ebx, %ecx, 4)
-
-# 16bit ext memory routines
-
-ext_store_iwram16:
-  and $0x7FFF, %eax                 # wrap around address
-  mov %dx, (IWRAM_OFF+0x8000)(%ebx, %eax)  # perform store
-  cmpw $0, IWRAM_OFF(%ebx, %eax)     # Check SMC mirror
-
-  jne smc_write
-  ret
-
-ext_store_ewram16:
-  and $0x3FFFF, %eax                # wrap around address
-  mov %dx, EWRAM_OFF(%ebx, %eax)    # perform store
-  cmpw $0, (EWRAM_OFF+0x40000)(%ebx, %eax)  # Check SMC mirror
-  jne smc_write
-  ret
-
-ext_store_io16:
-  and $0x3FF, %eax            # wrap around address
-  call _write_io_register16   # perform 16bit I/O register write
-  jmp write_epilogue          # see if it requires any system update
 
 ext_store_palette16:
   and $0x3FF, %eax            # wrap around address
-
 ext_store_palette16b:         # entry point for 8bit write
   mov %dx, PALETTE_RAM_OFF(%ebx, %eax) # write out palette value
   mov %edx, %ecx              # cx = dx
@@ -301,58 +309,6 @@ ext_store_palette16b:         # entry point for 8bit write
   mov %cx, PALETTE_RAM_CNV_OFF(%ebx, %eax)
   ret                         # done
 
-ext_store_vram16:
-  and $0x1FFFF, %eax          # wrap around address
-  cmp $0x18000, %eax          # see if address is in upper region
-  jb ext_store_vram16b
-  sub $0x8000, %eax           # if so wrap down
-
-ext_store_vram16b:
-  mov %dx, VRAM_OFF(%ebx, %eax)  # perform 16bit store
-  ret
-
-ext_store_oam16:
-  movl $1, OAM_UPDATED(%ebx)  # flag OAM update
-  and $0x3FF, %eax            # wrap around address
-  mov %dx, OAM_RAM_OFF(%ebx, %eax)  # perform 16bit store
-  ret
-
-ext_store_rtc:
-  and $0xFFFF, %edx           # make value 16bit
-  and $0xFF, %eax             # mask address
-  jmp _write_rtc              # write out RTC register
-
-defsymbl(execute_store_u16)
-  and $~0x01, %eax            # fix alignment
-  mov %eax, %ecx              # ecx = address
-  shr $24, %ecx               # ecx = address >> 24
-  cmp $15, %ecx
-  ja ext_store_ignore
-  # ecx = ext_store_u16_jtable[address >> 24]
-  jmp *ESTORE_U16_TBL(%ebx, %ecx, 4)
-
-# 32bit ext memory routines
-
-ext_store_iwram32:
-  and $0x7FFF, %eax                 # wrap around address
-  mov %edx, (IWRAM_OFF+0x8000)(%ebx, %eax)  # perform store
-  cmpl $0, IWRAM_OFF(%ebx, %eax)     # Check SMC mirror
-
-  jne smc_write
-  ret
-
-ext_store_ewram32:
-  and $0x3FFFF, %eax                # wrap around address
-  mov %edx, EWRAM_OFF(%ebx, %eax)   # perform store
-  cmpl $0, (EWRAM_OFF+0x40000)(%ebx, %eax)  # Check SMC mirror
-  jne smc_write
-  ret
-
-ext_store_io32:
-  and $0x3FF, %eax            # wrap around address
-  call _write_io_register32   # perform 32bit I/O register write
-  jmp write_epilogue          # see if it requires any system update
-
 ext_store_palette32:
   and $0x3FF, %eax            # wrap around address
   call ext_store_palette16b   # write first 16bits
@@ -360,30 +316,6 @@ ext_store_palette32:
   shr $16, %edx               # go to next 16bits
   jmp ext_store_palette16b    # write next 16bits
 
-ext_store_vram32:
-  and $0x1FFFF, %eax          # wrap around address
-  cmp $0x18000, %eax          # see if address is in upper region
-  jb ext_store_vram32b
-  sub $0x8000, %eax           # if so wrap down
-
-ext_store_vram32b:
-  mov %edx, VRAM_OFF(%ebx, %eax)  # perform 32bit store
-  ret
-
-ext_store_oam32:
-  movl $1, OAM_UPDATED(%ebx)  # flag OAM update
-  and $0x3FF, %eax            # wrap around address
-  mov %edx, OAM_RAM_OFF(%ebx, %eax)  # perform 32bit store
-  ret
-
-defsymbl(execute_store_u32)
-  and $~0x03, %eax            # fix alignment
-  mov %eax, %ecx              # ecx = address
-  shr $24, %ecx               # ecx = address >> 24
-  cmp $15, %ecx
-  ja ext_store_ignore
-  # ecx = ext_store_u32_jtable[address >> 24]
-  jmp *ESTORE_U32_TBL(%ebx, %ecx, 4)
 
 # %eax = new_cpsr
 # %edx = store_mask
@@ -527,12 +459,30 @@ ext_store_u32_jtable:
   .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
   .long ext_store_ignore      # 0x0F ignore
 
+ext_store_aligned_u32_jtable:
+  .long ext_store_ignore              # 0x00 BIOS, ignore
+  .long ext_store_ignore              # 0x01 invalid, ignore
+  .long ext_store_aligned_ewram32     # 0x02 EWRAM
+  .long ext_store_aligned_iwram32     # 0x03 IWRAM
+  .long ext_store_io32                # 0x04 I/O registers
+  .long ext_store_palette32           # 0x05 Palette RAM
+  .long ext_store_vram32              # 0x06 VRAM
+  .long ext_store_oam32               # 0x07 OAM RAM
+  .long ext_store_ignore              # 0x08 gamepak, ignore (no RTC in 32bit)
+  .long ext_store_ignore              # 0x09 gamepak, ignore
+  .long ext_store_ignore              # 0x0A gamepak, ignore
+  .long ext_store_ignore              # 0x0B gamepak, ignore
+  .long ext_store_ignore              # 0x0C gamepak, ignore
+  .long ext_store_eeprom              # 0x0D EEPROM (possibly)
+  .long ext_store_ignore              # 0x0E Flash ROM/SRAM must be 8bit
+  .long ext_store_ignore              # 0x0F ignore
+
 
 .bss
 .align 64
 
 defsymbl(x86_table_info)
-  .space 3*4*16
+  .space 4*4*16
 defsymbl(reg)
   .space 0x100
 defsymbl(palette_ram)

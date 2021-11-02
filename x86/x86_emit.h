@@ -1577,7 +1577,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define arm_block_memory_store()                                              \
   generate_load_reg_pc(a1, i, 8);                                             \
-  generate_function_call(write_memory32)                                      \
+  generate_function_call(execute_store_aligned_u32)                           \
 
 #define arm_block_memory_final_load()                                         \
   arm_block_memory_load()                                                     \
@@ -1940,7 +1940,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 #define thumb_block_memory_extra_push_lr(base_reg)                            \
   generate_add_reg_reg_imm(a0, s0, (bit_count[reg_list] * 4));                \
   generate_load_reg(a1, REG_LR);                                              \
-  generate_function_call(write_memory32)                                      \
+  generate_function_call(execute_store_aligned_u32)                           \
 
 #define thumb_block_memory_load()                                             \
   generate_function_call(execute_aligned_load32);                             \
@@ -1948,7 +1948,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define thumb_block_memory_store()                                            \
   generate_load_reg(a1, i);                                                   \
-  generate_function_call(write_memory32)                                      \
+  generate_function_call(execute_store_aligned_u32)                           \
 
 #define thumb_block_memory_final_load()                                       \
   thumb_block_memory_load()                                                   \
@@ -2298,8 +2298,8 @@ static void function_cc execute_swi(u32 pc)
   generate_load_pc(a0, pc);                                                   \
   generate_indirect_branch_no_cycle_update(type)                              \
 
-extern u32 x86_table_data[3][16];
-extern u32 x86_table_info[3][16];
+extern u32 x86_table_data[4][16];
+extern u32 x86_table_info[4][16];
 
 void init_emitter(void) {
   memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));
