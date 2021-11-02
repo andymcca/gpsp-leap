@@ -554,13 +554,6 @@ typedef enum
 #define generate_exit_block()                                                 \
   x86_emit_ret();                                                             \
 
-#define generate_update_pc(new_pc)                                            \
-  x86_emit_mov_reg_imm(eax, new_pc)                                           \
-
-#define generate_update_pc_reg()                                              \
-  generate_update_pc(pc);                                                     \
-  generate_store_reg(a0, REG_PC)                                              \
-
 #define generate_cycle_update()                                               \
   x86_emit_sub_reg_imm(reg_cycles, cycle_count);                              \
   cycle_count = 0                                                             \
@@ -2199,7 +2192,7 @@ static void function_cc execute_swi(u32 pc)
   generate_branch()                                                           \
 
 #define arm_bl()                                                              \
-  generate_update_pc((pc + 4));                                               \
+  generate_load_pc(a0, (pc + 4));                                             \
   generate_store_reg(a0, REG_LR);                                             \
   generate_branch()                                                           \
 
@@ -2210,7 +2203,7 @@ static void function_cc execute_swi(u32 pc)
 
 #define arm_swi()                                                             \
   collapse_flags(a0, a1);                                                     \
-  generate_update_pc((pc + 4));                                               \
+  generate_load_pc(a0, (pc + 4));                                             \
   generate_function_call(execute_swi);                                        \
   generate_branch()                                                           \
 
@@ -2221,7 +2214,7 @@ static void function_cc execute_swi(u32 pc)
   block_exit_position++                                                       \
 
 #define thumb_bl()                                                            \
-  generate_update_pc(((pc + 2) | 0x01));                                      \
+  generate_load_pc(a0, ((pc + 2) | 0x01));                                    \
   generate_store_reg(a0, REG_LR);                                             \
   generate_branch_cycle_update(                                               \
    block_exits[block_exit_position].branch_source,                            \
@@ -2231,7 +2224,7 @@ static void function_cc execute_swi(u32 pc)
 #define thumb_blh()                                                           \
 {                                                                             \
   thumb_decode_branch();                                                      \
-  generate_update_pc(((pc + 2) | 0x01));                                      \
+  generate_load_pc(a0, ((pc + 2) | 0x01));                                    \
   generate_load_reg(a1, REG_LR);                                              \
   generate_store_reg(a0, REG_LR);                                             \
   generate_mov(a0, a1);                                                       \
@@ -2254,7 +2247,7 @@ static void function_cc execute_swi(u32 pc)
 
 #define thumb_swi()                                                           \
   collapse_flags(a0, a1);                                                     \
-  generate_update_pc((pc + 2));                                               \
+  generate_load_pc(a0, (pc + 2));                                             \
   generate_function_call(execute_swi);                                        \
   generate_branch_cycle_update(                                               \
    block_exits[block_exit_position].branch_source,                            \
@@ -2302,7 +2295,7 @@ static void function_cc execute_swi(u32 pc)
 }
 
 #define generate_translation_gate(type)                                       \
-  generate_update_pc(pc);                                                     \
+  generate_load_pc(a0, pc);                                                   \
   generate_indirect_branch_no_cycle_update(type)                              \
 
 extern u32 x86_table_data[3][16];
