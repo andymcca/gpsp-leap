@@ -1022,17 +1022,6 @@ typedef enum
 // This is pretty infrequent (returning from interrupt handlers, et al) so
 // probably not worth optimizing for.
 
-#define check_for_interrupts()                                                \
-  if((io_registers[REG_IE] & io_registers[REG_IF]) &&                         \
-   io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))                    \
-  {                                                                           \
-    reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;                                  \
-    spsr[MODE_IRQ] = reg[REG_CPSR];                                           \
-    reg[REG_CPSR] = 0xD2;                                                     \
-    address = 0x00000018;                                                     \
-    set_cpu_mode(MODE_IRQ);                                                   \
-  }                                                                           \
-
 #define generate_load_reg_pc(ireg, reg_index, pc_offset)                      \
   if(reg_index == 15)                                                         \
   {                                                                           \
@@ -1058,7 +1047,16 @@ u32 function_cc execute_spsr_restore(u32 address)
     reg[REG_CPSR] = spsr[reg[CPU_MODE]];
     extract_flags();
     set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
-    check_for_interrupts();
+
+    if((io_registers[REG_IE] & io_registers[REG_IF]) &&
+     io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
+    {
+      reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
+      spsr[MODE_IRQ] = reg[REG_CPSR];
+      reg[REG_CPSR] = 0xD2;
+      address = 0x00000018;
+      set_cpu_mode(MODE_IRQ);
+    }
 
     if(reg[REG_CPSR] & 0x20)
       address |= 0x01;
