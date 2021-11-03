@@ -1407,76 +1407,9 @@ u32 function_cc execute_store_cpsr_body(u32 _cpsr)
   arm_psr_##transfer_type(op_type, psr_reg);                                  \
 }                                                                             \
 
-#define aligned_address_mask8  0xF0000000
-#define aligned_address_mask16 0xF0000001
-#define aligned_address_mask32 0xF0000003
-
-#define read_memory(size, type, address, dest)                                \
-{                                                                             \
-  u8 *map;                                                                    \
-                                                                              \
-  if(((address >> 24) == 0) && (reg[REG_PC] >= 0x4000))                       \
-  {                                                                           \
-    ror(dest, bios_read_protect, (address & 0x03) << 3);                      \
-    dest = (type)dest;                                                        \
-  }                                                                           \
-  else                                                                        \
-                                                                              \
-  if(((address & aligned_address_mask##size) == 0) &&                         \
-   (map = memory_map_read[address >> 15]))                                    \
-  {                                                                           \
-    dest = (type)readaddress##size(map, (address & 0x7FFF));                  \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    dest = (type)read_memory##size(address);                                  \
-  }                                                                           \
-}                                                                             \
-
-#define read_memory_s16(address, dest)                                        \
-{                                                                             \
-  u8 *map;                                                                    \
-                                                                              \
-  if(((address >> 24) == 0) && (reg[REG_PC] >= 0x4000))                       \
-  {                                                                           \
-    ror(dest, bios_read_protect, (address & 0x03) << 3);                      \
-    dest = (s16)dest;                                                         \
-  }                                                                           \
-  else                                                                        \
-                                                                              \
-  if(((address & aligned_address_mask16) == 0) &&                             \
-   (map = memory_map_read[address >> 15]))                                    \
-  {                                                                           \
-    dest = *((s16 *)((u8 *)map + (address & 0x7FFF)));                        \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    dest = (s16)read_memory16_signed(address);                                \
-  }                                                                           \
-}                                                                             \
-
-#define access_memory_generate_read_function(mem_size, name, mem_type)        \
-u32 function_cc execute_load_##name(u32 address)                              \
-{                                                                             \
-  u32 dest;                                                                   \
-  read_memory(mem_size, mem_type, address, dest);                             \
-  return dest;                                                                \
-}                                                                             \
-
-access_memory_generate_read_function(8, u8, u8);
-access_memory_generate_read_function(8, s8, s8);
-access_memory_generate_read_function(16, u16, u32);
-access_memory_generate_read_function(32, u32, u32);
-
-u32 function_cc execute_load_s16(u32 address)
-{
-  u32 dest;
-  read_memory_s16(address, dest);
-  return dest;
-}
-
 #define arm_access_memory_load(mem_type)                                      \
   cycle_count += 2;                                                           \
+  generate_load_pc(a1, pc);                                                   \
   generate_function_call(execute_load_##mem_type);                            \
   generate_store_reg_pc_no_flags(rv, rd)                                      \
 
@@ -1562,17 +1495,10 @@ u32 function_cc execute_load_s16(u32 address)
 #define word_bit_count(word)                                                  \
   (bit_count[word >> 8] + bit_count[word & 0xFF])                             \
 
-u32 function_cc execute_aligned_load32(u32 address)
-{
-  u8 *map;
-  if(!(address & 0xF0000000) && (map = memory_map_read[address >> 15]))
-    return address32(map, address & 0x7FFF);
-  else
-    return read_memory32(address);
-}
 
 #define arm_block_memory_load()                                               \
-  generate_function_call(execute_aligned_load32);                             \
+  generate_load_pc(a1, pc);                                                   \
+  generate_function_call(execute_load_u32);                                   \
   generate_store_reg(rv, i)                                                   \
 
 #define arm_block_memory_store()                                              \
@@ -1667,6 +1593,7 @@ u32 function_cc execute_aligned_load32(u32 address)
   arm_decode_swap();                                                          \
   cycle_count += 3;                                                           \
   generate_load_reg(a0, rn);                                                  \
+  generate_load_pc(a1, pc);                                                   \
   generate_function_call(execute_load_##type);                                \
   generate_mov(s0, rv);                                                       \
   generate_load_reg(a0, rn);                                                  \
@@ -1861,6 +1788,7 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define thumb_access_memory_load(mem_type, reg_rd)                            \
   cycle_count += 2;                                                           \
+  generate_load_pc(a1, pc);                                                   \
   generate_function_call(execute_load_##mem_type);                            \
   generate_store_reg(rv, reg_rd)                                              \
 
@@ -1932,7 +1860,8 @@ u32 function_cc execute_aligned_load32(u32 address)
 
 #define thumb_block_memory_extra_pop_pc()                                     \
   generate_add_reg_reg_imm(a0, s0, (bit_count[reg_list] * 4));                \
-  generate_function_call(execute_aligned_load32);                             \
+  generate_load_pc(a1, pc);                                                   \
+  generate_function_call(execute_load_u32);                                   \
   generate_store_reg(rv, REG_PC);                                             \
   generate_mov(a0, rv);                                                       \
   generate_indirect_branch_cycle_update(thumb)                                \
@@ -1943,7 +1872,8 @@ u32 function_cc execute_aligned_load32(u32 address)
   generate_function_call(execute_store_aligned_u32)                           \
 
 #define thumb_block_memory_load()                                             \
-  generate_function_call(execute_aligned_load32);                             \
+  generate_load_pc(a1, pc);                                                   \
+  generate_function_call(execute_load_u32);                                   \
   generate_store_reg(rv, i)                                                   \
 
 #define thumb_block_memory_store()                                            \
@@ -2298,8 +2228,8 @@ static void function_cc execute_swi(u32 pc)
   generate_load_pc(a0, pc);                                                   \
   generate_indirect_branch_no_cycle_update(type)                              \
 
-extern u32 x86_table_data[4][16];
-extern u32 x86_table_info[4][16];
+extern u32 x86_table_data[9][16];
+extern u32 x86_table_info[9][16];
 
 void init_emitter(void) {
   memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));

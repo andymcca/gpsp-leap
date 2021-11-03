@@ -39,6 +39,11 @@ _##symbol:
 #define _write_eeprom write_eeprom
 #define _write_backup write_backup
 #define _write_rtc write_rtc
+#define _read_memory8 read_memory8
+#define _read_memory8s read_memory8s
+#define _read_memory16 read_memory16
+#define _read_memory16s read_memory16s
+#define _read_memory32 read_memory32
 #define _execute_store_cpsr_body execute_store_cpsr_body
 #endif
 
@@ -64,10 +69,15 @@ _##symbol:
 .equ REG_SAVE4,         (30 * 4)
 .equ REG_SAVE5,         (31 * 4)
 
-.equ store_aligned_u32_tbl, -(16 * 4)
-.equ store_u32_tbl,         -(32 * 4)
-.equ store_u16_tbl,         -(48 * 4)
-.equ store_u8_tbl,          -(64 * 4)
+.equ load_u8_tbl,           -(9 * 16 * 4)
+.equ load_s8_tbl,           -(8 * 16 * 4)
+.equ load_u16_tbl,          -(7 * 16 * 4)
+.equ load_s16_tbl,          -(6 * 16 * 4)
+.equ load_u32_tbl,          -(5 * 16 * 4)
+.equ store_u8_tbl,          -(4 * 16 * 4)
+.equ store_u16_tbl,         -(3 * 16 * 4)
+.equ store_u32_tbl,         -(2 * 16 * 4)
+.equ store_aligned_u32_tbl, -(1 * 16 * 4)
 .equ PALETTE_RAM_OFF,     0x0100
 .equ PALETTE_RAM_CNV_OFF, 0x0500
 .equ OAM_RAM_OFF,         0x0900
@@ -76,6 +86,7 @@ _##symbol:
 .equ EWRAM_OFF,          0x28D00
 .equ IORAM_OFF,          0xA8D00
 .equ SPSR_OFF,           0xA9100
+.equ RDMAP_OFF,          0xA9200
 
 #define REG_CYCLES          %ebp
 
@@ -171,15 +182,19 @@ defsymbl(x86_indirect_branch_dual)
 
 # General ext memory routines
 
+ext_store_rtc8:               # No RTC writes on byte or word access
+ext_store_rtc32:
+ext_store_backup16:           # Backup (flash) accessed via byte writes
+ext_store_backup32:
 ext_store_ignore:
   ret                         # ignore these writes
 
-ext_store_rtc:
+ext_store_rtc16:
   and $0xFFFF, %edx           # make value 16bit
   and $0xFF, %eax             # mask address
   jmp _write_rtc              # write out RTC register
 
-ext_store_backup:
+ext_store_backup8:
   and $0xFF, %edx             # make value 8bit
   and $0xFFFF, %eax           # mask address
   jmp _write_backup           # perform backup write
@@ -317,6 +332,78 @@ ext_store_palette32:
   jmp ext_store_palette16b    # write next 16bits
 
 
+# Memory load routines
+
+#define load_stubs(rtype, movop, addrm, albits, slowfn)                      ;\
+                                                                             ;\
+  /* eax: address to read */                                                 ;\
+  /* edx: current PC address */                                              ;\
+                                                                             ;\
+defsymbl(execute_load_##rtype)                                               ;\
+  mov %eax, %ecx                                /* ecx = address */          ;\
+  rol $8, %ecx                                  /* ecx = ror(address, 24) */ ;\
+  and $((1<<(8+albits))-1), %ecx                /* preserve align+msb */     ;\
+  cmp $15, %ecx                                                              ;\
+  ja ext_load_slow##rtype                                                    ;\
+  jmp *load_##rtype##_tbl(%ebx, %ecx, 4)                                     ;\
+                                                                             ;\
+ext_load_bios##rtype:                                                        ;\
+  mov %edx, REG_PC(%ebx)                            /* Store current PC */   ;\
+  jmp ext_load_slow##rtype                                                   ;\
+                                                                             ;\
+ext_load_iwram##rtype:                                                       ;\
+  and $(0x7FFF & addrm), %eax                              /* Addr wrap */   ;\
+  movop (IWRAM_OFF+0x8000)(%ebx, %eax), %eax                /* Read mem */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_ewram##rtype:                                                       ;\
+  and $(0x3FFFF & addrm), %eax                             /* Addr wrap */   ;\
+  movop EWRAM_OFF(%ebx, %eax), %eax                         /* Read mem */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_vram##rtype:                                                        ;\
+  and $(0x1FFFF & addrm), %eax                             /* Addr wrap */   ;\
+  cmp $0x18000, %eax                               /* Weird 96KB mirror */   ;\
+  jb 1f                                                                      ;\
+  sub $0x8000, %eax                                 /* Mirror last bank */   ;\
+1:                                                                           ;\
+  movop VRAM_OFF(%ebx, %eax), %eax                          /* Read mem */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_oam##rtype:                                                         ;\
+  and $(0x3FF & addrm), %eax                               /* Addr wrap */   ;\
+  movop OAM_RAM_OFF(%ebx, %eax), %eax                       /* Read mem */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_palette##rtype:                                                     ;\
+  and $(0x3FF & addrm), %eax                               /* Addr wrap */   ;\
+  movop PALETTE_RAM_OFF(%ebx, %eax), %eax                   /* Read mem */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_io##rtype:                                                          ;\
+  and $(0x3FF & addrm), %eax                               /* Addr wrap */   ;\
+  movop IORAM_OFF(%ebx, %eax), %eax                         /* Read mem */   ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_rom##rtype:                                                         ;\
+  mov %eax, %ecx                                 /* ecx = address */         ;\
+  shr $15, %ecx                                  /* ecx = address >> 15 */   ;\
+  mov RDMAP_OFF(%ebx, %ecx, 4), %edx             /* Read rdmap pointer */    ;\
+  mov %eax, %ecx                                 /* ecx = address */         ;\
+  and $0x7FFF, %ecx                              /* ecx = address LSB */     ;\
+  movop (%edx, %ecx), %eax                       /* Read mem */              ;\
+  ret                                                                        ;\
+                                                                             ;\
+ext_load_slow##rtype:                                                        ;\
+  jmp slowfn                                                                 ;\
+
+load_stubs(u32, mov,    ~3, 2, _read_memory32)
+load_stubs(u16, movzwl, ~1, 1, _read_memory16)
+load_stubs(s16, movswl, ~1, 1, _read_memory16s)
+load_stubs( u8, movzbl, ~0, 0, _read_memory8)
+load_stubs( s8, movsbl, ~0, 0, _read_memory8s)
+
+
 # %eax = new_cpsr
 # %edx = store_mask
 
@@ -402,64 +489,55 @@ return_to_main:
   popl %ebx
   ret
 
+#define load_table(atype)                                                    ;\
+  .long ext_load_bios##atype          /* 0x00 BIOS                         */;\
+  .long ext_load_slow##atype          /* 0x01 open read                    */;\
+  .long ext_load_ewram##atype         /* 0x02 EWRAM                        */;\
+  .long ext_load_iwram##atype         /* 0x03 IWRAM                        */;\
+  .long ext_load_io##atype            /* 0x04 I/O registers                */;\
+  .long ext_load_palette##atype       /* 0x05 Palette RAM                  */;\
+  .long ext_load_vram##atype          /* 0x06 VRAM                         */;\
+  .long ext_load_oam##atype           /* 0x07 OAM RAM                      */;\
+  .long ext_load_rom##atype           /* 0x08 gamepak (or RTC)             */;\
+  .long ext_load_rom##atype           /* 0x09 gamepak                      */;\
+  .long ext_load_rom##atype           /* 0x0A gamepak                      */;\
+  .long ext_load_rom##atype           /* 0x0B gamepak                      */;\
+  .long ext_load_rom##atype           /* 0x0C gamepak                      */;\
+  .long ext_load_slow##atype          /* 0x0D EEPROM (possibly)            */;\
+  .long ext_load_slow##atype          /* 0x0E Flash ROM/SRAM               */;\
+  .long ext_load_slow##atype          /* 0x0F open read                    */;\
+
+#define store_table(asize)                                                   ;\
+  .long ext_store_ignore              /* 0x00 BIOS, ignore                 */;\
+  .long ext_store_ignore              /* 0x01 invalid, ignore              */;\
+  .long ext_store_ewram##asize        /* 0x02 EWRAM                        */;\
+  .long ext_store_iwram##asize        /* 0x03 IWRAM                        */;\
+  .long ext_store_io##asize           /* 0x04 I/O registers                */;\
+  .long ext_store_palette##asize      /* 0x05 Palette RAM                  */;\
+  .long ext_store_vram##asize         /* 0x06 VRAM                         */;\
+  .long ext_store_oam##asize          /* 0x07 OAM RAM                      */;\
+  .long ext_store_rtc##asize          /* 0x08 gamepak (RTC or ignore)      */;\
+  .long ext_store_ignore              /* 0x09 gamepak, ignore              */;\
+  .long ext_store_ignore              /* 0x0A gamepak, ignore              */;\
+  .long ext_store_ignore              /* 0x0B gamepak, ignore              */;\
+  .long ext_store_ignore              /* 0x0C gamepak, ignore              */;\
+  .long ext_store_eeprom              /* 0x0D EEPROM (possibly)            */;\
+  .long ext_store_backup##asize       /* 0x0E Flash ROM/SRAM               */;\
+  .long ext_store_ignore              /* 0x0F ignore                       */;\
+
 .data
 
 defsymbl(x86_table_data)
-ext_store_u8_jtable:
-  .long ext_store_ignore      # 0x00 BIOS, ignore
-  .long ext_store_ignore      # 0x01 invalid, ignore
-  .long ext_store_ewram8      # 0x02 EWRAM
-  .long ext_store_iwram8      # 0x03 IWRAM
-  .long ext_store_io8         # 0x04 I/O registers
-  .long ext_store_palette8    # 0x05 Palette RAM
-  .long ext_store_vram8       # 0x06 VRAM
-  .long ext_store_oam8        # 0x07 OAM RAM
-  .long ext_store_ignore      # 0x08 gamepak (no RTC accepted in 8bit)
-  .long ext_store_ignore      # 0x09 gamepak, ignore
-  .long ext_store_ignore      # 0x0A gamepak, ignore
-  .long ext_store_ignore      # 0x0B gamepak, ignore
-  .long ext_store_ignore      # 0x0C gamepak, ignore
-  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
-  .long ext_store_backup      # 0x0E Flash ROM/SRAM
-  .long ext_store_ignore      # 0x0F ignore
+  load_table(u8)
+  load_table(s8)
+  load_table(u16)
+  load_table(s16)
+  load_table(u32)
+  store_table(8)
+  store_table(16)
+  store_table(32)
 
-ext_store_u16_jtable:
-  .long ext_store_ignore      # 0x00 BIOS, ignore
-  .long ext_store_ignore      # 0x01 invalid, ignore
-  .long ext_store_ewram16     # 0x02 EWRAM
-  .long ext_store_iwram16     # 0x03 IWRAM
-  .long ext_store_io16        # 0x04 I/O registers
-  .long ext_store_palette16   # 0x05 Palette RAM
-  .long ext_store_vram16      # 0x06 VRAM
-  .long ext_store_oam16       # 0x07 OAM RAM
-  .long ext_store_rtc         # 0x08 gamepak or RTC
-  .long ext_store_ignore      # 0x09 gamepak, ignore
-  .long ext_store_ignore      # 0x0A gamepak, ignore
-  .long ext_store_ignore      # 0x0B gamepak, ignore
-  .long ext_store_ignore      # 0x0C gamepak, ignore
-  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
-  .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
-  .long ext_store_ignore      # 0x0F ignore
-
-ext_store_u32_jtable:
-  .long ext_store_ignore      # 0x00 BIOS, ignore
-  .long ext_store_ignore      # 0x01 invalid, ignore
-  .long ext_store_ewram32     # 0x02 EWRAM
-  .long ext_store_iwram32     # 0x03 IWRAM
-  .long ext_store_io32        # 0x04 I/O registers
-  .long ext_store_palette32   # 0x05 Palette RAM
-  .long ext_store_vram32      # 0x06 VRAM
-  .long ext_store_oam32       # 0x07 OAM RAM
-  .long ext_store_ignore      # 0x08 gamepak, ignore (no RTC in 32bit)
-  .long ext_store_ignore      # 0x09 gamepak, ignore
-  .long ext_store_ignore      # 0x0A gamepak, ignore
-  .long ext_store_ignore      # 0x0B gamepak, ignore
-  .long ext_store_ignore      # 0x0C gamepak, ignore
-  .long ext_store_eeprom      # 0x0D EEPROM (possibly)
-  .long ext_store_ignore      # 0x0E Flash ROM/SRAM must be 8bit
-  .long ext_store_ignore      # 0x0F ignore
-
-ext_store_aligned_u32_jtable:
+  # aligned word writes (non SMC signaling)
   .long ext_store_ignore              # 0x00 BIOS, ignore
   .long ext_store_ignore              # 0x01 invalid, ignore
   .long ext_store_aligned_ewram32     # 0x02 EWRAM
@@ -482,7 +560,7 @@ ext_store_aligned_u32_jtable:
 .align 64
 
 defsymbl(x86_table_info)
-  .space 4*4*16
+  .space 9*4*16
 defsymbl(reg)
   .space 0x100
 defsymbl(palette_ram)
@@ -503,6 +581,7 @@ defsymbl(spsr)
   .space 24
 defsymbl(reg_mode)
   .space 196
+  .space 36   # padding
 defsymbl(memory_map_read)
   .space 0x8000
 
