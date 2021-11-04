@@ -1567,7 +1567,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
    -((word_bit_count(reg_list)) * 4))                                         \
 
 
-// This isn't really a correct implementation, may have to fix later.
+// ARM: rn *must* be different from rm and rd. rm *can* be the same as rd.
 
 #define arm_swap(type)                                                        \
 {                                                                             \
@@ -1575,11 +1575,10 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   cycle_count += 3;                                                           \
   mips_emit_jal(mips_absolute_offset(execute_load_##type));                   \
   generate_load_reg(reg_a0, rn);                                              \
-  generate_mov(reg_a2, reg_rv);                                               \
   generate_load_reg(reg_a0, rn);                                              \
-  mips_emit_jal(mips_absolute_offset(execute_store_##type));                  \
   generate_load_reg(reg_a1, rm);                                              \
-  generate_store_reg(reg_a2, rd);                                             \
+  mips_emit_jal(mips_absolute_offset(execute_store_##type));                  \
+  generate_store_reg(reg_rv, rd);                                             \
 }                                                                             \
 
 #define thumb_generate_op_load_yes(_rs)                                       \
