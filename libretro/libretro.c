@@ -458,9 +458,9 @@ void retro_get_system_av_info(struct retro_system_av_info* info)
 void retro_init(void)
 {
 #if defined(HAVE_DYNAREC)
-  #if defined(HAVE_MMAP)
-   rom_translation_cache = mmap(NULL, ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE,
-                                PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+  #if defined(MMAP_JIT_CACHE)
+   rom_translation_cache = map_jit_block(ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE);
+   printf("rom_translation_cache %llx\n", (unsigned long long)rom_translation_cache);
    ram_translation_cache = &rom_translation_cache[ROM_TRANSLATION_CACHE_SIZE];
   #elif defined(_3DS)
    if (__ctr_svchax && !translation_caches_inited)
@@ -548,8 +548,8 @@ void retro_deinit(void)
    perf_cb.perf_log();
    memory_term();
 
-#if defined(HAVE_MMAP) && defined(HAVE_DYNAREC)
-   munmap(rom_translation_cache, ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE);
+#if defined(MMAP_JIT_CACHE) && defined(HAVE_DYNAREC)
+   unmap_jit_block(rom_translation_cache, ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE);
 #endif
 #if defined(_3DS) && defined(HAVE_DYNAREC)
 

@@ -12,6 +12,7 @@ SOURCES_C := $(CORE_DIR)/main.c \
              $(CORE_DIR)/input.c \
              $(CORE_DIR)/sound.c \
              $(CORE_DIR)/cheats.c \
+             $(CORE_DIR)/memmap.c \
              $(CORE_DIR)/libretro/libretro.c \
              $(CORE_DIR)/gba_cc_lut.c \
              $(LIBRETRO_COMM_DIR)/compat/compat_posix_string.c \
@@ -49,9 +50,5 @@ CFLAGS += -DARM_ARCH_BLENDING_OPTS
 SOURCES_ASM += $(CORE_DIR)/arm/video_blend.S
 endif
 
-endif
-
-ifeq ($(HAVE_MMAP_WIN32),1)
-SOURCES_C += $(CORE_DIR)/memmap_win32.c
 endif
 

@@ -840,7 +840,7 @@ defsymbl(palette_ram_converted)
 
 @ Vita and 3DS (and of course mmap) map their own cache sections through some
 @ platform-speficic mechanisms.
-#if !defined(HAVE_MMAP) && !defined(VITA) && !defined(_3DS)
+#if !defined(MMAP_JIT_CACHE) && !defined(VITA) && !defined(_3DS)
 
 @ Make this section executable!
 .text

@@ -32,7 +32,7 @@
 u8 *last_rom_translation_ptr = NULL;
 u8 *last_ram_translation_ptr = NULL;
 
-#if defined(HAVE_MMAP)
+#if defined(MMAP_JIT_CACHE)
 u8* rom_translation_cache;
 u8* ram_translation_cache;
 u8 *rom_translation_ptr;

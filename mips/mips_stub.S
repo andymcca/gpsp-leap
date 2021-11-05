@@ -595,7 +595,7 @@ fnptrs:
   .long execute_store_cpsr_body        # 7
   .long process_cheats                 # 8
 
-#if !defined(HAVE_MMAP)
+#if !defined(MMAP_JIT_CACHE)
 
 # Make this section executable!
 .text

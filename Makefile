@@ -1,8 +1,7 @@
 DEBUG=0
 FRONTEND_SUPPORTS_RGB565=1
 FORCE_32BIT_ARCH=0
-HAVE_MMAP=0
-HAVE_MMAP_WIN32=0
+MMAP_JIT_CACHE=0
 
 UNAME=$(shell uname -a)
 
@@ -75,7 +74,7 @@ ifeq ($(platform), unix)
 	CFLAGS += $(FORCE_32BIT)
 	LDFLAGS += -Wl,--no-undefined
 	ifeq ($(HAVE_DYNAREC),1)
-		HAVE_MMAP = 1
+		MMAP_JIT_CACHE = 1
 	endif
 
 # Linux portable
@@ -86,7 +85,7 @@ else ifeq ($(platform), linux-portable)
 	LIBM :=
 	CFLAGS += $(FORCE_32BIT)
 	ifeq ($(HAVE_DYNAREC),1)
-		HAVE_MMAP = 1
+		MMAP_JIT_CACHE = 1
 	endif
 
 # OS X
@@ -101,7 +100,7 @@ else ifeq ($(platform), osx)
 	fpic += -mmacosx-version-min=10.1
 	SHARED := -dynamiclib
 	ifeq ($(HAVE_DYNAREC),1)
-		HAVE_MMAP = 1
+		MMAP_JIT_CACHE = 1
 	endif
 
    ifeq ($(CROSS_COMPILE),1)
@@ -172,7 +171,7 @@ else ifeq ($(platform), qnx)
 	TARGET := $(TARGET_NAME)_libretro_qnx.so
 	fpic := -fPIC
 	SHARED := -shared -Wl,--version-script=link.T
-	HAVE_MMAP = 1
+	MMAP_JIT_CACHE = 1
 	CPU_ARCH := arm
 
 	CC = qcc -Vgcc_ntoarmv7le
@@ -257,7 +256,7 @@ else ifeq ($(platform), rpi3)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 	CPU_ARCH := arm
-	HAVE_MMAP = 1
+	MMAP_JIT_CACHE = 1
 	HAVE_DYNAREC = 1
 
 # Raspberry Pi 2
@@ -269,7 +268,7 @@ else ifeq ($(platform), rpi2)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 	CPU_ARCH := arm
-	HAVE_MMAP = 1
+	MMAP_JIT_CACHE = 1
 	HAVE_DYNAREC = 1
 
 # Raspberry Pi 1
@@ -282,7 +281,7 @@ else ifeq ($(platform), rpi1)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 	CPU_ARCH := arm
-	HAVE_MMAP = 1
+	MMAP_JIT_CACHE = 1
 	HAVE_DYNAREC = 1
 
 # Classic Platforms ####################
@@ -310,7 +309,7 @@ else ifeq ($(platform), classic_armv7_a7)
 	ARCH = arm
 	BUILTIN_GPU = neon
 	CPU_ARCH := arm
-	HAVE_MMAP = 1
+	MMAP_JIT_CACHE = 1
 	HAVE_DYNAREC = 1
 	ifeq ($(shell echo `$(CC) -dumpversion` "< 4.9" | bc -l), 1)
 	  CFLAGS += -march=armv7-a
@@ -352,7 +351,7 @@ else ifneq (,$(findstring armv,$(platform)))
 	TARGET := $(TARGET_NAME)_libretro.so
 	SHARED := -shared -Wl,--version-script=link.T
 	CPU_ARCH := arm
-	HAVE_MMAP = 1
+	MMAP_JIT_CACHE = 1
 	fpic := -fPIC
 	ifneq (,$(findstring cortexa5,$(platform)))
 		CFLAGS += -marm -mcpu=cortex-a5
@@ -463,14 +462,13 @@ else
 	SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=link.T
 	CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__
 	ifeq ($(HAVE_DYNAREC),1)
-		HAVE_MMAP = 1
-		HAVE_MMAP_WIN32 = 1
+		MMAP_JIT_CACHE = 1
 	endif
 
 endif
 
-ifeq ($(HAVE_MMAP), 1)
-CFLAGS += -DHAVE_MMAP
+ifeq ($(MMAP_JIT_CACHE), 1)
+CFLAGS += -DMMAP_JIT_CACHE
 endif
 
 # Add -DTRACE_INSTRUCTIONS to trace instruction execution
@@ -487,11 +485,11 @@ DEFINES += -DHAVE_DYNAREC
 endif
 
 ifeq ($(CPU_ARCH), arm)
-DEFINES += -DARM_ARCH
+	DEFINES += -DARM_ARCH
 else ifeq ($(CPU_ARCH), mips)
-DEFINES += -DMIPS_ARCH
+	DEFINES += -DMIPS_ARCH
 else ifeq ($(CPU_ARCH), x86_32)
-DEFINES += -DX86_ARCH
+	DEFINES += -DX86_ARCH
 endif
 
 include Makefile.common

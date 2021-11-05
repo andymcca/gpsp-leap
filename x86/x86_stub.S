@@ -585,16 +585,7 @@ defsymbl(reg_mode)
 defsymbl(memory_map_read)
   .space 0x8000
 
-#if !defined(HAVE_MMAP)
-
-# Make this section executable!
-.text
-.section .jit,"awx",%nobits
-.align 4
-defsymbl(rom_translation_cache)
-  .space ROM_TRANSLATION_CACHE_SIZE
-defsymbl(ram_translation_cache)
-  .space RAM_TRANSLATION_CACHE_SIZE
-
+#ifndef MMAP_JIT_CACHE
+  #error "x86 dynarec builds *require* MMAP_JIT_CACHE"
 #endif
 

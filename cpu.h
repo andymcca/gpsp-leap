@@ -131,7 +131,7 @@ s32 translate_block_arm(u32 pc, translation_region_type translation_region,
 s32 translate_block_thumb(u32 pc, translation_region_type translation_region,
  u32 smc_enable);
 
-#if defined(HAVE_MMAP)
+#if defined(MMAP_JIT_CACHE)
 extern u8* rom_translation_cache;
 extern u8* ram_translation_cache;
 #elif defined(_3DS)
