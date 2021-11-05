@@ -473,11 +473,6 @@ ifeq ($(HAVE_MMAP), 1)
 CFLAGS += -DHAVE_MMAP
 endif
 
-ifeq ($(FORCE_32BIT_ARCH), 1)
-# Forcibly disable PIC
-fpic :=
-endif
-
 # Add -DTRACE_INSTRUCTIONS to trace instruction execution
 ifeq ($(DEBUG), 1)
 	OPTIMIZE      := -O0 -g
