@@ -180,7 +180,7 @@ typedef enum
 } x86_condition_codes;
 
 #define x86_relative_offset(source, offset, next)                             \
-  ((u32)offset - ((u32)source + next))                                        \
+  ((u32)((uintptr_t)offset - ((uintptr_t)source + next)))                     \
 
 #define x86_unequal_operands(op_a, op_b)                                      \
   (x86_reg_number_##op_a != x86_reg_number_##op_b)                            \
@@ -404,6 +404,17 @@ typedef enum
 #define reg_t0      esi
 #define reg_rv      eax
 
+#if defined(_WIN64)
+  #define reg_arg0  ecx
+  #define reg_arg1  edx
+#elif defined(__x86_64__) || defined(__amd64__)
+  #define reg_arg0  edi
+  #define reg_arg1  esi
+#else
+  #define reg_arg0  eax
+  #define reg_arg1  edx
+#endif
+
 /* Offsets from reg_base, see stub.S */
 #define SPSR_BASE_OFF   0xA9100
 
@@ -588,11 +599,11 @@ typedef enum
 
 #define generate_indirect_branch_cycle_update(type)                           \
   generate_cycle_update();                                                    \
-  x86_emit_jmp_offset(x86_relative_offset(translation_ptr,                    \
+  x86_emit_call_offset(x86_relative_offset(translation_ptr,                   \
    x86_indirect_branch_##type, 4))                                            \
 
 #define generate_indirect_branch_no_cycle_update(type)                        \
-  x86_emit_jmp_offset(x86_relative_offset(translation_ptr,                    \
+  x86_emit_call_offset(x86_relative_offset(translation_ptr,                   \
    x86_indirect_branch_##type, 4))                                            \
 
 #define block_prologue_size 0
@@ -663,8 +674,8 @@ typedef enum
   }
 
   #define emit_trace_instruction(pc, mode)         \
-    x86_emit_mov_reg_imm(reg_a0, pc);              \
-    x86_emit_mov_reg_imm(reg_a1, mode);            \
+    x86_emit_mov_reg_imm(reg_arg0, pc);            \
+    x86_emit_mov_reg_imm(reg_arg1, mode);          \
     generate_function_call(trace_instruction);
   #define emit_trace_arm_instruction(pc)           \
     emit_trace_instruction(pc, 1)
@@ -1062,9 +1073,8 @@ u32 function_cc execute_spsr_restore(u32 address)
   generate_store_reg(ireg, reg_index);                                        \
   if(reg_index == 15)                                                         \
   {                                                                           \
-    generate_mov(a0, ireg);                                                   \
+    generate_mov(arg0, ireg);                                                 \
     generate_function_call(execute_spsr_restore);                             \
-    generate_mov(a0, rv);                                                     \
     generate_indirect_branch_dual();                                          \
   }                                                                           \
 
@@ -1355,18 +1365,17 @@ u32 function_cc execute_spsr_restore(u32 address)
 // store_mask and address are stored in the SAVE slots, since there's no real
 // register space to nicely pass them.
 
-u32 function_cc execute_store_cpsr_body(u32 _cpsr)
+u32 execute_store_cpsr_body()
 {
-  reg[REG_CPSR] = _cpsr;
   if(reg[REG_SAVE] & 0xFF)
   {
-    set_cpu_mode(cpu_modes[_cpsr & 0x1F]);
+    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
     if((io_registers[REG_IE] & io_registers[REG_IF]) &&
-     io_registers[REG_IME] && ((_cpsr & 0x80) == 0))
+     io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
     {
       reg_mode[MODE_IRQ][6] = reg[REG_SAVE2] + 4;
-      spsr[MODE_IRQ] = _cpsr;
-      reg[REG_CPSR] = (_cpsr & 0xFFFFFF00) | 0xD2;
+      spsr[MODE_IRQ] = reg[REG_CPSR];
+      reg[REG_CPSR] = (reg[REG_CPSR] & 0xFFFFFF00) | 0xD2;
       set_cpu_mode(MODE_IRQ);
       return 0x00000018;
     }
@@ -1518,7 +1527,6 @@ u32 function_cc execute_store_cpsr_body(u32 _cpsr)
 #define arm_block_memory_adjust_pc_load()                                     \
   if(reg_list & 0x8000)                                                       \
   {                                                                           \
-    generate_mov(a0, rv);                                                     \
     generate_indirect_branch_arm();                                           \
   }                                                                           \
 
@@ -1865,7 +1873,6 @@ u32 function_cc execute_store_cpsr_body(u32 _cpsr)
   generate_load_pc(a1, pc);                                                   \
   generate_function_call(execute_load_u32);                                   \
   generate_store_reg(rv, REG_PC);                                             \
-  generate_mov(a0, rv);                                                       \
   generate_indirect_branch_cycle_update(thumb)                                \
 
 #define thumb_block_memory_extra_push_lr(base_reg)                            \
@@ -2138,7 +2145,7 @@ static void function_cc execute_swi(u32 pc)
 
 #define arm_swi()                                                             \
   collapse_flags(a0, a1);                                                     \
-  generate_load_pc(a0, (pc + 4));                                             \
+  generate_load_pc(arg0, (pc + 4));                                           \
   generate_function_call(execute_swi);                                        \
   generate_branch()                                                           \
 
@@ -2182,7 +2189,7 @@ static void function_cc execute_swi(u32 pc)
 
 #define thumb_swi()                                                           \
   collapse_flags(a0, a1);                                                     \
-  generate_load_pc(a0, (pc + 2));                                             \
+  generate_load_pc(arg0, (pc + 2));                                           \
   generate_function_call(execute_swi);                                        \
   generate_branch_cycle_update(                                               \
    block_exits[block_exit_position].branch_source,                            \
@@ -2233,8 +2240,8 @@ static void function_cc execute_swi(u32 pc)
   generate_load_pc(a0, pc);                                                   \
   generate_indirect_branch_no_cycle_update(type)                              \
 
-extern u32 x86_table_data[9][16];
-extern u32 x86_table_info[9][16];
+extern void* x86_table_data[9][16];
+extern void* x86_table_info[9][16];
 
 void init_emitter(void) {
   memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));

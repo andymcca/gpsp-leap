@@ -21,19 +21,21 @@ endif
 
 
 ifeq ($(firstword $(filter x86_64,$(UNAME))),x86_64)
-
+	HAVE_DYNAREC := 1
+	CPU_ARCH := x86_32
 else ifeq ($(firstword $(filter amd64,$(UNAME))),amd64)
-
+	HAVE_DYNAREC := 1
+	CPU_ARCH := x86_32
 else ifeq ($(firstword $(filter x86,$(UNAME))),x86)
 	FORCE_32BIT_ARCH = 1
+	HAVE_DYNAREC := 1
+	CPU_ARCH := x86_32
 endif
 
 FORCE_32BIT :=
 
 ifeq ($(FORCE_32BIT_ARCH),1)
-	HAVE_DYNAREC := 1
 	FORCE_32BIT := -m32
-	CPU_ARCH := x86_32
 endif
 
 # system platform
