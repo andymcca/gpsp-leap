@@ -1096,11 +1096,6 @@ const u32 psr_masks[16] =
 #define word_bit_count(word)                                                  \
   (bit_count[word >> 8] + bit_count[word & 0xFF])                             \
 
-#define sprint_no(access_type, offset_type, writeback_type)                   \
-
-#define sprint_yes(access_type, offset_type, writeback_type)                  \
-  printf("sbit on %s %s %s\n", #access_type, #offset_type, #writeback_type)   \
-
 #define arm_block_writeback_load()                                            \
   if(!((reg_list >> rn) & 0x01))                                              \
   {                                                                           \

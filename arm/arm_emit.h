@@ -1448,12 +1448,6 @@ static void trace_instruction(u32 pc, u32 mode)
 #define word_bit_count(word)                                                  \
   (bit_count[word >> 8] + bit_count[word & 0xFF])                             \
 
-#define sprint_no(access_type, pre_op, post_op, wb)                           \
-
-#define sprint_yes(access_type, pre_op, post_op, wb)                          \
-  printf("sbit on %s %s %s %s\n", #access_type, #pre_op, #post_op, #wb)       \
-
-
 /* TODO: Make these use cached registers. Implement iwram_stack_optimize. */
 
 #define arm_block_memory_load()                                               \

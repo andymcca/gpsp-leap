@@ -1395,11 +1395,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define word_bit_count(word)                                                  \
   (bit_count[word >> 8] + bit_count[word & 0xFF])                             \
 
-#define sprint_no(access_type, pre_op, post_op, wb)                           \
-
-#define sprint_yes(access_type, pre_op, post_op, wb)                          \
-  printf("sbit on %s %s %s %s\n", #access_type, #pre_op, #post_op, #wb)       \
-
 #define arm_block_memory_load()                                               \
   generate_function_call_swap_delay(execute_aligned_load32);                  \
   generate_store_reg(reg_rv, i)                                               \
@@ -1528,44 +1523,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
     arm_block_memory_adjust_pc_##access_type();                               \
   }                                                                           \
 }                                                                             \
-
-#define arm_block_writeback_no()
-
-#define arm_block_writeback_yes()                                             \
-  mips_emit_addu(arm_to_mips_reg[rn], reg_a2, reg_zero)                       \
-
-#define arm_block_address_preadjust_up_full(wb)                               \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn],                                \
-   ((word_bit_count(reg_list)) * 4));                                         \
-  arm_block_writeback_##wb()                                                  \
-
-#define arm_block_address_preadjust_up(wb)                                    \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn], 4);                            \
-  arm_block_writeback_##wb()                                                  \
-
-#define arm_block_address_preadjust_down_full(wb)                             \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn],                                \
-   -((word_bit_count(reg_list)) * 4));                                        \
-  arm_block_writeback_##wb()                                                  \
-
-#define arm_block_address_preadjust_down(wb)                                  \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn],                                \
-   -(((word_bit_count(reg_list)) * 4) - 4));                                  \
-  arm_block_writeback_##wb()
-
-#define arm_block_address_preadjust_no(wb)                                    \
-  mips_emit_addu(reg_a2, arm_to_mips_reg[rn], reg_zero)                       \
-
-#define arm_block_address_postadjust_no()                                     \
-
-#define arm_block_address_postadjust_up()                                     \
-  mips_emit_addiu(arm_to_mips_reg[rn], reg_a2,                                \
-   ((word_bit_count(reg_list)) * 4))                                          \
-
-#define arm_block_address_postadjust_down()                                   \
-  mips_emit_addiu(arm_to_mips_reg[rn], reg_a2,                                \
-   -((word_bit_count(reg_list)) * 4))                                         \
-
 
 // ARM: rn *must* be different from rm and rd. rm *can* be the same as rd.
 
