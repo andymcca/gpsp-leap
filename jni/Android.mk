@@ -16,6 +16,10 @@ else ifeq ($(TARGET_ARCH),x86)
    COREFLAGS += -DMMAP_JIT_CACHE
    CPU_ARCH := x86_32
    HAVE_DYNAREC := 1
+else ifeq ($(TARGET_ARCH),x86_64)
+   COREFLAGS += -DMMAP_JIT_CACHE
+   CPU_ARCH := x86_32
+   HAVE_DYNAREC := 1
 endif
 
 ifeq ($(HAVE_DYNAREC),1)
