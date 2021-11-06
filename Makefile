@@ -19,7 +19,7 @@ else ifneq ($(findstring win,$(shell uname -s)),)
 endif
 endif
 
-
+ifeq ($(platform), unix)
 ifeq ($(firstword $(filter x86_64,$(UNAME))),x86_64)
 	HAVE_DYNAREC := 1
 	CPU_ARCH := x86_32
@@ -30,6 +30,7 @@ else ifeq ($(firstword $(filter x86,$(UNAME))),x86)
 	FORCE_32BIT_ARCH = 1
 	HAVE_DYNAREC := 1
 	CPU_ARCH := x86_32
+endif
 endif
 
 FORCE_32BIT :=
@@ -463,10 +464,11 @@ else
 	CC ?= gcc
 	SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=link.T
 	CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__
-	ifeq ($(HAVE_DYNAREC),1)
-		MMAP_JIT_CACHE = 1
-	endif
 
+	# Windows32/64 has dynarec support
+	HAVE_DYNAREC := 1
+	CPU_ARCH := x86_32
+	MMAP_JIT_CACHE = 1
 endif
 
 ifeq ($(MMAP_JIT_CACHE), 1)
