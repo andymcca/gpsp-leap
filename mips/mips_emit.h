@@ -582,44 +582,6 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
   return rm;                                                                  \
 }                                                                             \
 
-#define read_memory_constant_u8(address)                                      \
-  read_memory8(address)                                                       \
-
-#define read_memory_constant_u16(address)                                     \
-  read_memory16(address)                                                      \
-
-#define read_memory_constant_u32(address)                                     \
-  read_memory32(address)                                                      \
-
-#define read_memory_constant_s8(address)                                      \
-  (s8)read_memory8(address)                                                   \
-
-#define read_memory_constant_s16(address)                                     \
-  (s16)read_memory16_signed(address)                                          \
-
-#define generate_load_memory_u8(ireg, offset)                                 \
-  mips_emit_lbu(ireg, ireg, offset)                                           \
-
-#define generate_load_memory_u16(ireg, offset)                                \
-  mips_emit_lhu(ireg, ireg, offset)                                           \
-
-#define generate_load_memory_u32(ireg, offset)                                \
-  mips_emit_lw(ireg, ireg, offset)                                            \
-
-#define generate_load_memory_s8(ireg, offset)                                 \
-  mips_emit_lb(ireg, ireg, offset)                                            \
-
-#define generate_load_memory_s16(ireg, offset)                                \
-  mips_emit_lh(ireg, ireg, offset)                                            \
-
-#define generate_load_memory(type, ireg, address)                             \
-{                                                                             \
-  u32 _address = (u32)(address);                                              \
-  u32 _address_hi = (_address + 0x8000) >> 16;                                \
-  mips_emit_lui(ireg, _address_hi >> 16)                                      \
-  generate_load_memory_##type(ireg, _address - (_address_hi << 16));          \
-}                                                                             \
-
 #define generate_block_extra_vars()                                           \
   u32 stored_pc = pc;                                                         \
   u8 *update_trampoline                                                       \
@@ -664,8 +626,8 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
                                                                               \
     return rm;                                                                \
   }                                                                           \
-                                                                              \
-  void generate_indirect_branch_arm()                                         \
+
+#define generate_indirect_branch_arm()                                        \
   {                                                                           \
     if(condition == 0x0E)                                                     \
     {                                                                         \
@@ -676,8 +638,8 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
       generate_indirect_branch_no_cycle_update(arm);                          \
     }                                                                         \
   }                                                                           \
-                                                                              \
-  void generate_indirect_branch_dual()                                        \
+
+#define generate_indirect_branch_dual()                                       \
   {                                                                           \
     if(condition == 0x0E)                                                     \
     {                                                                         \
