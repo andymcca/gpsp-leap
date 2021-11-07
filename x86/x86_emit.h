@@ -260,6 +260,10 @@ typedef enum
   x86_emit_opcode_1b_ext_mem(mov_rm_imm, base, offset);                       \
   x86_emit_dword(imm)                                                         \
 
+#define x86_emit_and_mem_imm(imm, base, offset)                               \
+  x86_emit_opcode_1b_ext_mem(and_rm_imm, base, offset);                       \
+  x86_emit_dword(imm)                                                         \
+
 #define x86_emit_shl_reg_imm(dest, imm)                                       \
   x86_emit_opcode_1b_ext_reg(shl_reg_imm, dest);                              \
   x86_emit_byte(imm)                                                          \
@@ -486,6 +490,9 @@ typedef enum
 
 #define generate_rcr1(ireg)                                                   \
   x86_emit_rot_reg1(rcr, reg_##ireg)                                          \
+
+#define generate_and_mem(imm, ireg_base, offset)                              \
+  x86_emit_and_mem_imm(imm, reg_##ireg_base, (offset))                        \
 
 #define generate_and(ireg_dest, ireg_src)                                     \
   x86_emit_and_reg_reg(reg_##ireg_dest, reg_##ireg_src)                       \
@@ -1078,44 +1085,39 @@ u32 function_cc execute_spsr_restore(u32 address)
     generate_indirect_branch_dual();                                          \
   }                                                                           \
 
+// These generate a branch on the opposite condition on purpose.
+// For ARM mode we aim to skip instructions (therefore opposite)
+// In Thumb mode we skip the conditional branch in a similar way
 #define generate_condition_eq(ireg)                                           \
-  generate_load_reg(ireg, REG_Z_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_Z_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
 
 #define generate_condition_ne(ireg)                                           \
-  generate_load_reg(ireg, REG_Z_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_Z_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
 
 #define generate_condition_cs(ireg)                                           \
-  generate_load_reg(ireg, REG_C_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_C_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
 
 #define generate_condition_cc(ireg)                                           \
-  generate_load_reg(ireg, REG_C_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_C_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
 
 #define generate_condition_mi(ireg)                                           \
-  generate_load_reg(ireg, REG_N_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_N_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
 
 #define generate_condition_pl(ireg)                                           \
-  generate_load_reg(ireg, REG_N_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_N_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
 
 #define generate_condition_vs(ireg)                                           \
-  generate_load_reg(ireg, REG_V_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_V_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_z, backpatch_address)                  \
 
 #define generate_condition_vc(ireg)                                           \
-  generate_load_reg(ireg, REG_V_FLAG);                                        \
-  generate_test_imm(ireg, 1);                                                 \
+  generate_and_mem(1, base, REG_V_FLAG * 4);                                  \
   x86_emit_j_filler(x86_condition_code_nz, backpatch_address)                 \
 
 #define generate_condition_hi(ireg)                                           \
