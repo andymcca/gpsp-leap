@@ -677,14 +677,10 @@ u32 execute_spsr_restore_body(u32 address)
   return address;
 }
 
-typedef enum
-{
-  CONDITION_TRUE,
-  CONDITION_FALSE,
-  CONDITION_EQUAL,
-  CONDITION_NOT_EQUAL
-} condition_check_type;
 
+// These generate a branch on the opposite condition on purpose.
+// For ARM mode we aim to skip instructions (therefore opposite)
+// In Thumb mode we skip the conditional branch in a similar way
 
 #define generate_condition_eq()                                               \
   mips_emit_b_filler(beq, reg_z_cache, reg_zero, backpatch_address);          \
@@ -1826,7 +1822,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define thumb_conditional_branch(condition)                                   \
 {                                                                             \
-  condition_check_type condition_check;                                       \
   generate_condition_##condition();                                           \
   generate_branch_no_cycle_update(                                            \
    block_exits[block_exit_position].branch_source,                            \
