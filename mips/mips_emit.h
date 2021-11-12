@@ -1662,14 +1662,8 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   thumb_access_memory_##access_type(mem_type, reg_rd);                        \
 }                                                                             \
 
-
 #define thumb_block_address_preadjust_no(base_reg)                            \
   mips_emit_addu(reg_a2, arm_to_mips_reg[base_reg], reg_zero)                 \
-
-#define thumb_block_address_preadjust_up(base_reg)                            \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[base_reg],                          \
-   (bit_count[reg_list] * 4));                                                \
-  mips_emit_addu(arm_to_mips_reg[base_reg], reg_a2, reg_zero)                 \
 
 #define thumb_block_address_preadjust_down(base_reg)                          \
   mips_emit_addiu(reg_a2, arm_to_mips_reg[base_reg],                          \
@@ -1686,10 +1680,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_block_address_postadjust_up(base_reg)                           \
   mips_emit_addiu(arm_to_mips_reg[base_reg], reg_a2,                          \
    (bit_count[reg_list] * 4))                                                 \
-
-#define thumb_block_address_postadjust_down(base_reg)                         \
-  mips_emit_addiu(arm_to_mips_reg[base_reg], reg_a2,                          \
-   -(bit_count[reg_list] * 4))                                                \
 
 #define thumb_block_address_postadjust_pop_pc(base_reg)                       \
   mips_emit_addiu(arm_to_mips_reg[base_reg], reg_a2,                          \
