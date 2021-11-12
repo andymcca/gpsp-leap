@@ -1754,9 +1754,6 @@ static void trace_instruction(u32 pc, u32 mode)
 
 /* TODO: Make these use cached registers. Implement iwram_stack_optimize. */
 
-#define thumb_block_address_preadjust_up()                                    \
-  generate_add_imm(reg_s0, (bit_count[reg_list] * 4), 0)                      \
-
 #define thumb_block_address_preadjust_down()                                  \
   generate_sub_imm(reg_s0, (bit_count[reg_list] * 4), 0)                      \
 
@@ -1770,11 +1767,6 @@ static void trace_instruction(u32 pc, u32 mode)
 
 #define thumb_block_address_postadjust_up(base_reg)                           \
   generate_add_reg_reg_imm(reg_a0, reg_s0, (bit_count[reg_list] * 4), 0);     \
-  thumb_generate_store_reg(reg_a0, base_reg)                                  \
-
-#define thumb_block_address_postadjust_down(base_reg)                         \
-  generate_mov(reg_a0, reg_s0);                                               \
-  generate_sub_imm(reg_a0, (bit_count[reg_list] * 4), 0);                     \
   thumb_generate_store_reg(reg_a0, base_reg)                                  \
 
 #define thumb_block_address_postadjust_pop_pc(base_reg)                       \

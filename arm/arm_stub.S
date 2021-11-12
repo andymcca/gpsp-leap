@@ -77,6 +77,7 @@ _##symbol:
 #define PAL_RAM_OFF       0x900
 #define RDMAP_OFF         0xD00
 #define IOREG_OFF        0x8D00
+#define PAL_CONV_OFF     0x9100
 
 
 #if __ARM_ARCH >= 6
@@ -495,6 +496,15 @@ ext_store_u##store_type:                                                     ;\
   str r2, [reg_base, #REG_PC]             /* write out PC                  */;\
   store_align_##store_type()                                                 ;\
   call_c_function(write_memory##store_type)                                  ;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                          /* return                        */;\
+                                                                             ;\
+ext_io_store_u##store_type:                                                  ;\
+  save_flags()                                                               ;\
+  ldr r2, [lr]                            /* load PC                       */;\
+  str r2, [reg_base, #REG_PC]             /* write out PC                  */;\
+  store_align_##store_type()                                                 ;\
+  call_c_function(write_memory##store_type)                                  ;\
   b write_epilogue                        /* handle additional write stuff */;\
                                                                              ;\
 ext_store_iwram_u##store_type:                                               ;\
@@ -548,20 +558,20 @@ ext_store_ignore:
   add pc, lr, #4                          @ return
 
 #define store_lookup_table(store_type)                                       ;\
-  .word ext_store_u##store_type           /*   -1: ignore, for > 0x0F      */;\
+  .word ext_store_ignore                  /*   -1: ignore, for > 0x0F      */;\
   .word ext_store_ignore                  /* 0x00: BIOS, ignore            */;\
   .word ext_store_ignore                  /* 0x01: ignore                  */;\
   .word ext_store_ewram_u##store_type     /* 0x02: ewram                   */;\
   .word ext_store_iwram_u##store_type     /* 0x03: iwram                   */;\
-  .word ext_store_u##store_type           /* 0x04: I/O regs                */;\
-  .word ext_store_u##store_type           /* 0x05: palette RAM             */;\
+  .word ext_io_store_u##store_type        /* 0x04: I/O regs                */;\
+  .word ext_store_palette_u##store_type   /* 0x05: palette RAM             */;\
   .word ext_store_vram_u##store_type      /* 0x06: vram                    */;\
   .word ext_store_oam_ram_u##store_type   /* 0x07: oam ram                 */;\
   .word ext_store_u##store_type           /* 0x08: gamepak: ignore         */;\
-  .word ext_store_u##store_type           /* 0x09: gamepak: ignore         */;\
-  .word ext_store_u##store_type           /* 0x0A: gamepak: ignore         */;\
-  .word ext_store_u##store_type           /* 0x0B: gamepak: ignore         */;\
-  .word ext_store_u##store_type           /* 0x0C: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x09: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x0A: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x0B: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x0C: gamepak: ignore         */;\
   .word ext_store_u##store_type           /* 0x0D: EEPROM                  */;\
   .word ext_store_u##store_type           /* 0x0E: backup                  */;\
   .word ext_store_ignore                  /* 0x0F: ignore                  */;\
@@ -570,14 +580,62 @@ execute_store_builder(8,  strb, strh, ldrb, 0)
 execute_store_builder(16, strh, strh, ldrh, 1)
 execute_store_builder(32, str,  str,  ldr,  2)
 
+@ Palette writes are special since they are converted on the fly for speed
+
+ext_store_palette_u8:
+  bic r1, r1, #0xff00                     // Duplicate the byte
+  orr r1, r1, lsl #8
+ext_store_palette_u16:
+  mask_addr_16(10)                        // Accesses are always 16 bit
+  add r2, reg_base, #PAL_RAM_OFF          // r2 = palette base
+  strh r1, [r0, r2]                       // store data
+
+  and r2, r1, #0x3E0                      // Convert color point
+  lsl r2, r2, #1
+  orr r2, r1, lsl #11
+  and r1, r1, #0x7C00
+  orr r2, r1, lsr #10
+
+  add r1, reg_base, #PAL_CONV_OFF         // r1 = converted palette ram
+  strh r2, [r0, r1]                       // Converted value write (r2)
+  add pc, lr, #4                          // return
+
+ext_store_palette_u32_safe:
+  sub lr, lr, #4
+ext_store_palette_u32:
+  mask_addr_32(10)                        // Accesses are always 16 bit
+  add r2, reg_base, #PAL_RAM_OFF          // r2 = palette base
+  str r1, [r0, r2]                        // store data
+  add r2, reg_base, #PAL_CONV_OFF         // r2 = converted palette ram
+
+  lsr r9, r1, #10
+  and r9, r9, #0x1F
+  orr r9, r1, lsl #11
+  bic r1, r1, #0x1F
+  bic r1, r1, #0xFC00
+  orr r9, r1, lsl #1
+  strh r9, [r0, r2]                       // Write first halfword
+  add r0, r0, #2
+
+  lsr r1, r1, #16
+  and r9, r1, #0x3E0
+  lsl r9, r9, #1
+  orr r9, r1, lsl #11
+  and r1, r1, #0x7C00
+  orr r9, r1, lsr #10
+  strh r9, [r0, r2]                       // Write second halfword
+
+  add pc, lr, #4                          // return
+
+
 @ This is a store that is executed in a strm case (so no SMC checks in-between)
 
 ext_store_u32_safe:
-  str lr, [reg_base, #REG_SAVE3]          @ Restore lr
+ext_io_store_u32_safe:
   save_flags()
   call_c_function(write_memory32)         @ Perform 32bit store
   restore_flags()
-  ldr pc, [reg_base, #REG_SAVE3]          @ return
+  bx lr                                   @ Return
 
 ext_store_iwram_u32_safe:
   mask_addr_8(15)                         @ Mask to mirror memory (no need to align!)
@@ -834,7 +892,6 @@ defsymbl(memory_map_read)
   .space 0x8000
 defsymbl(io_registers)
   .space 0x400
-
 defsymbl(palette_ram_converted)
   .space 0x400
 
