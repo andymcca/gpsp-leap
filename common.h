@@ -86,7 +86,7 @@
     (value & 0x7FFF)
 #else
   #define convert_palette(value) \
-    (((value & 0x1F) << 11) | ((value & 0x03E0) << 1) | (value >> 10))
+    (((value & 0x1F) << 11) | ((value & 0x03E0) << 1) | ((value >> 10) & 0x1F))
 #endif
 
 #define GBA_SCREEN_WIDTH  (240)
