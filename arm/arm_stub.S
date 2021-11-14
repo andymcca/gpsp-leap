@@ -446,16 +446,10 @@ return_to_main:
   ldmia sp!, { r4, r5, r6, r7, r8, r9, r10, r11, r12, lr }
   bx lr
 
-
-#define store_align_8()                                                      ;\
-  and r1, r1, #0xff                                                          ;\
-
-#define store_align_16()                                                     ;\
-  bic r0, r0, #0x01                                                          ;\
-  extract_u16(r1, r1)                                                        ;\
-
-#define store_align_32()                                                     ;\
-  bic r0, r0, #0x03                                                          ;\
+@ Prepares stores for external write function (align + zero extend value)
+#define store_align_8()   and r1, r1, #0xff
+#define store_align_16()  bic r0, r0, #0x01; extract_u16(r1, r1)
+#define store_align_32()  bic r0, r0, #0x03
 
 #define mask_addr_8(nbits)                                                   ;\
   mov r0, r0, lsl #(32 - nbits)            /* isolate bottom n bits in top */;\
@@ -474,10 +468,7 @@ return_to_main:
 @ Vram, OAM and palette memories can only be accessed at a 16 bit boundary
 #define mask_addr_bus16_32(nbits) mask_addr_32(nbits)
 #define mask_addr_bus16_16(nbits) mask_addr_16(nbits)
-#define mask_addr_bus16_8(nbits) \
-  mask_addr_16(nbits)            \
-  extract_u16(r1, r1)
-
+#define mask_addr_bus16_8(nbits)  mask_addr_16(nbits)
 
 @ Write out to memory.
 
@@ -488,7 +479,7 @@ return_to_main:
 @ The instruction at LR is not an inst but a u32 data that contains the PC
 @ Used for SMC. That's why return is essentially `pc = lr + 4`
 
-#define execute_store_builder(store_type, str_op, str_op16, load_op, tnum)   ;\
+#define execute_store_builder(store_type, str_op, str_op16, load_op)         ;\
                                                                              ;\
 ext_store_u##store_type:                                                     ;\
   save_flags()                                                               ;\
@@ -576,9 +567,9 @@ ext_store_ignore:
   .word ext_store_u##store_type           /* 0x0E: backup                  */;\
   .word ext_store_ignore                  /* 0x0F: ignore                  */;\
 
-execute_store_builder(8,  strb, strh, ldrb, 0)
-execute_store_builder(16, strh, strh, ldrh, 1)
-execute_store_builder(32, str,  str,  ldr,  2)
+execute_store_builder(8,  strb, strh, ldrb)
+execute_store_builder(16, strh, strh, ldrh)
+execute_store_builder(32, str,  str,  ldr )
 
 @ Palette writes are special since they are converted on the fly for speed
 
@@ -764,7 +755,7 @@ lookup_pc_arm:
   ldr r0, [r2, r0, lsr #(32 - mirrorbits)]                                   ;\
 
 
-#define execute_load_builder(load_type, albits, load_function, tnum)         ;\
+#define execute_load_builder(load_type, albits, load_function)               ;\
                                                                              ;\
 ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
   save_flags()                                                               ;\
@@ -843,11 +834,11 @@ ld_slow_##load_type:                                                         ;\
 
 .pool
 
-execute_load_builder(u8,  0, read_memory8,   4)
-execute_load_builder(s8,  0, read_memory8s,  5)
-execute_load_builder(u16, 1, read_memory16,  6)
-execute_load_builder(s16, 1, read_memory16s, 7)
-execute_load_builder(u32, 2, read_memory32,  8)
+execute_load_builder(u8,  0, read_memory8  )
+execute_load_builder(s8,  0, read_memory8s )
+execute_load_builder(u16, 1, read_memory16 )
+execute_load_builder(s16, 1, read_memory16s)
+execute_load_builder(u32, 2, read_memory32 )
 
 .data
 .align 4
