@@ -54,6 +54,19 @@ static int translation_caches_inited = 0;
 // Usually 59.72750057 Hz, unless GBC_RATE is overclocked (for 60FPS)
 #define GBA_FPS ((float) GBC_BASE_RATE) / (308 * 228 * 4)
 
+/* An alpha factor of 1/180 is *somewhat* equivalent
+ * to calculating the average for the last 180
+ * frames, or 3 seconds of runtime... */
+#define SAMPLES_PER_FRAME_MOVING_AVG_ALPHA (1.0f / 180.0f)
+static s16 *audio_sample_buffer          = NULL;
+static u32 audio_sample_buffer_size      = 0;
+static float audio_samples_per_frame_avg = 0.0f;
+
+/* Workaround for a RetroArch audio driver
+ * limitation: a maximum of 1024 frames
+ * can be written per call of audio_batch_cb() */
+#define AUDIO_BATCH_FRAMES_MAX 1024
+
 /* Maximum number of consecutive frames that
  * can be skipped */
 #define FRAMESKIP_MAX 30
@@ -72,6 +85,7 @@ static bios_type selected_bios               = auto_detect;
 
 static retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
+static retro_audio_sample_batch_t audio_batch_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_environment_t environ_cb;
 
@@ -367,6 +381,56 @@ void set_fastforward_override(bool fastforward)
    environ_cb(RETRO_ENVIRONMENT_SET_FASTFORWARDING_OVERRIDE, &ff_override);
 }
 
+static void audio_run(void)
+{
+   u32 samples_available = sound_samples_available();
+
+   if (samples_available > 0)
+   {
+      s16 *audio_buffer_ptr;
+      u32 samples_to_read;
+      u32 samples_produced;
+
+      /* Update 'running average' of number of
+      * samples per frame.
+      * Note that this is not a true running
+      * average, but just a leaky-integrator/
+      * exponential moving average, used because
+      * it is simple and fast (i.e. requires no
+      * window of samples). */
+      audio_samples_per_frame_avg = (SAMPLES_PER_FRAME_MOVING_AVG_ALPHA * (float)samples_available) +
+            ((1.0f - SAMPLES_PER_FRAME_MOVING_AVG_ALPHA) * audio_samples_per_frame_avg);
+
+      samples_to_read = (u32)(audio_samples_per_frame_avg + 0.5f);
+
+      /* Resize audio output buffer, if required */
+      if (audio_sample_buffer_size < (samples_to_read * 2))
+      {
+         audio_sample_buffer_size = (samples_to_read * 2);
+         audio_sample_buffer      = (s16*)realloc(audio_sample_buffer,
+               audio_sample_buffer_size * sizeof(s16));
+      }
+
+      samples_produced = sound_read_samples(audio_sample_buffer, samples_to_read);
+
+      /* Workaround for a RetroArch audio driver
+       * limitation: a maximum of 1024 frames
+       * can be written per call of audio_batch_cb(),
+       * so we have to send samples in chunks */
+      audio_buffer_ptr = audio_sample_buffer;
+      while (samples_produced > 0)
+      {
+         u32 samples_to_write = (samples_produced > AUDIO_BATCH_FRAMES_MAX) ?
+               AUDIO_BATCH_FRAMES_MAX : samples_produced;
+
+         audio_batch_cb(audio_buffer_ptr, samples_to_write);
+
+         samples_produced -= samples_to_write;
+         audio_buffer_ptr += samples_to_write << 1;
+      }
+   }
+}
+
 static void video_run(void)
 {
    u16 *gba_screen_pixels_buf = gba_screen_pixels;
@@ -457,6 +521,11 @@ void retro_get_system_av_info(struct retro_system_av_info* info)
 
 void retro_init(void)
 {
+   u32 audio_samples_per_frame = (u32)((float)(GBA_SOUND_FREQUENCY) / (float)(GBA_FPS));
+   audio_sample_buffer_size    = audio_samples_per_frame * 2;
+   audio_sample_buffer         = (s16*)malloc(audio_sample_buffer_size * sizeof(s16));
+   audio_samples_per_frame_avg = (float)audio_samples_per_frame;
+
 #if defined(HAVE_DYNAREC)
   #if defined(MMAP_JIT_CACHE)
    rom_translation_cache = map_jit_block(ROM_TRANSLATION_CACHE_SIZE + RAM_TRANSLATION_CACHE_SIZE);
@@ -593,6 +662,13 @@ void retro_deinit(void)
    video_post_process     = NULL;
    post_process_cc        = false;
    post_process_mix       = false;
+
+   if (audio_sample_buffer)
+      free(audio_sample_buffer);
+
+   audio_sample_buffer         = NULL;
+   audio_sample_buffer_size    = 0;
+   audio_samples_per_frame_avg = 0.0f;
 }
 
 static retro_time_t retro_perf_dummy_get_time_usec() { return 0; }
@@ -636,6 +712,14 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 {
    video_cb = cb;
 }
+
+void retro_set_audio_sample(retro_audio_sample_t cb) { }
+
+void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)
+{
+   audio_batch_cb = cb;
+}
+
 void retro_set_input_poll(retro_input_poll_t cb)
 {
    input_poll_cb = cb;
@@ -1159,7 +1243,7 @@ void retro_run(void)
       execute_arm(execute_cycles);
    }
 
-   render_audio();
+   audio_run();
    video_run();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)

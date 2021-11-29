@@ -749,34 +749,38 @@ unsigned sound_write_savestate(u8 *dst)
   return (unsigned int)(dst - startp);
 }
 
-
-#include "libretro.h"
-
-static retro_audio_sample_batch_t audio_batch_cb;
-void retro_set_audio_sample(retro_audio_sample_t cb) { }
-void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
-
-void render_audio(void)
+u32 sound_samples_available(void)
 {
-   static s16 stream_base[512];
-   s16 *source;
+   u32 num_samples = (gbc_sound_buffer_index - sound_buffer_base) & BUFFER_SIZE_MASK;
+   num_samples = (num_samples > 512) ? (num_samples - 512) : 0;
+   return (num_samples >> 1);
+}
+
+u32 sound_read_samples(s16 *out, u32 count)
+{
+   u32 samples_available = sound_samples_available();
    u32 i;
 
-   while (((gbc_sound_buffer_index - sound_buffer_base) & BUFFER_SIZE_MASK) > 512)
+   if (count > samples_available)
+      count = samples_available;
+
+   for(i = 0; i < (count << 1); i++)
    {
-      source = (s16 *)(sound_buffer + sound_buffer_base);
-      for(i = 0; i < 512; i++)
-      {
-         s32 current_sample = source[i];
-         if(current_sample > 2047)
-            current_sample = 2047;
-         if(current_sample < -2048)
-            current_sample = -2048;
-         stream_base[i] = current_sample * 16;
-         source[i] = 0;
-      }
-      audio_batch_cb(stream_base, 256);
-      sound_buffer_base += 512;
-      sound_buffer_base &= BUFFER_SIZE_MASK;
+      u32 source_index   = (sound_buffer_base + i) & BUFFER_SIZE_MASK;
+      s32 current_sample = sound_buffer[source_index];
+
+      sound_buffer[source_index] = 0;
+
+      if(current_sample > 2047)
+         current_sample = 2047;
+      if(current_sample < -2048)
+         current_sample = -2048;
+
+      out[i] = current_sample * 16;
    }
+
+   sound_buffer_base += (count << 1);
+   sound_buffer_base &= BUFFER_SIZE_MASK;
+
+   return count;
 }
