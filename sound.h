@@ -108,8 +108,7 @@ void init_sound(int need_reset);
 unsigned sound_write_savestate(u8 *dst);
 bool sound_read_savestate(const u8 *src);
 
-u32 sound_samples_available(void);
-u32 sound_read_samples(s16 *out, u32 count);
+u32 sound_read_samples(s16 *out, u32 frames);
 
 void reset_sound(void);
 

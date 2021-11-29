@@ -749,22 +749,22 @@ unsigned sound_write_savestate(u8 *dst)
   return (unsigned int)(dst - startp);
 }
 
-u32 sound_samples_available(void)
+u32 sound_read_samples(s16 *out, u32 frames)
 {
-   u32 num_samples = (gbc_sound_buffer_index - sound_buffer_base) & BUFFER_SIZE_MASK;
-   num_samples = (num_samples > 512) ? (num_samples - 512) : 0;
-   return (num_samples >> 1);
-}
-
-u32 sound_read_samples(s16 *out, u32 count)
-{
-   u32 samples_available = sound_samples_available();
    u32 i;
+   u32 samples_to_read   = frames << 1;
+   /* Get total number of samples in the buffer */
+   u32 samples_available = (gbc_sound_buffer_index - sound_buffer_base) & BUFFER_SIZE_MASK;
+   /* The last 512 samples are 'in use', and cannot
+    * be read out yet */
+   samples_available     = (samples_available > 512) ? (samples_available - 512) : 0;
+   /* Available sample count must be an even number */
+   samples_available     = (samples_available >> 1) << 1;
 
-   if (count > samples_available)
-      count = samples_available;
+   if (samples_to_read > samples_available)
+      samples_to_read = samples_available;
 
-   for(i = 0; i < (count << 1); i++)
+   for(i = 0; i < samples_to_read; i++)
    {
       u32 source_index   = (sound_buffer_base + i) & BUFFER_SIZE_MASK;
       s32 current_sample = sound_buffer[source_index];
@@ -779,8 +779,9 @@ u32 sound_read_samples(s16 *out, u32 count)
       out[i] = current_sample * 16;
    }
 
-   sound_buffer_base += (count << 1);
+   sound_buffer_base += samples_to_read;
    sound_buffer_base &= BUFFER_SIZE_MASK;
 
-   return count;
+   /* Function returns number of frames read */
+   return (samples_to_read >> 1);
 }
