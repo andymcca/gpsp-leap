@@ -749,34 +749,39 @@ unsigned sound_write_savestate(u8 *dst)
   return (unsigned int)(dst - startp);
 }
 
-
-#include "libretro.h"
-
-static retro_audio_sample_batch_t audio_batch_cb;
-void retro_set_audio_sample(retro_audio_sample_t cb) { }
-void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
-
-void render_audio(void)
+u32 sound_read_samples(s16 *out, u32 frames)
 {
-   static s16 stream_base[512];
-   s16 *source;
    u32 i;
+   u32 samples_to_read   = frames << 1;
+   /* Get total number of samples in the buffer */
+   u32 samples_available = (gbc_sound_buffer_index - sound_buffer_base) & BUFFER_SIZE_MASK;
+   /* The last 512 samples are 'in use', and cannot
+    * be read out yet */
+   samples_available     = (samples_available > 512) ? (samples_available - 512) : 0;
+   /* Available sample count must be an even number */
+   samples_available     = (samples_available >> 1) << 1;
 
-   while (((gbc_sound_buffer_index - sound_buffer_base) & BUFFER_SIZE_MASK) > 512)
+   if (samples_to_read > samples_available)
+      samples_to_read = samples_available;
+
+   for(i = 0; i < samples_to_read; i++)
    {
-      source = (s16 *)(sound_buffer + sound_buffer_base);
-      for(i = 0; i < 512; i++)
-      {
-         s32 current_sample = source[i];
-         if(current_sample > 2047)
-            current_sample = 2047;
-         if(current_sample < -2048)
-            current_sample = -2048;
-         stream_base[i] = current_sample * 16;
-         source[i] = 0;
-      }
-      audio_batch_cb(stream_base, 256);
-      sound_buffer_base += 512;
-      sound_buffer_base &= BUFFER_SIZE_MASK;
+      u32 source_index   = (sound_buffer_base + i) & BUFFER_SIZE_MASK;
+      s32 current_sample = sound_buffer[source_index];
+
+      sound_buffer[source_index] = 0;
+
+      if(current_sample > 2047)
+         current_sample = 2047;
+      if(current_sample < -2048)
+         current_sample = -2048;
+
+      out[i] = current_sample * 16;
    }
+
+   sound_buffer_base += samples_to_read;
+   sound_buffer_base &= BUFFER_SIZE_MASK;
+
+   /* Function returns number of frames read */
+   return (samples_to_read >> 1);
 }
