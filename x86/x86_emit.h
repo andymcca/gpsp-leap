@@ -1302,6 +1302,7 @@ u32 function_cc execute_spsr_restore(u32 address)
 }                                                                             \
 
 #define arm_multiply_flags_yes()                                              \
+  generate_and(a0, a0);                                                       \
   generate_update_flag(z, REG_Z_FLAG)                                         \
   generate_update_flag(s, REG_N_FLAG)
 
@@ -1320,8 +1321,8 @@ u32 function_cc execute_spsr_restore(u32 address)
   generate_load_reg(a1, rs);                                                  \
   generate_multiply(a1);                                                      \
   arm_multiply_add_##add_op();                                                \
-  generate_store_reg(a0, rd);                                                 \
   arm_multiply_flags_##flags();                                               \
+  generate_store_reg(a0, rd);                                                 \
 }                                                                             \
 
 #define arm_multiply_long_flags_yes()                                         \
@@ -2042,9 +2043,10 @@ u32 execute_store_cpsr_body()
   storefnc(a0, rd);
 
 #define arm_data_proc_muls(rd, storefnc)                                      \
-  arm_data_proc_mul(rd, storefnc);                                            \
-  update_logical_flags();
-
+  generate_multiply(a1);                                                      \
+  generate_and(a0, a0);                                                       \
+  update_logical_flags();                                                     \
+  storefnc(a0, rd);
 
 #define arm_data_proc_adc(rd, storefnc)                                       \
   /* Loads the flag to the right value by adding it to ~0 causing carry */    \
