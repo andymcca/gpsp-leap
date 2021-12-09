@@ -2083,9 +2083,9 @@ static void emit_mem_access_loadop(
     break;
   case 1:
     if (signext) {
-      // Load 16 with sign extension is essentially a load byte
       if (alignment) {
-        mips_emit_lb(reg_rv, reg_rv, (base_addr & 0xffff));
+        // Unaligned signed 16b load, is just a load byte (due to sign extension)
+        mips_emit_lb(reg_rv, reg_rv, ((base_addr | 1) & 0xffff));
       } else {
         mips_emit_lh(reg_rv, reg_rv, (base_addr & 0xffff));
       }
