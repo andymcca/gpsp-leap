@@ -448,7 +448,7 @@ load_stubs( s8, movsbl, ~0, 0, read_memory8s)
 # arg0 (%eax) = new_cpsr
 # arg1 (%edx) = store_mask
 defsymbl(execute_store_cpsr)
-  mov %edx, REG_SAVE(REG_BASE)    # save store_mask
+  mov %edx, %esi                  # save store_mask for later
 
   mov %eax, %ecx                  # ecx = new_cpsr
   and %edx, %ecx                  # ecx = new_cpsr & store_mask
@@ -458,13 +458,18 @@ defsymbl(execute_store_cpsr)
   or %ecx, %eax                   # eax = new cpsr combined with old
   mov %eax, REG_CPSR(REG_BASE)    # save new cpsr to register
 
+  # Check whether any side effects (IRQ) could have happened
+  test $0xff, %esi
+  jnz 1f
+  extract_flags                   # pull out flag vars from new CPSR
+  ret
+1:
   CALL_FUNC(execute_store_cpsr_body)   # do the dirty work in this C function
   extract_flags                   # pull out flag vars from new CPSR
-
   cmp $0, %eax                    # see if return value is 0
-  jnz 1f                          # might have changed the PC
+  jnz 2f                          # might have changed the PC
   ret                             # return
-1:    # PC has changed, due to IRQ triggered
+2:    # PC has changed, due to IRQ triggered
   mov %eax, CARG1_REG             # Returned addr from C function
   CALL_FUNC(block_lookup_address_arm)  # lookup new PC
   add $ADDR_SIZE_BYTES, STACK_REG # get rid of current return address

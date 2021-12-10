@@ -1365,23 +1365,18 @@ u32 function_cc execute_spsr_restore(u32 address)
   execute_read_##psr_reg(rv);                                                 \
   generate_store_reg(rv, rd)                                                  \
 
-// store_mask and address are stored in the SAVE slots, since there's no real
-// register space to nicely pass them.
-
+// Does mode-change magic (including IRQ checks)
 u32 execute_store_cpsr_body()
 {
-  if(reg[REG_SAVE] & 0xFF)
+  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
+  if((io_registers[REG_IE] & io_registers[REG_IF]) &&
+      io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
   {
-    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
-    if((io_registers[REG_IE] & io_registers[REG_IF]) &&
-     io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
-    {
-      reg_mode[MODE_IRQ][6] = reg[REG_SAVE2] + 4;
-      spsr[MODE_IRQ] = reg[REG_CPSR];
-      reg[REG_CPSR] = (reg[REG_CPSR] & 0xFFFFFF00) | 0xD2;
-      set_cpu_mode(MODE_IRQ);
-      return 0x00000018;
-    }
+    reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
+    spsr[MODE_IRQ] = reg[REG_CPSR];
+    reg[REG_CPSR] = (reg[REG_CPSR] & 0xFFFFFF00) | 0xD2;
+    set_cpu_mode(MODE_IRQ);
+    return 0x00000018;
   }
 
   return 0;
@@ -1397,7 +1392,7 @@ u32 execute_store_cpsr_body()
 
 #define execute_store_cpsr()                                                  \
   generate_load_imm(a1, psr_masks[psr_field]);                                \
-  generate_store_reg_i32(pc + 4, REG_SAVE2);                                  \
+  generate_store_reg_i32(pc, REG_PC);                                         \
   generate_function_call(execute_store_cpsr)                                  \
 
 /* spsr[reg[CPU_MODE]] = (new_spsr & store_mask) | (old_spsr & (~store_mask))*/
