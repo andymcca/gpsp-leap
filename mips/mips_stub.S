@@ -445,31 +445,39 @@ no_spsr_restore:
   nop
 
 # $4: new cpsr
-# $5: store mask
-# $6: current PC
+# $5: current PC
+# $6: store mask
 
 defsymbl(execute_store_cpsr)
-  and $1, $4, $5                  # $1 = new_cpsr & store_mask
+  and $1, $4, $6                  # $1 = new_cpsr & store_mask
   lw $2, REG_CPSR($16)            # $2 = current cpsr
-  nor $4, $5, $0                  # $4 = ~store_mask
+  nor $4, $6, $0                  # $4 = ~store_mask
   and $2, $2, $4                  # $2 = (cpsr & (~store_mask))
   or $1, $1, $2                   # $1 = new cpsr combined with old
   extract_flags_body              # extract flags from $1
+
+  andi $6, $6, 0xff               # Check whether we overwrote mode
+  bnez $6, 1f
+  sw $1, REG_CPSR($16)            # Store new CPSR (delay slot)
+
+  jr $ra
+  nop
+
+1:
   sw $ra, REG_SAVE3($16)
   save_registers
   addu $4, $1, $0                 # load the new CPSR
   cfncall execute_store_cpsr_body, 7   # do the dirty work in this C function
 
-  bne $2, $0, changed_pc_cpsr     # this could have changed the pc
+  bnez $2, 2f                     # this could have changed the pc
   nop
 
   restore_registers
-
   lw $ra, REG_SAVE3($16)
   jr $ra
   nop
 
-changed_pc_cpsr:
+2:
   addu $4, $2, $0                      # load new address in $4
   cfncall block_lookup_address_arm, 1  # GBA address is in $4
   restore_registers                    # restore registers
@@ -478,16 +486,17 @@ changed_pc_cpsr:
 
 
 # $4: new spsr
-# $5: store mask
+# $5: current PC (unused)
+# $6: store mask
 
 defsymbl(execute_store_spsr)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
   sll $1, $1, 2                   # adjust to word offset size
   addu $1, $1, $16
   lw $2, SPSR_BASE($1)            # $2 = spsr[cpu_mode]
-  and $4, $4, $5                  # $4 = new_spsr & store_mask
-  nor $5, $5, $0                  # $5 = ~store_mask
-  and $2, $2, $5                  # $2 = (spsr & (~store_mask))
+  and $4, $4, $6                  # $4 = new_spsr & store_mask
+  nor $6, $6, $0                  # $6 = ~store_mask
+  and $2, $2, $6                  # $2 = (spsr & (~store_mask))
   or $4, $4, $2                   # $4 = new spsr combined with old
   jr $ra                          # return
   sw $4, SPSR_BASE($1)            # spsr[cpu_mode] = $4 (delay slot)

@@ -52,9 +52,6 @@ u32 execute_spsr_restore(u32 address);
 void execute_store_cpsr(u32 new_cpsr, u32 store_mask);
 void execute_store_spsr(u32 new_spsr, u32 store_mask);
 
-u32 execute_spsr_restore_body(u32 address);
-u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address);
-
 
 #define reg_base    mips_reg_s0
 #define reg_cycles  mips_reg_s1
@@ -1222,21 +1219,17 @@ u32 execute_spsr_restore_body(u32 address)
   generate_function_call(execute_read_##psr_reg);                             \
   generate_store_reg(reg_rv, rd)                                              \
 
-u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
+u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 {
-  reg[REG_CPSR] = _cpsr;
-  if(store_mask & 0xFF)
+  set_cpu_mode(cpu_modes[_cpsr & 0x1F]);
+  if((io_registers[REG_IE] & io_registers[REG_IF]) &&
+   io_registers[REG_IME] && ((_cpsr & 0x80) == 0))
   {
-    set_cpu_mode(cpu_modes[_cpsr & 0x1F]);
-    if((io_registers[REG_IE] & io_registers[REG_IF]) &&
-     io_registers[REG_IME] && ((_cpsr & 0x80) == 0))
-    {
-      reg_mode[MODE_IRQ][6] = address + 4;
-      spsr[MODE_IRQ] = _cpsr;
-      reg[REG_CPSR] = 0xD2;
-      set_cpu_mode(MODE_IRQ);
-      return 0x00000018;
-    }
+    reg_mode[MODE_IRQ][6] = address + 4;
+    spsr[MODE_IRQ] = _cpsr;
+    reg[REG_CPSR] = 0xD2;
+    set_cpu_mode(MODE_IRQ);
+    return 0x00000018;
   }
 
   return 0;
@@ -1250,8 +1243,8 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_psr_store(op_type, psr_reg)                                       \
   arm_psr_load_new_##op_type();                                               \
-  generate_load_imm(reg_a1, psr_masks[psr_field]);                            \
-  generate_load_pc(reg_a2, (pc + 4));                                         \
+  generate_load_pc(reg_a1, (pc));                                             \
+  generate_load_imm(reg_a2, psr_masks[psr_field]);                            \
   generate_function_call_swap_delay(execute_store_##psr_reg)                  \
 
 #define arm_psr(op_type, transfer_type, psr_reg)                              \
