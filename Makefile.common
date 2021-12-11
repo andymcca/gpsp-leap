@@ -31,16 +31,15 @@ SOURCES_C += $(CORE_DIR)/cpu_threaded.c
 endif
 
 ifeq ($(HAVE_DYNAREC), 1)
-
-ifeq ($(CPU_ARCH), x86_32)
-SOURCES_ASM += $(CORE_DIR)/x86/x86_stub.S
-endif
-ifeq ($(CPU_ARCH), arm)
-SOURCES_ASM += $(CORE_DIR)/arm/arm_stub.S
-endif
-ifeq ($(CPU_ARCH), mips)
-SOURCES_ASM += $(CORE_DIR)/mips/mips_stub.S
-endif
+  ifeq ($(CPU_ARCH), x86_32)
+    SOURCES_ASM += $(CORE_DIR)/x86/x86_stub.S
+  else ifeq ($(CPU_ARCH), arm)
+    SOURCES_ASM += $(CORE_DIR)/arm/arm_stub.S
+  else ifeq ($(CPU_ARCH), arm64)
+    SOURCES_ASM += $(CORE_DIR)/arm/arm64_stub.S
+  else ifeq ($(CPU_ARCH), mips)
+    SOURCES_ASM += $(CORE_DIR)/mips/mips_stub.S
+  endif
 endif
 
 ifeq ($(CPU_ARCH), arm)

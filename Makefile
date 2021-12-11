@@ -349,6 +349,17 @@ else ifeq ($(platform), wii)
 	CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -D__ppc__
 	STATIC_LINKING = 1
 
+# aarch64 (armv8)
+else ifeq ($(platform), arm64)
+	TARGET := $(TARGET_NAME)_libretro.so
+	SHARED := -shared -Wl,--version-script=link.T
+	fpic := -fPIC
+	CFLAGS += -fomit-frame-pointer -ffast-math
+	LDFLAGS += -Wl,--no-undefined
+	HAVE_DYNAREC := 1
+	MMAP_JIT_CACHE = 1
+	CPU_ARCH := arm64
+
 # ARM
 else ifneq (,$(findstring armv,$(platform)))
 	TARGET := $(TARGET_NAME)_libretro.so
@@ -488,6 +499,7 @@ CFLAGS += -DMMAP_JIT_CACHE
 endif
 
 # Add -DTRACE_INSTRUCTIONS to trace instruction execution
+# Can add -DTRACE_REGISTERS to additionally print register values
 ifeq ($(DEBUG), 1)
 	OPTIMIZE      := -O0 -g
 else
@@ -502,6 +514,8 @@ endif
 
 ifeq ($(CPU_ARCH), arm)
 	DEFINES += -DARM_ARCH
+else ifeq ($(CPU_ARCH), arm64)
+	DEFINES += -DARM64_ARCH
 else ifeq ($(CPU_ARCH), mips)
 	DEFINES += -DMIPS_ARCH
 else ifeq ($(CPU_ARCH), x86_32)

@@ -218,6 +218,8 @@ extern u8 bit_count[256];
   #include "mips/mips_emit.h"
 #elif defined(ARM_ARCH)
   #include "arm/arm_emit.h"
+#elif defined(ARM64_ARCH)
+  #include "arm/arm64_emit.h"
 #else
   #include "x86/x86_emit.h"
 #endif
@@ -243,7 +245,7 @@ extern u8 bit_count[256];
   void platform_cache_sync(void *baseaddr, void *endptr) {
     ctr_flush_invalidate_cache();
   }
-#elif defined(ARM_ARCH)
+#elif defined(ARM_ARCH) || defined(ARM64_ARCH)
   void platform_cache_sync(void *baseaddr, void *endptr) {
     __clear_cache(baseaddr, endptr);
   }
