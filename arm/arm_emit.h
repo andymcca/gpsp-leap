@@ -1238,21 +1238,34 @@ static void trace_instruction(u32 pc, u32 mode)
     printf("Executed arm %x\n", pc);
   else
     printf("Executed thumb %x\n", pc);
+  #ifdef TRACE_REGISTERS
+  print_regs();
+  #endif
 }
 
 #ifdef TRACE_INSTRUCTIONS
-  #define emit_trace_instruction(pc, mode)         \
+  #define emit_trace_instruction(pc, mode, regt)   \
+  {                                                \
+    unsigned i;                                    \
+    for (i = 0; i < 15; i++) {                     \
+      if (regt[i] != mem_reg) {                    \
+        ARM_STR_IMM(0, regt[i], reg_base, (i*4));  \
+      }                                            \
+    }                                              \
     generate_save_flags();                         \
     ARM_STMDB_WB(0, ARMREG_SP, 0x500C);            \
     arm_load_imm_32bit(reg_a0, pc);                \
     arm_load_imm_32bit(reg_a1, mode);              \
     generate_function_far_call(armfn_debug_trace); \
     ARM_LDMIA_WB(0, ARMREG_SP, 0x500C);            \
-    generate_restore_flags();
+    generate_restore_flags();                      \
+  }
+
   #define emit_trace_thumb_instruction(pc)         \
-    emit_trace_instruction(pc, 0)
+    emit_trace_instruction(pc, 0, thumb_register_allocation)
+
   #define emit_trace_arm_instruction(pc)           \
-    emit_trace_instruction(pc, 1)
+    emit_trace_instruction(pc, 1, arm_register_allocation)
 #else
   #define emit_trace_thumb_instruction(pc)
   #define emit_trace_arm_instruction(pc)

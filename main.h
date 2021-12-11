@@ -92,7 +92,7 @@ extern u32 num_skipped_frames;
 extern int dynarec_enable;
 extern boot_mode selected_boot_mode;
 
-void change_ext(const char *src, char *buffer, const char *extension);
+void print_regs(void);
 
 #endif
 

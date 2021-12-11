@@ -269,14 +269,16 @@ u32 file_length(FILE *fp)
   return length;
 }
 
-void change_ext(const char *src, char *buffer, const char *extension)
+void print_regs(void)
 {
-  char *dot_position;
-  strcpy(buffer, src);
-  dot_position = strrchr(buffer, '.');
-
-  if(dot_position)
-    strcpy(dot_position, extension);
+  printf("R0=%08x R1=%08x R2=%08x R3=%08x "
+         "R4=%08x R5=%08x R6=%08x R7=%08x "
+         "R8=%08x R9=%08x R10=%08x R11=%08x "
+         "R12=%08x R13=%08x R14=%08x\n",
+         reg[0], reg[1], reg[2], reg[3],
+         reg[4], reg[5], reg[6], reg[7],
+         reg[8], reg[9], reg[10], reg[11],
+         reg[12], reg[13], reg[14]);
 }
 
 bool main_read_savestate(const u8 *src)

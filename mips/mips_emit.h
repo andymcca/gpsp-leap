@@ -1877,6 +1877,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
       printf("Executed arm %x\n", pc);
     else
       printf("Executed thumb %x\n", pc);
+    #ifdef TRACE_REGISTERS
+    print_regs();
+    #endif
   }
 
   #define emit_trace_instruction(pc, mode)                                      \

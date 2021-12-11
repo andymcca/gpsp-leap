@@ -678,6 +678,9 @@ typedef enum
       printf("Executed arm %x\n", pc);
     else
       printf("Executed thumb %x\n", pc);
+    #ifdef TRACE_REGISTERS
+    print_regs();
+    #endif
   }
 
   #define emit_trace_instruction(pc, mode)         \
