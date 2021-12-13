@@ -1861,7 +1861,7 @@ extern void* ldst_lookup_tables[16*4 + 17*6];
 
 
 void init_emitter() {
-  rom_cache_watermark = 0;
+  rom_cache_watermark = INITIAL_ROM_WATERMARK;
   init_bios_hooks();
 
   // Generate handler table

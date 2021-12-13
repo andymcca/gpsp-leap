@@ -3424,6 +3424,7 @@ void init_bios_hooks(void)
   // Pre-generate this entry point so that we can safely invoke fast
   // SWI calls from ROM and RAM regardless of cache flushes.
   rom_translation_ptr = &rom_translation_cache[rom_cache_watermark];
+  last_rom_translation_ptr = rom_translation_ptr;
   bios_swi_entrypoint = block_lookup_address_arm(0x8);
   rom_cache_watermark = (u32)(rom_translation_ptr - rom_translation_cache);
 }
