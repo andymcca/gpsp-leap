@@ -642,25 +642,6 @@ typedef enum
     }                                                                         \
   }                                                                           \
 
-#define calculate_z_flag(dest)                                                \
-  reg[REG_Z_FLAG] = (dest == 0)                                               \
-
-#define calculate_n_flag(dest)                                                \
-  reg[REG_N_FLAG] = ((signed)dest < 0)                                        \
-
-#define calculate_c_flag_sub(dest, src_a, src_b)                              \
-  reg[REG_C_FLAG] = ((unsigned)src_b <= (unsigned)src_a)                      \
-
-#define calculate_v_flag_sub(dest, src_a, src_b)                              \
-  reg[REG_V_FLAG] = ((signed)src_b > (signed)src_a) != ((signed)dest < 0)     \
-
-#define calculate_c_flag_add(dest, src_a, src_b)                              \
-  reg[REG_C_FLAG] = ((unsigned)dest < (unsigned)src_a)                        \
-
-#define calculate_v_flag_add(dest, src_a, src_b)                              \
-  reg[REG_V_FLAG] = ((signed)dest < (signed)src_a) != ((signed)src_b < 0)     \
-
-
 
 #define get_shift_imm()                                                       \
   u32 shift = (opcode >> 7) & 0x1F                                            \
@@ -696,6 +677,10 @@ typedef enum
   #define emit_trace_arm_instruction(pc)
 #endif
 
+#define check_generate_n_flag   (flag_status & 0x08)
+#define check_generate_z_flag   (flag_status & 0x04)
+#define check_generate_c_flag   (flag_status & 0x02)
+#define check_generate_v_flag   (flag_status & 0x01)
 
 #define generate_asr_no_flags_reg(ireg)                                       \
 {                                                                             \
@@ -1730,8 +1715,7 @@ u32 execute_store_cpsr_body()
   } else {                                                                    \
     generate_or(a0, a0);                                                      \
   }                                                                           \
-  generate_update_flag(z, REG_Z_FLAG)                                         \
-  generate_update_flag(s, REG_N_FLAG)                                         \
+  update_logical_flags()                                                      \
 
 #define thumb_lsr_imm_op()                                                    \
   if (imm) {                                                                  \
@@ -1742,8 +1726,7 @@ u32 execute_store_cpsr_body()
     generate_update_flag(nz, REG_C_FLAG)                                      \
     generate_xor(a0, a0);                                                     \
   }                                                                           \
-  generate_update_flag(z, REG_Z_FLAG)                                         \
-  generate_update_flag(s, REG_N_FLAG)                                         \
+  update_logical_flags()                                                      \
 
 #define thumb_asr_imm_op()                                                    \
   if (imm) {                                                                  \
@@ -1753,8 +1736,7 @@ u32 execute_store_cpsr_body()
     generate_shift_right_arithmetic(a0, 31);                                  \
     generate_update_flag(s, REG_C_FLAG)                                       \
   }                                                                           \
-  generate_update_flag(z, REG_Z_FLAG)                                         \
-  generate_update_flag(s, REG_N_FLAG)                                         \
+  update_logical_flags()                                                      \
 
 #define thumb_ror_imm_op()                                                    \
   if (imm) {                                                                  \
@@ -1763,8 +1745,7 @@ u32 execute_store_cpsr_body()
   } else {                                                                    \
     generate_rrx_flags(a0);                                                   \
   }                                                                           \
-  generate_update_flag(z, REG_Z_FLAG)                                         \
-  generate_update_flag(s, REG_N_FLAG)                                         \
+  update_logical_flags()                                                      \
 
 
 #define generate_shift_load_operands_reg()                                    \
@@ -1781,8 +1762,7 @@ u32 execute_store_cpsr_body()
 #define thumb_shift_operation_reg(op_type)                                    \
   generate_##op_type##_flags_reg(a0);                                         \
   generate_or(a0, a0);                                                        \
-  generate_update_flag(z, REG_Z_FLAG)                                         \
-  generate_update_flag(s, REG_N_FLAG)                                         \
+  update_logical_flags()                                                      \
 
 #define thumb_shift(decode_type, op_type, value_type)                         \
 {                                                                             \
@@ -1964,42 +1944,57 @@ u32 execute_store_cpsr_body()
 // Execute functions
 
 #define update_logical_flags()                                                \
-  generate_update_flag(z, REG_Z_FLAG)                                         \
-  generate_update_flag(s, REG_N_FLAG)
+  if (check_generate_z_flag) {                                                \
+    generate_update_flag(z, REG_Z_FLAG)                                       \
+  }                                                                           \
+  if (check_generate_n_flag) {                                                \
+    generate_update_flag(s, REG_N_FLAG)                                       \
+  }                                                                           \
 
 #define update_add_flags()                                                    \
   update_logical_flags()                                                      \
-  generate_update_flag(c, REG_C_FLAG)                                         \
-  generate_update_flag(o, REG_V_FLAG)
+  if (check_generate_c_flag) {                                                \
+    generate_update_flag(c, REG_C_FLAG)                                       \
+  }                                                                           \
+  if (check_generate_v_flag) {                                                \
+    generate_update_flag(o, REG_V_FLAG)                                       \
+  }                                                                           \
 
 #define update_sub_flags()                                                    \
   update_logical_flags()                                                      \
-  generate_update_flag(nc, REG_C_FLAG)                                        \
-  generate_update_flag(o, REG_V_FLAG)
+  if (check_generate_c_flag) {                                                \
+    generate_update_flag(nc, REG_C_FLAG)                                      \
+  }                                                                           \
+  if (check_generate_v_flag) {                                                \
+    generate_update_flag(o, REG_V_FLAG)                                       \
+  }                                                                           \
 
 #define arm_data_proc_and(rd, storefnc)                                       \
   generate_and(a0, a1);                                                       \
   storefnc(a0, rd);
 
 #define arm_data_proc_ands(rd, storefnc)                                      \
-  arm_data_proc_and(rd, storefnc);                                            \
-  update_logical_flags()
+  generate_and(a0, a1);                                                       \
+  update_logical_flags();                                                     \
+  storefnc(a0, rd);
 
 #define arm_data_proc_eor(rd, storefnc)                                       \
   generate_xor(a0, a1);                                                       \
   storefnc(a0, rd);
 
 #define arm_data_proc_eors(rd, storefnc)                                      \
-  arm_data_proc_eor(rd, storefnc);                                            \
-  update_logical_flags()
+  generate_xor(a0, a1);                                                       \
+  update_logical_flags();                                                     \
+  storefnc(a0, rd);
 
 #define arm_data_proc_orr(rd, storefnc)                                       \
   generate_or(a0, a1);                                                        \
   storefnc(a0, rd);
 
 #define arm_data_proc_orrs(rd, storefnc)                                      \
-  arm_data_proc_orr(rd, storefnc);                                            \
-  update_logical_flags()
+  generate_or(a0, a1);                                                        \
+  update_logical_flags();                                                     \
+  storefnc(a0, rd);
 
 #define arm_data_proc_bic(rd, storefnc)                                       \
   generate_not(a0);                                                           \
@@ -2007,16 +2002,19 @@ u32 execute_store_cpsr_body()
   storefnc(a0, rd);
 
 #define arm_data_proc_bics(rd, storefnc)                                      \
-  arm_data_proc_bic(rd, storefnc);                                            \
-  update_logical_flags()
+  generate_not(a0);                                                           \
+  generate_and(a0, a1);                                                       \
+  update_logical_flags();                                                     \
+  storefnc(a0, rd);
 
 #define arm_data_proc_add(rd, storefnc)                                       \
   generate_add(a0, a1);                                                       \
   storefnc(a0, rd);
 
 #define arm_data_proc_adds(rd, storefnc)                                      \
-  arm_data_proc_add(rd, storefnc);                                            \
-  update_add_flags();
+  generate_add(a0, a1);                                                       \
+  update_add_flags();                                                         \
+  storefnc(a0, rd);
 
 // Argument ordering is inverted between arm and x86
 #define arm_data_proc_sub(rd, storefnc)                                       \
@@ -2029,12 +2027,14 @@ u32 execute_store_cpsr_body()
 
 // Borrow flag in ARM is opposite to carry flag in x86
 #define arm_data_proc_subs(rd, storefnc)                                      \
-  arm_data_proc_sub(rd, storefnc)                                             \
-  update_sub_flags()
+  generate_sub(a1, a0);                                                       \
+  update_sub_flags();                                                         \
+  storefnc(a1, rd);
 
 #define arm_data_proc_rsbs(rd, storefnc)                                      \
-  arm_data_proc_rsb(rd, storefnc)                                             \
-  update_sub_flags()
+  generate_sub(a0, a1);                                                       \
+  update_sub_flags();                                                         \
+  storefnc(a0, rd);
 
 #define arm_data_proc_mul(rd, storefnc)                                       \
   generate_multiply(a1);                                                      \
@@ -2046,36 +2046,49 @@ u32 execute_store_cpsr_body()
   update_logical_flags();                                                     \
   storefnc(a0, rd);
 
-#define arm_data_proc_adc(rd, storefnc)                                       \
+#define load_c_flag(tmpreg)                                                   \
   /* Loads the flag to the right value by adding it to ~0 causing carry */    \
-  generate_load_imm(a2, 0xffffffff);                                          \
-  generate_add_memreg(a2, REG_C_FLAG);                                        \
+  generate_load_imm(tmpreg, 0xffffffff);                                      \
+  generate_add_memreg(tmpreg, REG_C_FLAG);                                    \
+
+#define load_inv_c_flag(tmpreg)                                               \
+  /* Loads the inverse C flag (for subtraction, since ARM's inverted) */      \
+  generate_load_reg(tmpreg, REG_C_FLAG);                                      \
+  generate_sub_imm(tmpreg, 1);                                                \
+
+
+#define arm_data_proc_adc(rd, storefnc)                                       \
+  load_c_flag(a2)                                                             \
   generate_adc(a0, a1);                                                       \
   storefnc(a0, rd);
 
 #define arm_data_proc_adcs(rd, storefnc)                                      \
-  arm_data_proc_adc(rd, storefnc)                                             \
-  update_add_flags()
+  load_c_flag(a2)                                                             \
+  generate_adc(a0, a1);                                                       \
+  update_add_flags()                                                          \
+  storefnc(a0, rd);
 
 #define arm_data_proc_sbc(rd, storefnc)                                       \
-  generate_load_reg(a2, REG_C_FLAG);                                          \
-  generate_sub_imm(a2, 1);                                                    \
+  load_inv_c_flag(a2)                                                         \
   generate_sbb(a1, a0);                                                       \
   storefnc(a1, rd);
 
 #define arm_data_proc_sbcs(rd, storefnc)                                      \
-  arm_data_proc_sbc(rd, storefnc)                                             \
-  update_sub_flags()
+  load_inv_c_flag(a2)                                                         \
+  generate_sbb(a1, a0);                                                       \
+  update_sub_flags()                                                          \
+  storefnc(a1, rd);
 
 #define arm_data_proc_rsc(rd, storefnc)                                       \
-  generate_load_reg(a2, REG_C_FLAG);                                          \
-  generate_sub_imm(a2, 1);                                                    \
+  load_inv_c_flag(a2)                                                         \
   generate_sbb(a0, a1);                                                       \
   storefnc(a0, rd);
 
 #define arm_data_proc_rscs(rd, storefnc)                                      \
-  arm_data_proc_rsc(rd, storefnc)                                             \
-  update_sub_flags()
+  load_inv_c_flag(a2)                                                         \
+  generate_sbb(a0, a1);                                                       \
+  update_sub_flags()                                                          \
+  storefnc(a0, rd);
 
 
 #define arm_data_proc_test_cmp()                                              \
