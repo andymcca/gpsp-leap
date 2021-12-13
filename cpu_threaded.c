@@ -2917,18 +2917,15 @@ block_lookup_address_builder(dual);
 
 #define thumb_dead_flag_eliminate()                                           \
 {                                                                             \
-  u32 needed_mask;                                                            \
-  needed_mask = block_data[block_data_position].flag_data >> 8;               \
+  u32 needed_mask = 0xff;                                                     \
                                                                               \
-  block_data_position--;                                                      \
-  while(block_data_position >= 0)                                             \
+  while(--block_data_position >= 0)                                           \
   {                                                                           \
     flag_status = block_data[block_data_position].flag_data;                  \
     block_data[block_data_position].flag_data =                               \
      (flag_status & needed_mask);                                             \
     needed_mask &= ~((flag_status >> 4) & 0x0F);                              \
     needed_mask |= flag_status >> 8;                                          \
-    block_data_position--;                                                    \
   }                                                                           \
 }                                                                             \
 
