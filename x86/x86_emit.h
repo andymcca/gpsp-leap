@@ -2223,10 +2223,9 @@ static void function_cc execute_swi(u32 pc)
   generate_store_reg(a0, 0);                                                  \
   generate_store_reg(a1, 1);                                                  \
   generate_mov(a1, a0);                                                       \
-  generate_shift_right(a1, 31);                                               \
-  generate_xor(a1, a0);                                                       \
-  generate_shift_right_arithmetic(a0, 31);                                    \
-  generate_add(a0, a1);                                                       \
+  generate_shift_right_arithmetic(a1, 31);                                    \
+  generate_xor(a0, a1);                                                       \
+  generate_sub(a0, a1);                                                       \
   generate_store_reg(a0, 3);                                                  \
   generate_branch_patch_conditional(jmpinst, translation_ptr);                \
 }
@@ -2243,10 +2242,9 @@ static void function_cc execute_swi(u32 pc)
   generate_store_reg(a0, 0);                                                  \
   generate_store_reg(a1, 1);                                                  \
   generate_mov(a1, a0);                                                       \
-  generate_shift_right(a1, 31);                                               \
-  generate_xor(a1, a0);                                                       \
-  generate_shift_right_arithmetic(a0, 31);                                    \
-  generate_add(a0, a1);                                                       \
+  generate_shift_right_arithmetic(a1, 31);                                    \
+  generate_xor(a0, a1);                                                       \
+  generate_sub(a0, a1);                                                       \
   generate_store_reg(a0, 3);                                                  \
   generate_branch_patch_conditional(jmpinst, translation_ptr);                \
 }
