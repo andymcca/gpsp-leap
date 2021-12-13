@@ -173,9 +173,10 @@ void print_register_usage(void)
   u32 imm;                                                                    \
   u32 rn = (opcode >> 16) & 0x0F;                                             \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
+  u32 imm_ror = ((opcode >> 8) & 0xF) << 1;                                   \
   (void)rd;                                                                   \
   (void)rn;                                                                   \
-  ror(imm, opcode & 0xFF, ((opcode >> 8) & 0x0F) * 2);                        \
+  ror(imm, opcode & 0xFF, imm_ror);                                           \
   using_register(arm, rd, op_dest);                                           \
   using_register(arm, rn, op_src)                                             \
 
@@ -282,7 +283,7 @@ void print_register_usage(void)
   u32 rd = opcode & 0x07;                                                     \
   using_register(thumb, rd, op_dest);                                         \
   using_register(thumb, rn, op_src);                                          \
-  using_register(thumb, rn, op_src)                                           \
+  using_register(thumb, rs, op_src)                                           \
 
 #define thumb_decode_add_sub_imm()                                            \
   u32 imm = (opcode >> 6) & 0x07;                                             \
@@ -358,18 +359,15 @@ void print_register_usage(void)
 #define calculate_n_flag(dest)                                                \
   n_flag = ((signed)dest < 0)                                                 \
 
-#define calculate_c_flag_sub(dest, src_a, src_b)                              \
-  c_flag = ((unsigned)src_b <= (unsigned)src_a)                               \
+#define calculate_c_flag_sub(dest, src_a, src_b, carry)                       \
+  c_flag = (carry) ? ((unsigned)src_b <= (unsigned)src_a) :                   \
+                     ((unsigned)src_b < (unsigned)src_a);                     \
 
 #define calculate_v_flag_sub(dest, src_a, src_b)                              \
-  v_flag = ((signed)src_b > (signed)src_a) != ((signed)dest < 0)              \
-
-#define calculate_c_flag_add(dest, src_a, src_b)                              \
-  c_flag = ((unsigned)dest < (unsigned)src_a)                                 \
+  v_flag = (((src_a ^ src_b) & (~src_b ^ dest)) >> 31)
 
 #define calculate_v_flag_add(dest, src_a, src_b)                              \
-  v_flag = ((signed)dest < (signed)src_a) != ((signed)src_b < 0)              \
-
+  v_flag = ((~((src_a) ^ (src_b)) & ((src_a) ^ (dest))) >> 31)
 
 #define calculate_reg_sh()                                                    \
   u32 reg_sh = 0;                                                             \
@@ -661,13 +659,12 @@ void print_register_usage(void)
 #define calculate_flags_add(dest, src_a, src_b)                               \
   calculate_z_flag(dest);                                                     \
   calculate_n_flag(dest);                                                     \
-  calculate_c_flag_add(dest, src_a, src_b);                                   \
   calculate_v_flag_add(dest, src_a, src_b)                                    \
 
-#define calculate_flags_sub(dest, src_a, src_b)                               \
+#define calculate_flags_sub(dest, src_a, src_b, carry)                        \
   calculate_z_flag(dest);                                                     \
   calculate_n_flag(dest);                                                     \
-  calculate_c_flag_sub(dest, src_a, src_b);                                   \
+  calculate_c_flag_sub(dest, src_a, src_b, carry);                            \
   calculate_v_flag_sub(dest, src_a, src_b)                                    \
 
 #define calculate_flags_logic(dest)                                           \
@@ -756,6 +753,8 @@ void print_register_usage(void)
 
 #define arm_data_proc_flags_imm()                                             \
   arm_decode_data_proc_imm(opcode)                                            \
+  if(imm_ror)                                                                 \
+    c_flag = (imm >> 31);  /* imm is rotated already! */                      \
 
 #define arm_data_proc_imm()                                                   \
   arm_decode_data_proc_imm(opcode)                                            \
@@ -791,25 +790,30 @@ void print_register_usage(void)
   arm_spsr_restore();                                                         \
 }                                                                             \
 
-#define arm_data_proc_add_flags(src_a, src_b, type)                           \
+#define arm_data_proc_add_flags(src_a, src_b, src_c, type)                    \
 {                                                                             \
+  u32 _sc = src_c;                                                            \
   arm_pc_offset(8);                                                           \
   arm_data_proc_##type();                                                     \
   flags_vars(src_a, src_b);                                                   \
   dest = _sa + _sb;                                                           \
+  c_flag = (dest < _sb);                                                      \
+  dest += _sc;                                                                \
+  c_flag |= (dest < _sc);                                                     \
   calculate_flags_add(dest, _sa, _sb);                                        \
   arm_pc_offset(-4);                                                          \
   reg[rd] = dest;                                                             \
   arm_spsr_restore();                                                         \
 }
 
-#define arm_data_proc_sub_flags(src_a, src_b, type)                           \
+#define arm_data_proc_sub_flags(src_a, src_b, src_c, type)                    \
 {                                                                             \
+  u32 _sc = src_c;                                                            \
   arm_pc_offset(8);                                                           \
   arm_data_proc_##type();                                                     \
   flags_vars(src_a, src_b);                                                   \
-  dest = _sa - _sb;                                                           \
-  calculate_flags_sub(dest, _sa, _sb);                                        \
+  dest = _sa + (~(_sb)) + _sc;                                                \
+  calculate_flags_sub(dest, _sa, _sb, _sc);                                   \
   arm_pc_offset(-4);                                                          \
   reg[rd] = dest;                                                             \
   arm_spsr_restore();                                                         \
@@ -830,6 +834,7 @@ void print_register_usage(void)
   arm_data_proc_##type();                                                     \
   flags_vars(src_a, src_b);                                                   \
   dest = _sa + _sb;                                                           \
+  c_flag = (dest < _sb);                                                      \
   calculate_flags_add(dest, _sa, _sb);                                        \
   arm_pc_offset(-4);                                                          \
 }                                                                             \
@@ -840,7 +845,7 @@ void print_register_usage(void)
   arm_data_proc_##type();                                                     \
   flags_vars(src_a, src_b);                                                   \
   dest = _sa - _sb;                                                           \
-  calculate_flags_sub(dest, _sa, _sb);                                        \
+  calculate_flags_sub(dest, _sa, _sb, 1);                                     \
   arm_pc_offset(-4);                                                          \
 }                                                                             \
 
@@ -1202,12 +1207,16 @@ const u32 psr_masks[16] =
 // Types: add_sub, add_sub_imm, alu_op, imm
 // Affects N/Z/C/V flags
 
-#define thumb_add(type, dest_reg, src_a, src_b)                               \
+#define thumb_add(type, dest_reg, src_a, src_b, src_c)                        \
 {                                                                             \
+  const u32 _sc = src_c;                                                      \
   thumb_decode_##type();                                                      \
   const u32 _sa = src_a;                                                      \
   const u32 _sb = src_b;                                                      \
   u32 dest = _sa + _sb;                                                       \
+  c_flag = (dest < _sb);                                                      \
+  dest += _sc;                                                                \
+  c_flag |= (dest < _sc);                                                     \
   calculate_flags_add(dest, _sa, _sb);                                        \
   reg[dest_reg] = dest;                                                       \
   thumb_pc_offset(2);                                                         \
@@ -1221,13 +1230,14 @@ const u32 psr_masks[16] =
   thumb_pc_offset(2);                                                         \
 }                                                                             \
 
-#define thumb_sub(type, dest_reg, src_a, src_b)                               \
+#define thumb_sub(type, dest_reg, src_a, src_b, src_c)                        \
 {                                                                             \
   thumb_decode_##type();                                                      \
   const u32 _sa = src_a;                                                      \
   const u32 _sb = src_b;                                                      \
-  u32 dest = _sa - _sb;                                                       \
-  calculate_flags_sub(dest, _sa, _sb);                                        \
+  const u32 _sc = src_c;                                                      \
+  u32 dest = _sa + (~_sb) + _sc;                                              \
+  calculate_flags_sub(dest, _sa, _sb, _sc);                                   \
   reg[dest_reg] = dest;                                                       \
   thumb_pc_offset(2);                                                         \
 }                                                                             \
@@ -1378,6 +1388,7 @@ const u32 psr_masks[16] =
   const u32 _sa = src_a;                                                      \
   const u32 _sb = src_b;                                                      \
   u32 dest = _sa + _sb;                                                       \
+  c_flag = (dest < _sb);                                                      \
   calculate_flags_add(dest, src_a, src_b);                                    \
   thumb_pc_offset(2);                                                         \
 }                                                                             \
@@ -1388,7 +1399,7 @@ const u32 psr_masks[16] =
   const u32 _sa = src_a;                                                      \
   const u32 _sb = src_b;                                                      \
   u32 dest = _sa - _sb;                                                       \
-  calculate_flags_sub(dest, src_a, src_b);                                    \
+  calculate_flags_sub(dest, src_a, src_b, 1);                                 \
   thumb_pc_offset(2);                                                         \
 }                                                                             \
 
@@ -1896,7 +1907,7 @@ arm_loop:
              else
              {
                 /* SUBS rd, rn, reg_op */
-                arm_data_proc_sub_flags(reg[rn], reg_sh, reg);
+                arm_data_proc_sub_flags(reg[rn], reg_sh, 1, reg);
              }
              break;
 
@@ -1937,7 +1948,7 @@ arm_loop:
              else
              {
                 /* RSBS rd, rn, reg_op */
-                arm_data_proc_sub_flags(reg_sh, reg[rn], reg);
+                arm_data_proc_sub_flags(reg_sh, reg[rn], 1, reg);
              }
              break;
 
@@ -1991,7 +2002,7 @@ arm_loop:
              else
              {
                 /* ADDS rd, rn, reg_op */
-                arm_data_proc_add_flags(reg[rn], reg_sh, reg);
+                arm_data_proc_add_flags(reg[rn], reg_sh, 0, reg);
              }
              break;
 
@@ -2045,7 +2056,7 @@ arm_loop:
              else
              {
                 /* ADCS rd, rn, reg_op */
-                arm_data_proc_add_flags(reg[rn], reg_sh + c_flag, reg);
+                arm_data_proc_add_flags(reg[rn], reg_sh, c_flag, reg);
              }
              break;
 
@@ -2099,7 +2110,7 @@ arm_loop:
              else
              {
                 /* SBCS rd, rn, reg_op */
-                arm_data_proc_sub_flags(reg[rn], (reg_sh + (c_flag ^ 1)), reg);
+                arm_data_proc_sub_flags(reg[rn], reg_sh, c_flag, reg);
              }
              break;
 
@@ -2153,7 +2164,7 @@ arm_loop:
              else
              {
                 /* RSCS rd, rn, reg_op */
-                arm_data_proc_sub_flags((reg_sh + c_flag - 1), reg[rn], reg);
+                arm_data_proc_sub_flags(reg_sh, reg[rn], c_flag, reg);
              }
              break;
 
@@ -2548,7 +2559,7 @@ arm_loop:
 
           case 0x25:
              /* SUBS rd, rn, imm */
-             arm_data_proc_sub_flags(reg[rn], imm, imm);
+             arm_data_proc_sub_flags(reg[rn], imm, 1, imm);
              break;
 
           case 0x26:
@@ -2558,7 +2569,7 @@ arm_loop:
 
           case 0x27:
              /* RSBS rd, rn, imm */
-             arm_data_proc_sub_flags(imm, reg[rn], imm);
+             arm_data_proc_sub_flags(imm, reg[rn], 1, imm);
              break;
 
           case 0x28:
@@ -2568,7 +2579,7 @@ arm_loop:
 
           case 0x29:
              /* ADDS rd, rn, imm */
-             arm_data_proc_add_flags(reg[rn], imm, imm);
+             arm_data_proc_add_flags(reg[rn], imm, 0, imm);
              break;
 
           case 0x2A:
@@ -2578,7 +2589,7 @@ arm_loop:
 
           case 0x2B:
              /* ADCS rd, rn, imm */
-             arm_data_proc_add_flags(reg[rn] + imm, c_flag, imm);
+             arm_data_proc_add_flags(reg[rn], imm, c_flag, imm);
              break;
 
           case 0x2C:
@@ -2588,7 +2599,7 @@ arm_loop:
 
           case 0x2D:
              /* SBCS rd, rn, imm */
-             arm_data_proc_sub_flags(reg[rn], (imm + (c_flag ^ 1)), imm);
+             arm_data_proc_sub_flags(reg[rn], imm, c_flag, imm);
              break;
 
           case 0x2E:
@@ -2598,7 +2609,7 @@ arm_loop:
 
           case 0x2F:
              /* RSCS rd, rn, imm */
-             arm_data_proc_sub_flags((imm + c_flag - 1), reg[rn], imm);
+             arm_data_proc_sub_flags(imm, reg[rn], c_flag, imm);
              break;
 
           case 0x30:
@@ -3258,25 +3269,25 @@ thumb_loop:
           case 0x18:
           case 0x19:
              /* ADD rd, rs, rn */
-             thumb_add(add_sub, rd, reg[rs], reg[rn]);
+             thumb_add(add_sub, rd, reg[rs], reg[rn], 0);
              break;
 
           case 0x1A:
           case 0x1B:
              /* SUB rd, rs, rn */
-             thumb_sub(add_sub, rd, reg[rs], reg[rn]);
+             thumb_sub(add_sub, rd, reg[rs], reg[rn], 1);
              break;
 
           case 0x1C:
           case 0x1D:
              /* ADD rd, rs, imm */
-             thumb_add(add_sub_imm, rd, reg[rs], imm);
+             thumb_add(add_sub_imm, rd, reg[rs], imm, 0);
              break;
 
           case 0x1E:
           case 0x1F:
              /* SUB rd, rs, imm */
-             thumb_sub(add_sub_imm, rd, reg[rs], imm);
+             thumb_sub(add_sub_imm, rd, reg[rs], imm, 1);
              break;
 
           case 0x20 ... 0x27:
@@ -3291,12 +3302,12 @@ thumb_loop:
 
           case 0x30 ... 0x37:
              /* ADD r0..7, imm */
-             thumb_add(imm, ((opcode >> 8) & 7), reg[(opcode >> 8) & 7], imm);
+             thumb_add(imm, ((opcode >> 8) & 7), reg[(opcode >> 8) & 7], imm, 0);
              break;
 
           case 0x38 ... 0x3F:
              /* SUB r0..7, imm */
-             thumb_sub(imm, ((opcode >> 8) & 7), reg[(opcode >> 8) & 7], imm);
+             thumb_sub(imm, ((opcode >> 8) & 7), reg[(opcode >> 8) & 7], imm, 1);
              break;
 
           case 0x40:
@@ -3334,12 +3345,12 @@ thumb_loop:
 
                 case 0x01:
                    /* ADC rd, rs */
-                   thumb_add(alu_op, rd, reg[rd] + reg[rs], c_flag);
+                   thumb_add(alu_op, rd, reg[rd], reg[rs], c_flag);
                    break;
 
                 case 0x02:
                    /* SBC rd, rs */
-                   thumb_sub(alu_op, rd, reg[rd] - reg[rs], (c_flag ^ 1));
+                   thumb_sub(alu_op, rd, reg[rd], reg[rs], c_flag);
                    break;
 
                 case 0x03:
@@ -3359,7 +3370,7 @@ thumb_loop:
 
                 case 0x01:
                    /* NEG rd, rs */
-                   thumb_sub(alu_op, rd, 0, reg[rs]);
+                   thumb_sub(alu_op, rd, 0, reg[rs], 1);
                    break;
 
                 case 0x02:
@@ -3413,7 +3424,7 @@ thumb_loop:
                 u32 _sb = reg[rs];
                 u32 dest = _sa - _sb;
                 thumb_pc_offset(-2);
-                calculate_flags_sub(dest, _sa, _sb);
+                calculate_flags_sub(dest, _sa, _sb, 1);
              }
              break;
 
