@@ -176,7 +176,7 @@ u32 arm_to_a64_reg[] =
     aa64_emit_movne(ireg, (~(imm)));                                          \
   } else if (((imm) & 0xffff) == 0) {                                         \
     /* immediate like 0xxxxx0000 */                                           \
-    aa64_emit_movhiz(ireg, (imm));                                            \
+    aa64_emit_movhiz(ireg, ((imm) >> 16));                                    \
   } else {                                                                    \
     aa64_emit_movlo(ireg, imm);                                               \
     if ((imm) >= (1 << 16)) {                                                 \
