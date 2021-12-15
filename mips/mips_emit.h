@@ -116,36 +116,23 @@ u32 arm_to_mips_reg[] =
   mips_emit_addu(ireg, arm_to_mips_reg[reg_index], reg_zero)                  \
 
 #define generate_load_imm(ireg, imm)                                          \
-  if(((s32)imm >= -32768) && ((s32)imm <= 32767))                             \
-  {                                                                           \
+  if(((s32)imm >= -32768) && ((s32)imm <= 32767)) {                           \
     mips_emit_addiu(ireg, reg_zero, imm);                                     \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    if(((u32)imm >> 16) == 0x0000)                                            \
-    {                                                                         \
-      mips_emit_ori(ireg, reg_zero, imm);                                     \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      mips_emit_lui(ireg, imm >> 16);                                         \
-                                                                              \
-      if(((u32)imm & 0x0000FFFF) != 0x00000000)                               \
-      {                                                                       \
-        mips_emit_ori(ireg, ireg, imm & 0xFFFF);                              \
-      }                                                                       \
+  } else if(((u32)imm >> 16) == 0x0000) {                                     \
+    mips_emit_ori(ireg, reg_zero, imm);                                       \
+  } else {                                                                    \
+    mips_emit_lui(ireg, imm >> 16);                                           \
+    if (((u32)(imm) & 0x0000FFFF)) {                                          \
+      mips_emit_ori(ireg, ireg, (imm) & 0xFFFF);                              \
     }                                                                         \
   }                                                                           \
 
 #define generate_load_pc(ireg, new_pc)                                        \
 {                                                                             \
   s32 pc_delta = (new_pc) - (stored_pc);                                      \
-  if((pc_delta >= -32768) && (pc_delta <= 32767))                             \
-  {                                                                           \
+  if((pc_delta >= -32768) && (pc_delta <= 32767)) {                           \
     mips_emit_addiu(ireg, reg_pc, pc_delta);                                  \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
+  } else {                                                                    \
     generate_load_imm(ireg, (new_pc));                                        \
   }                                                                           \
 }                                                                             \
@@ -272,25 +259,18 @@ u32 arm_to_mips_reg[] =
   mips_emit_j(mips_absolute_offset(mips_indirect_branch_##type));             \
   mips_emit_nop()                                                             \
 
+#define block_prologue_size 8
+
 #define generate_block_prologue()                                             \
   update_trampoline = translation_ptr;                                        \
   mips_emit_j(mips_absolute_offset(mips_update_gba));                         \
   mips_emit_nop();                                                            \
   generate_load_imm(reg_pc, stored_pc)                                        \
 
-#define block_prologue_size 8
-
-#define check_generate_n_flag                                                 \
-  (flag_status & 0x08)                                                        \
-
-#define check_generate_z_flag                                                 \
-  (flag_status & 0x04)                                                        \
-
-#define check_generate_c_flag                                                 \
-  (flag_status & 0x02)                                                        \
-
-#define check_generate_v_flag                                                 \
-  (flag_status & 0x01)                                                        \
+#define check_generate_n_flag (flag_status & 0x08)
+#define check_generate_z_flag (flag_status & 0x04)
+#define check_generate_c_flag (flag_status & 0x02)
+#define check_generate_v_flag (flag_status & 0x01)
 
 #define generate_load_reg_pc(ireg, reg_index, pc_offset)                      \
   if(reg_index == REG_PC)                                                     \
@@ -519,57 +499,42 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
 {                                                                             \
   switch((opcode >> 4) & 0x07)                                                \
   {                                                                           \
-    /* LSL imm */                                                             \
-    case 0x0:                                                                 \
+    case 0x0: /* LSL imm */                                                   \
     {                                                                         \
       generate_shift_imm(arm_reg_a0, lsl, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* LSL reg */                                                             \
-    case 0x1:                                                                 \
+    case 0x1: /* LSL reg */                                                   \
     {                                                                         \
       generate_shift_reg(arm_reg_a0, lsl, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* LSR imm */                                                             \
-    case 0x2:                                                                 \
+    case 0x2: /* LSR imm */                                                   \
     {                                                                         \
       generate_shift_imm(arm_reg_a0, lsr, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* LSR reg */                                                             \
-    case 0x3:                                                                 \
+    case 0x3: /* LSR reg */                                                   \
     {                                                                         \
       generate_shift_reg(arm_reg_a0, lsr, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* ASR imm */                                                             \
-    case 0x4:                                                                 \
+    case 0x4: /* ASR imm */                                                   \
     {                                                                         \
       generate_shift_imm(arm_reg_a0, asr, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* ASR reg */                                                             \
-    case 0x5:                                                                 \
+    case 0x5: /* ASR reg */                                                   \
     {                                                                         \
       generate_shift_reg(arm_reg_a0, asr, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* ROR imm */                                                             \
-    case 0x6:                                                                 \
+    case 0x6: /* ROR imm */                                                   \
     {                                                                         \
       generate_shift_imm(arm_reg_a0, ror, flags_op);                          \
       break;                                                                  \
     }                                                                         \
-                                                                              \
-    /* ROR reg */                                                             \
-    case 0x7:                                                                 \
+    case 0x7: /* ROR reg */                                                   \
     {                                                                         \
       generate_shift_reg(arm_reg_a0, ror, flags_op);                          \
       break;                                                                  \
@@ -592,35 +557,27 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
   {                                                                           \
     switch((opcode >> 5) & 0x03)                                              \
     {                                                                         \
-      /* LSL imm */                                                           \
-      case 0x0:                                                               \
+      case 0x0: /* LSL imm */                                                 \
       {                                                                       \
         generate_shift_imm(arm_reg_a1, lsl, no_flags);                        \
         break;                                                                \
       }                                                                       \
-                                                                              \
-      /* LSR imm */                                                           \
-      case 0x1:                                                               \
+      case 0x1: /* LSR imm */                                                 \
       {                                                                       \
         generate_shift_imm(arm_reg_a1, lsr, no_flags);                        \
         break;                                                                \
       }                                                                       \
-                                                                              \
-      /* ASR imm */                                                           \
-      case 0x2:                                                               \
+      case 0x2: /* ASR imm */                                                 \
       {                                                                       \
         generate_shift_imm(arm_reg_a1, asr, no_flags);                        \
         break;                                                                \
       }                                                                       \
-                                                                              \
-      /* ROR imm */                                                           \
-      case 0x3:                                                               \
+      case 0x3: /* ROR imm */                                                 \
       {                                                                       \
         generate_shift_imm(arm_reg_a1, ror, no_flags);                        \
         break;                                                                \
       }                                                                       \
     }                                                                         \
-                                                                              \
     return rm;                                                                \
   }                                                                           \
 
@@ -746,66 +703,21 @@ u32 execute_spsr_restore_body(u32 address)
 #define generate_condition()                                                  \
   switch(condition)                                                           \
   {                                                                           \
-    case 0x0:                                                                 \
-      generate_condition_eq();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x1:                                                                 \
-      generate_condition_ne();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x2:                                                                 \
-      generate_condition_cs();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x3:                                                                 \
-      generate_condition_cc();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x4:                                                                 \
-      generate_condition_mi();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x5:                                                                 \
-      generate_condition_pl();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x6:                                                                 \
-      generate_condition_vs();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x7:                                                                 \
-      generate_condition_vc();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x8:                                                                 \
-      generate_condition_hi();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0x9:                                                                 \
-      generate_condition_ls();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0xA:                                                                 \
-      generate_condition_ge();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0xB:                                                                 \
-      generate_condition_lt();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0xC:                                                                 \
-      generate_condition_gt();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0xD:                                                                 \
-      generate_condition_le();                                                \
-      break;                                                                  \
-                                                                              \
-    case 0xE:                                                                 \
-      break;                                                                  \
-                                                                              \
-    case 0xF:                                                                 \
+    case 0x0: generate_condition_eq(); break;                                 \
+    case 0x1: generate_condition_ne(); break;                                 \
+    case 0x2: generate_condition_cs(); break;                                 \
+    case 0x3: generate_condition_cc(); break;                                 \
+    case 0x4: generate_condition_mi(); break;                                 \
+    case 0x5: generate_condition_pl(); break;                                 \
+    case 0x6: generate_condition_vs(); break;                                 \
+    case 0x7: generate_condition_vc(); break;                                 \
+    case 0x8: generate_condition_hi(); break;                                 \
+    case 0x9: generate_condition_ls(); break;                                 \
+    case 0xA: generate_condition_ge(); break;                                 \
+    case 0xB: generate_condition_lt(); break;                                 \
+    case 0xC: generate_condition_gt(); break;                                 \
+    case 0xD: generate_condition_le(); break;                                 \
+    default:                                                                  \
       break;                                                                  \
   }                                                                           \
 
