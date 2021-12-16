@@ -39,9 +39,9 @@ char save_path[512];
 
 void trigger_ext_event(void);
 
-static void update_timers(irq_type *irq_raised)
+static unsigned update_timers(irq_type *irq_raised)
 {
-   unsigned i;
+   unsigned i, ret = 0;
    for (i = 0; i < 4; i++)
    {
       if(timer[i].status == TIMER_INACTIVE)
@@ -70,14 +70,15 @@ static void update_timers(irq_type *irq_raised)
       if(i < 2)
       {
          if(timer[i].direct_sound_channels & 0x01)
-            sound_timer(timer[i].frequency_step, 0);
+            ret += sound_timer(timer[i].frequency_step, 0);
 
          if(timer[i].direct_sound_channels & 0x02)
-            sound_timer(timer[i].frequency_step, 1);
+            ret += sound_timer(timer[i].frequency_step, 1);
       }
 
       timer[i].count += (timer[i].reload << timer[i].prescale);
    }
+   return ret;
 }
 
 void init_main(void)
@@ -109,6 +110,7 @@ void init_main(void)
 u32 update_gba(void)
 {
   irq_type irq_raised = IRQ_NONE;
+  int dma_cycles;
 
   do
   {
@@ -125,7 +127,8 @@ u32 update_gba(void)
       gbc_sound_update = 0;
     }
 
-    update_timers(&irq_raised);
+    // Timers can trigger DMA (usually sound) and consume cycles
+    dma_cycles = update_timers(&irq_raised);
 
     video_count -= execute_cycles;
 
@@ -152,7 +155,7 @@ u32 update_gba(void)
           for(i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_HBLANK)
-              dma_transfer(i);
+              dma_transfer(i, &dma_cycles);
           }
         }
 
@@ -183,7 +186,7 @@ u32 update_gba(void)
           for(i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_VBLANK)
-              dma_transfer(i);
+              dma_transfer(i, &dma_cycles);
           }
         }
         else
@@ -235,7 +238,7 @@ u32 update_gba(void)
     if(irq_raised)
       raise_interrupt(irq_raised);
 
-    execute_cycles = video_count;
+    execute_cycles = MAX(0, video_count);
 
     for (i = 0; i < 4; i++)
     {
@@ -247,7 +250,11 @@ u32 update_gba(void)
     }
   } while(reg[CPU_HALT_STATE] != CPU_ACTIVE && !reg[COMPLETED_FRAME]);
 
-  return execute_cycles;
+  // We voluntarily limit this. It is not accurate but it would be much harder.
+  dma_cycles = MIN(64, dma_cycles);
+  dma_cycles = MIN(execute_cycles, dma_cycles);
+
+  return execute_cycles - dma_cycles;
 }
 
 void reset_gba(void)
@@ -288,7 +295,7 @@ bool main_read_savestate(const u8 *src)
   const u8 *p2 = bson_find_key(src, "timers");
   if (!p1 || !p2)
     return false;
-  execute_cycles = 123;
+
   if (!(bson_read_int32(p1, "cpu-ticks", &cpu_ticks) &&
          bson_read_int32(p1, "exec-cycles", &execute_cycles) &&
          bson_read_int32(p1, "video-count", (u32*)&video_count)))
