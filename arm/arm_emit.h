@@ -1131,7 +1131,7 @@ u32 execute_spsr_restore_body(u32 pc)
   ARM_MLA(0, _rd, _rm, _rs, _rn)                                              \
 
 #define arm_multiply_add_no_flags_yes()                                       \
-  ARM_MULS(0, reg_a0, reg_a0, reg_a1)                                         \
+  ARM_MULS(0, _rd, _rm, _rs)                                                  \
 
 #define arm_multiply_add_yes_flags_yes()                                      \
   u32 _rn = arm_prepare_load_reg(&translation_ptr, reg_a2, rn);               \
@@ -1177,7 +1177,7 @@ u32 execute_spsr_restore_body(u32 pc)
   arm_decode_multiply_long();                                                 \
   u32 _rm = arm_prepare_load_reg(&translation_ptr, reg_a2, rm);               \
   u32 _rs = arm_prepare_load_reg(&translation_ptr, reg_rs, rs);               \
-  u32 _rdlo = arm_prepare_store_reg(reg_a0, rdlo);                            \
+  u32 _rdlo = (rdlo == rdhi) ? reg_a0 : arm_prepare_store_reg(reg_a0, rdlo);  \
   u32 _rdhi = arm_prepare_store_reg(reg_a1, rdhi);                            \
   arm_multiply_long_add_##add_op(name);                                       \
   arm_multiply_long_op(flags, arm_multiply_long_name_##name);                 \

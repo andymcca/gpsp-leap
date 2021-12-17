@@ -1913,7 +1913,7 @@ void translate_icache_sync() {
                                                                               \
         case 0x01:                                                            \
           /* MUL rd, rs */                                                    \
-          thumb_data_proc(alu_op, muls, reg, rd, rd, rs);                     \
+          thumb_data_proc(alu_op, muls, reg, rd, rs, rd);                     \
           cycle_count += 2;  /* Between 1 and 4 extra cycles */               \
           break;                                                              \
                                                                               \
