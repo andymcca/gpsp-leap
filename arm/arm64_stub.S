@@ -565,6 +565,17 @@ ext_store_oam_ram_u##store_type##_safe:                                      ;\
   str w29, [reg_base, #OAM_UPDATED]       /* write non zero to signal      */;\
   ret                                     /* return                        */;\
                                                                              ;\
+ext_store_ioreg_u##store_type:                                               ;\
+  str w2, [reg_base, #REG_PC]             /* write out PC                  */;\
+  str lr, [reg_base, #REG_SAVE]           /* Preserve LR                   */;\
+  and w0, w0, #(0x3ff & ~stmask)                                             ;\
+  store_registers()                                                          ;\
+  bl write_io_register##store_type                                           ;\
+  cbnz w0, write_epilogue                 /* handle additional write stuff */;\
+  ldr lr, [reg_base, #REG_SAVE]                                              ;\
+  load_registers()                                                           ;\
+  ret                                     /* resume if no side effects     */;\
+                                                                             ;\
 3:                                                                           ;\
   str w2, [reg_base, #REG_PC]             /* write out PC                  */;\
   store_registers()                       /* store registers               */;\
@@ -581,7 +592,7 @@ ext_store_ignore:
   .quad ext_store_ignore                  /* 0x01: ignore                  */;\
   .quad ext_store_ewram_u##store_type     /* 0x02: ewram                   */;\
   .quad ext_store_iwram_u##store_type     /* 0x03: iwram                   */;\
-  .quad ext_store_u##store_type           /* 0x04: I/O regs                */;\
+  .quad ext_store_ioreg_u##store_type     /* 0x04: I/O regs                */;\
   .quad ext_store_palette_u##store_type   /* 0x05: palette RAM             */;\
   .quad ext_store_vram_u##store_type      /* 0x06: vram                    */;\
   .quad ext_store_oam_ram_u##store_type   /* 0x07: oam ram                 */;\
@@ -652,6 +663,15 @@ ext_store_ewram_u32_safe:
   add x3, reg_base, #(EWRAM_OFF)          // x3 = ewram base
   str w1, [x0, x3]                        // store data
   ret                                     // Return
+ext_store_ioreg_u32_safe:
+  str lr, [reg_base, #REG_SAVE]
+  and w0, w0, #(0x3fc)
+  store_registers()
+  bl write_io_register32
+  cbnz w0, write_epilogue
+  ldr lr, [reg_base, #REG_SAVE]
+  load_registers()
+  ret
 .size execute_aligned_store32, .-execute_aligned_store32
 
 // This is called whenever an external store with side effects was performed
