@@ -582,7 +582,7 @@ ext_store_ignore:
   .quad ext_store_ewram_u##store_type     /* 0x02: ewram                   */;\
   .quad ext_store_iwram_u##store_type     /* 0x03: iwram                   */;\
   .quad ext_store_u##store_type           /* 0x04: I/O regs                */;\
-  .quad ext_store_u##store_type           /* 0x05: palette RAM             */;\
+  .quad ext_store_palette_u##store_type   /* 0x05: palette RAM             */;\
   .quad ext_store_vram_u##store_type      /* 0x06: vram                    */;\
   .quad ext_store_oam_ram_u##store_type   /* 0x07: oam ram                 */;\
   .quad ext_store_u##store_type           /* 0x08: gamepak: ignore         */;\
@@ -597,6 +597,41 @@ ext_store_ignore:
 execute_store_builder(8,  strb, strh, ldrb, 0, 1, 0)
 execute_store_builder(16, strh, strh, ldrh, 1, 1, 1)
 execute_store_builder(32, str,  str,  ldr,  3, 3, 2)
+
+// Palette writes are special since they are converted on the fly for speed
+
+ext_store_palette_u8:
+  bfi w1, w1, #8, #24                     // Duplicate the byte
+ext_store_palette_u16:
+  and w0, w0, #(0x3fe)
+  add x3, reg_base, #(PAL_RAM_OFF)
+  strh w1, [x3, x0]
+
+  ubfx w2, w1, #10, #5                    // Extract blue to red
+  bfi  w2, w1, #11, #5                    // Move red to blue
+  and  w1, w1, #0x03E0                    // Extract green component
+  orr  w1, w2, w1, lsl #1                 // Merge the three components
+
+  add x3, reg_base, #(PALCNV_RAM_OFF)
+  strh w1, [x3, x0]
+  ret
+
+ext_store_palette_u32_safe:
+ext_store_palette_u32:
+  and w0, w0, #(0x3fc)
+  add x3, reg_base, #(PAL_RAM_OFF)
+  str w1, [x3, x0]
+
+  and   w2, w1, #0x7C007C00               // Get blue components
+  and   w3, w1, #0x001F001F               // Get red components
+  lsr   w2, w2, #10                       // Place blue in the final register
+  orr   w2, w2, w3, lsl #11               // Merge red
+  and   w3, w1, #0x03E003E0               // Get green component
+  orr   w1, w2, w3, lsl #1                // Merge green
+
+  add x3, reg_base, #(PALCNV_RAM_OFF)
+  str w1, [x3, x0]
+  ret
 
 // This is a store that is executed in a strm case (so no SMC checks in-between)
 
