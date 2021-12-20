@@ -1360,7 +1360,7 @@ static void trace_instruction(u32 pc, u32 mode)
 #define arm_access_memory_load(mem_type)                                      \
   cycle_count += 2;                                                           \
   generate_load_call_##mem_type();                                            \
-  write32((pc + 8));                                                          \
+  write32(pc);                                                                \
   arm_generate_store_reg_pc_no_flags(reg_rv, rd)                              \
 
 #define arm_access_memory_store(mem_type)                                     \
@@ -1732,7 +1732,7 @@ static void trace_instruction(u32 pc, u32 mode)
 #define thumb_access_memory_load(mem_type, _rd)                               \
   cycle_count += 2;                                                           \
   generate_load_call_##mem_type();                                            \
-  write32((pc + 4));                                                          \
+  write32(pc);                                                                \
   thumb_generate_store_reg(reg_rv, _rd)                                       \
 
 #define thumb_access_memory_store(mem_type, _rd)                              \

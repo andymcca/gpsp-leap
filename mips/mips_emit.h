@@ -1197,7 +1197,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 #define arm_access_memory_load(mem_type)                                      \
   cycle_count += 2;                                                           \
   mips_emit_jal(mips_absolute_offset(execute_load_##mem_type));               \
-  generate_load_pc(reg_a1, (pc + 8));                                         \
+  generate_load_pc(reg_a1, (pc));                                             \
   generate_store_reg(reg_rv, rd);                                             \
   check_store_reg_pc_no_flags(rd)                                             \
 
@@ -1562,7 +1562,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 #define thumb_access_memory_load(mem_type, reg_rd)                            \
   cycle_count += 2;                                                           \
   mips_emit_jal(mips_absolute_offset(execute_load_##mem_type));               \
-  generate_load_pc(reg_a1, (pc + 4));                                         \
+  generate_load_pc(reg_a1, (pc));                                             \
   generate_store_reg(reg_rv, reg_rd)                                          \
 
 #define thumb_access_memory_store(mem_type, reg_rd)                           \

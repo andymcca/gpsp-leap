@@ -1269,7 +1269,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_access_memory_load(mem_type)                                      \
   cycle_count += 2;                                                           \
-  generate_load_pc(reg_a1, (pc + 8));                                         \
+  generate_load_pc(reg_a1, (pc));                                             \
   generate_function_call(execute_load_##mem_type);                            \
   generate_store_reg(reg_res, rd);                                            \
   check_store_reg_pc_no_flags(rd)                                             \
@@ -1595,7 +1595,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define thumb_access_memory_load(mem_type, reg_rd)                            \
   cycle_count += 2;                                                           \
-  generate_load_pc(reg_a1, (pc + 4));                                         \
+  generate_load_pc(reg_a1, (pc));                                             \
   generate_function_call(execute_load_##mem_type);                            \
   generate_store_reg(reg_res, reg_rd)                                         \
 

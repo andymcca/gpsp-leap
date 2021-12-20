@@ -504,22 +504,22 @@ void function_cc write_eeprom(u32 unused_address, u32 value)
 
 #define read_open8()                                                          \
   if(!(reg[REG_CPSR] & 0x20))                                                 \
-    value = read_memory8(reg[REG_PC] + 4 + (address & 0x03));                 \
+    value = read_memory8(reg[REG_PC] + 8 + (address & 0x03));                 \
   else                                                                        \
-    value = read_memory8(reg[REG_PC] + 2 + (address & 0x01))                  \
+    value = read_memory8(reg[REG_PC] + 4 + (address & 0x01))                  \
 
 #define read_open16()                                                         \
   if(!(reg[REG_CPSR] & 0x20))                                                 \
-    value = read_memory16(reg[REG_PC] + 4 + (address & 0x02));                \
+    value = read_memory16(reg[REG_PC] + 8 + (address & 0x02));                \
   else                                                                        \
-    value = read_memory16(reg[REG_PC] + 2)                                    \
+    value = read_memory16(reg[REG_PC] + 4)                                    \
 
 #define read_open32()                                                         \
   if(!(reg[REG_CPSR] & 0x20))                                                 \
-    value = read_memory32(reg[REG_PC] + 4);                                   \
+    value = read_memory32(reg[REG_PC] + 8);                                   \
   else                                                                        \
   {                                                                           \
-    u32 current_instruction = read_memory16(reg[REG_PC] + 2);                 \
+    u32 current_instruction = read_memory16(reg[REG_PC] + 4);                 \
     value = current_instruction | (current_instruction << 16);                \
   }                                                                           \
 
