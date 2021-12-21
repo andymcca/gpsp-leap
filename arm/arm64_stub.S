@@ -149,6 +149,7 @@ defsymbl(a64_update_gba)
   consolidate_flags(w0)                   // update the CPSR
   store_registers()                       // save out registers
 
+  mov w0, reg_cycles                      // load remaining cycles
   bl update_gba                           // update GBA state
 
   ldr w1, [reg_base, #COMPLETED_FRAME]    // return to main if new frame
@@ -682,7 +683,9 @@ write_epilogue:
   beq smc_write                           // if so, goto SMC handler
 
 alert_loop:
+  mov w0, reg_cycles                      // load remaining cycles
   bl update_gba                           // update GBA until CPU isn't halted
+  mov reg_cycles, w0                      // load new cycle count
 
   ldr w1, [reg_base, #COMPLETED_FRAME]    // Check whether a frame was completed
   cbnz w1, return_to_main                 // and return to caller function.
@@ -690,7 +693,6 @@ alert_loop:
   ldr w1, [reg_base, #CPU_HALT_STATE]     // Check whether the CPU is halted
   cbnz w1, alert_loop                     // and keep looping until it is
 
-  mov reg_cycles, w0                      // load new cycle count
   ldr w0, [reg_base, #REG_PC]             // load new PC
   b lookup_pc                             // Resume execution at that PC
 

@@ -585,6 +585,7 @@ typedef enum
 #define generate_branch_no_cycle_update(writeback_location, new_pc)           \
   if(pc == idle_loop_target_pc)                                               \
   {                                                                           \
+    generate_load_imm(cycles, 0);                                             \
     x86_emit_mov_reg_imm(eax, new_pc);                                        \
     generate_function_call(x86_update_gba);                                   \
     x86_emit_jmp_filler(writeback_location);                                  \

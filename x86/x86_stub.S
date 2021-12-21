@@ -166,8 +166,8 @@ defsymbl(x86_update_gba)
   mov %eax, REG_PC(REG_BASE)          # current PC = eax
   collapse_flags                      # update cpsr, trashes ecx and edx
 
+  mov REG_CYCLES, CARG1_REG           # Load remaining cycles as arg0
   CALL_FUNC(update_gba)               # process the next event
-
   mov %eax, REG_CYCLES                # new cycle count
 
   # did we just complete a frame? go back to main then
@@ -246,7 +246,9 @@ write_epilogue:
   je smc_write
 
 alert_loop:
+  mov REG_CYCLES, CARG1_REG   # Load remaining cycles as arg0
   CALL_FUNC(update_gba)       # process the next event
+  mov %eax, REG_CYCLES        # load new cycle count
   
   # did we just complete a frame? go back to main then
   cmpl $0, COMPLETED_FRAME(REG_BASE)
@@ -258,7 +260,6 @@ alert_loop:
   cmp $0, %edx                # 0 means it has
   jnz alert_loop              # if not go again
 
-  mov %eax, REG_CYCLES        # load new cycle count
   jmp lookup_pc               # pc has definitely changed
 
 no_alert:

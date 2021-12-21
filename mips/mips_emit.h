@@ -231,6 +231,7 @@ u32 arm_to_mips_reg[] =
   if(pc == idle_loop_target_pc)                                               \
   {                                                                           \
     generate_load_pc(reg_a0, new_pc);                                         \
+    mips_emit_lui(reg_cycles, 0);                                             \
     generate_function_call_swap_delay(mips_update_gba);                       \
     mips_emit_j_filler(writeback_location);                                   \
     mips_emit_nop();                                                          \
