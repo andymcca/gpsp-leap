@@ -39,7 +39,7 @@ char save_path[512];
 
 void trigger_ext_event(void);
 
-static unsigned update_timers(irq_type *irq_raised)
+static unsigned update_timers(irq_type *irq_raised, unsigned completed_cycles)
 {
    unsigned i, ret = 0;
    for (i = 0; i < 4; i++)
@@ -49,7 +49,7 @@ static unsigned update_timers(irq_type *irq_raised)
 
       if(timer[i].status != TIMER_CASCADE)
       {
-         timer[i].count -= execute_cycles;
+         timer[i].count -= completed_cycles;
          /* io_registers accessors range: REG_TM0D, REG_TM1D, REG_TM2D, REG_TM3D */
          write_ioreg(REG_TM0D + (i * 2), -(timer[i].count > timer[i].prescale));
       }
@@ -107,16 +107,21 @@ void init_main(void)
 #endif
 }
 
-u32 update_gba(void)
+u32 update_gba(int remaining_cycles)
 {
   irq_type irq_raised = IRQ_NONE;
   int dma_cycles;
+  remaining_cycles = MAX(remaining_cycles, -64);
 
   do
   {
     unsigned i;
-    cpu_ticks += execute_cycles;
+    // Number of cycles we ask to run - cycles that we did not execute
+    // (remaining_cycles can be negative and should be close to zero)
+    unsigned completed_cycles = execute_cycles - remaining_cycles;
+    cpu_ticks += completed_cycles;
 
+    remaining_cycles = 0;
     reg[CHANGED_PC_STATUS] = 0;
     reg[COMPLETED_FRAME] = 0;
 
@@ -128,9 +133,9 @@ u32 update_gba(void)
     }
 
     // Timers can trigger DMA (usually sound) and consume cycles
-    dma_cycles = update_timers(&irq_raised);
+    dma_cycles = update_timers(&irq_raised, completed_cycles);
 
-    video_count -= execute_cycles;
+    video_count -= completed_cycles;
 
     if(video_count <= 0)
     {
@@ -238,7 +243,7 @@ u32 update_gba(void)
     if(irq_raised)
       raise_interrupt(irq_raised);
 
-    execute_cycles = MAX(0, video_count);
+    execute_cycles = MAX(video_count, 0);
 
     for (i = 0; i < 4; i++)
     {

@@ -259,6 +259,7 @@ u32 arm_to_a64_reg[] =
 #define generate_branch_no_cycle_update(writeback_location, new_pc)           \
   if(pc == idle_loop_target_pc)                                               \
   {                                                                           \
+    generate_load_imm(reg_cycles, 0);                                         \
     generate_load_pc(reg_a0, new_pc);                                         \
     generate_function_call(a64_update_gba);                                   \
     emit_branch_filler(writeback_location);                                   \

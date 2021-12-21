@@ -163,18 +163,14 @@ _##symbol:
 @ Input:
 @ r0: current PC
 
-#define return_straight()                                                    ;\
-  bx lr                                                                      ;\
+#define return_straight()   bx lr
+#define return_add()        add pc, lr, #4
 
-#define return_add()                                                         ;\
-  add pc, lr, #4                                                             ;\
+#define load_pc_straight()  ldr r0, [lr, #-12]
+#define load_pc_add()       ldr r0, [lr]
 
-#define load_pc_straight()                                                   ;\
-  ldr r0, [lr, #-12]                                                         ;\
-
-#define load_pc_add()                                                        ;\
-  ldr r0, [lr]                                                               ;\
-
+#define cycles_straight()  mvn r0, reg_cycles
+#define cycles_add()       mov r0, #0
 
 #define arm_update_gba_builder(name, mode, return_op)                        ;\
                                                                              ;\
@@ -186,6 +182,7 @@ defsymbl(arm_update_gba_##name)                                              ;\
   collapse_flags(r0)                      /* update the flags              */;\
                                                                              ;\
   store_registers_##mode()                /* save out registers            */;\
+  cycles_##return_op()                    /* remaining cycles in arg0      */;\
   call_c_function(update_gba)             /* update GBA state              */;\
                                                                              ;\
   ldr r1, [reg_base, #COMPLETED_FRAME]    /* return if new frame           */;\

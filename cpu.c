@@ -1635,7 +1635,7 @@ void execute_arm(u32 cycles)
   {
     /* Do not execute until CPU is active */
     while(reg[CPU_HALT_STATE] != CPU_ACTIVE) {
-       cycles_remaining = update_gba();
+       cycles_remaining = update_gba(cycles_remaining);
 
        if (reg[COMPLETED_FRAME])
           return;
@@ -3225,7 +3225,7 @@ skip_instruction:
     } while(cycles_remaining > 0);
 
     collapse_flags();
-    cycles_remaining = update_gba();
+    cycles_remaining = update_gba(cycles_remaining);
     if (reg[COMPLETED_FRAME])
        return;
     continue;
@@ -3738,7 +3738,7 @@ thumb_loop:
     } while(cycles_remaining > 0);
 
     collapse_flags();
-    cycles_remaining = update_gba();
+    cycles_remaining = update_gba(cycles_remaining);
     if (reg[COMPLETED_FRAME])
       return;
     continue;
@@ -3749,7 +3749,7 @@ thumb_loop:
       collapse_flags();
 
       while(reg[CPU_HALT_STATE] != CPU_ACTIVE) {
-        cycles_remaining = update_gba();
+        cycles_remaining = update_gba(cycles_remaining);
         if (reg[COMPLETED_FRAME])
           return;
       }

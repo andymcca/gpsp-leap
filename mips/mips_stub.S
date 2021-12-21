@@ -119,6 +119,8 @@ symbol:
 .equ FNPTRS_MEMOPS,       (REGMODE_BASE + 196)
 .equ FNPTRS_BASE,         (FNPTRS_MEMOPS + 960*2)
 
+#define reg_cycles        $17
+
 .set noat
 .set noreorder
 
@@ -240,12 +242,13 @@ defsymbl(mips_update_gba)
   collapse_flags                  # update cpsr
   save_registers                  # save registers
   sw $0, CHANGED_PC_STATUS($16)
+  move $4, reg_cycles             # Remaining cycles as asg0
   cfncall update_gba, 0           # process the next event
 
   lw $1, COMPLETED_FRAME($16)     # Check whether we completed a frame
   bne $1, $0, return_to_main      # Return to main thread now
 
-  addu $17, $2, $0                # $17 = new cycle count (ret value)
+  move reg_cycles, $2             # update new cycle count (ret value)
 
   lw $ra, REG_SAVE2($16)          # restore return address
 
@@ -327,7 +330,9 @@ defsymbl(write_io_epilogue)
 
 
 alert_loop:
+  move $4, reg_cycles             # Remaining cycles as asg0
   cfncall update_gba, 0           # process the next event
+  move reg_cycles, $2             # update new cycle count (ret value)
 
   lw $1, COMPLETED_FRAME($16)     # Check whether we completed a frame
   bne $1, $0, return_to_main      # Return to main thread now
@@ -336,7 +341,6 @@ alert_loop:
   bne $1, $0, alert_loop          # see if it hasn't changed
   nop
 
-  addu $17, $2, $0                # $17 = new cycle counter
   lw $4, REG_PC($16)              # $4 = new PC
 
   j lookup_pc
@@ -522,7 +526,7 @@ defsymbl(execute_arm_translate_internal)
   move $16, $5
   REG_S $28, GP_SAVE($16)
 
-  addu $17, $4, $0                # load cycle counter register
+  move reg_cycles, $4             # load cycle counter register
 
   extract_flags                   # load flag variables
 
