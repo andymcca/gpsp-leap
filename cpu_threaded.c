@@ -1727,9 +1727,11 @@ void translate_icache_sync() {
     {                                                                         \
       u32 swinum = (opcode >> 16) & 0xFF;                                     \
       if (swinum == 6) {                                                      \
+        cycle_count += 64;   /* Big under-estimation here */                  \
         arm_hle_div(arm);                                                     \
       }                                                                       \
       else if (swinum == 7) {                                                 \
+        cycle_count += 64;   /* Big under-estimation here */                  \
         arm_hle_div_arm(arm);                                                 \
       }                                                                       \
       else {                                                                  \
@@ -2297,9 +2299,11 @@ void translate_icache_sync() {
     {                                                                         \
       u32 swinum = opcode & 0xFF;                                             \
       if (swinum == 6) {                                                      \
+        cycle_count += 64;   /* Big under-estimation here */                  \
         arm_hle_div(thumb);                                                   \
       }                                                                       \
       else if (swinum == 7) {                                                 \
+        cycle_count += 64;   /* Big under-estimation here */                  \
         arm_hle_div_arm(thumb);                                               \
       }                                                                       \
       else {                                                                  \
