@@ -1372,8 +1372,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
   if((rn == REG_SP) && iwram_stack_optimize)                                  \
   {                                                                           \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
-    generate_load_imm(reg_a0, ((u32)(iwram + 0x8000)));                       \
+    mips_emit_lui(reg_a0, ((u32)(iwram + 0x8000 + 0x8000) >> 16));            \
     mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
+    offset = (u32)(iwram + 0x8000) & 0xFFFF;                                  \
                                                                               \
     for(i = 0; i < 16; i++)                                                   \
     {                                                                         \
@@ -1680,11 +1681,11 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 #define thumb_block_memory_sp_extra_down()                                    \
 
 #define thumb_block_memory_sp_extra_pop_pc()                                  \
-  mips_emit_lw(reg_a0, reg_a1, (bit_count[reg_list] * 4));                    \
+  mips_emit_lw(reg_a0, reg_a1, offset);                                       \
   generate_indirect_branch_cycle_update(thumb)                                \
 
 #define thumb_block_memory_sp_extra_push_lr()                                 \
-  mips_emit_sw(reg_r14, reg_a1, (bit_count[reg_list] * 4))                    \
+  mips_emit_sw(reg_r14, reg_a1, offset)                                       \
 
 #define thumb_block_memory(access_type, pre_op, post_op, base_reg)            \
 {                                                                             \
@@ -1698,8 +1699,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
   if((base_reg == REG_SP) && iwram_stack_optimize)                            \
   {                                                                           \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
-    generate_load_imm(reg_a0, ((u32)(iwram + 0x8000)));                       \
+    mips_emit_lui(reg_a0, ((u32)(iwram + 0x8000 + 0x8000) >> 16));            \
     mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
+    offset = (u32)(iwram + 0x8000) & 0xFFFF;                                  \
                                                                               \
     for(i = 0; i < 8; i++)                                                    \
     {                                                                         \
