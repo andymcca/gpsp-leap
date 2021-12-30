@@ -153,7 +153,6 @@ extern u8 *ram_translation_ptr;
 #define MAX_TRANSLATION_GATES 8
 
 extern u32 idle_loop_target_pc;
-extern u32 iwram_stack_optimize;
 extern u32 translation_gate_targets;
 extern u32 translation_gate_target_pc[MAX_TRANSLATION_GATES];
 

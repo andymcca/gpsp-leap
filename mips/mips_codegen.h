@@ -114,6 +114,7 @@ typedef enum
 {
   mips_regimm_bltz       = 0x00,
   mips_regimm_bltzal     = 0x10,
+  mips_regimm_bgezal     = 0x11,
   mips_regimm_synci      = 0x1F
 } mips_function_regimm;
 
@@ -398,6 +399,9 @@ typedef enum
 
 #define mips_emit_bltzal(rs, offset)                                          \
   mips_emit_regimm(bltzal, rs, offset)                                        \
+
+#define mips_emit_bgezal(rs, offset)                                          \
+  mips_emit_regimm(bgezal, rs, offset)                                        \
 
 #define mips_emit_bltz(rs, offset)                                            \
   mips_emit_regimm(bltz, rs, offset)                                          \

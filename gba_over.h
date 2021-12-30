@@ -8,10 +8,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80031d6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -25,10 +22,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x803880a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -42,10 +36,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x803880a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -59,10 +50,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8036e2a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -76,10 +64,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8036e2a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -93,10 +78,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000f1c,                   /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -110,10 +92,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0x3000f1c,                   /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -127,10 +106,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x846d060,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -144,10 +120,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000338,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -161,10 +134,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -178,10 +148,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -195,10 +162,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000526,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -212,10 +176,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800397c,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -229,10 +190,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000a26,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -246,10 +204,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -263,10 +218,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003d2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -280,10 +232,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003d2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -297,10 +246,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -314,10 +260,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80007ec,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -331,10 +274,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8011208,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -348,10 +288,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8010eb0,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -365,10 +302,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -382,10 +316,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -399,10 +330,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -416,10 +344,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0x30041c8,                   /* translation_gate_target_1 */
       0x3004fa0,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -433,10 +358,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8002f30,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -450,10 +372,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80006c2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -467,10 +386,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000c2e,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -484,10 +400,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000c2e,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -501,10 +414,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -518,10 +428,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800fabe,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -535,10 +442,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800041e,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -552,10 +456,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800b428,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -569,10 +470,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800b428,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -586,10 +484,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -603,10 +498,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0x3000820,                   /* translation_gate_target_1 */
       0x30009ac,                   /* translation_gate_target_2 */
       0x3007dac,                   /* translation_gate_target_3 */
@@ -621,10 +513,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x08013542,                  /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0x30009ac,                   /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -641,10 +530,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8013844,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0x30009ac,                   /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -658,10 +544,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000f92,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -675,10 +558,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -692,10 +572,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008a2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -709,10 +586,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008a2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -726,10 +600,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000fae,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -743,10 +614,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000fae,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -760,10 +628,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -777,10 +642,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -794,10 +656,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x801d340,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -811,10 +670,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8016064,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -828,10 +684,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -845,10 +698,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -862,10 +712,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -879,10 +726,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -896,10 +740,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -913,10 +754,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -930,10 +768,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -947,10 +782,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8014e0a,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0x3000d00,                   /* translation_gate_target_1 */
       0x3000a30,                   /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -964,10 +796,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8033eec,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -981,10 +810,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -998,10 +824,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1015,10 +838,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1032,10 +852,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1049,10 +866,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000338,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1066,10 +880,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000338,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1083,10 +894,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000358,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1100,10 +908,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800036c,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1117,10 +922,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800036c,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1134,10 +936,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003a6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1151,10 +950,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003a6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1168,10 +964,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003ca,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1185,10 +978,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003ca,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1202,10 +992,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80003da,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1219,10 +1006,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000544,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1236,10 +1020,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80004ee,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1253,10 +1034,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000664,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1270,10 +1048,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8001a08,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1287,10 +1062,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800090c,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1304,10 +1076,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000298,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1321,10 +1090,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1338,10 +1104,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000b00,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1355,10 +1118,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x809f394,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1372,10 +1132,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x81c7290,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1389,10 +1146,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x3001cf8,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1406,10 +1160,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1423,10 +1174,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1440,10 +1188,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1457,10 +1202,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8066378,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1474,10 +1216,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x3001cf8,                   /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1491,10 +1230,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80075a6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1508,10 +1244,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008ce,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1525,10 +1258,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008ce,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1542,10 +1272,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008ce,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1559,10 +1286,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008ce,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1576,10 +1300,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008ce,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1593,10 +1314,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008ce,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1610,10 +1328,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1627,10 +1342,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1644,10 +1356,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1661,10 +1370,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1678,10 +1384,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1695,10 +1398,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1712,10 +1412,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1729,10 +1426,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1746,10 +1440,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1763,10 +1454,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1780,10 +1468,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1797,10 +1482,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1814,10 +1496,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1831,10 +1510,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1848,10 +1524,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1865,10 +1538,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1882,10 +1552,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1899,10 +1566,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1917,10 +1581,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1934,10 +1595,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1951,10 +1609,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1968,10 +1623,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -1985,10 +1637,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80008b6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2002,10 +1651,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2019,10 +1665,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2036,10 +1679,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2053,10 +1693,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2070,10 +1707,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x808ff3a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2092,10 +1726,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800041a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2109,10 +1740,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800065a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2126,10 +1754,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800065a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2143,10 +1768,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80013d4,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2160,10 +1782,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80004ee,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2178,10 +1797,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2196,10 +1812,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2213,10 +1826,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2230,10 +1840,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2247,10 +1854,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2264,10 +1868,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2281,10 +1882,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2298,10 +1896,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2315,10 +1910,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2332,10 +1924,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2349,10 +1938,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2366,10 +1952,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8001cf2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2383,10 +1966,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8001cf2,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2400,10 +1980,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000534,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2417,10 +1994,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000534,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2434,10 +2008,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8002ba4,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2451,10 +2022,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8002ba4,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2468,10 +2036,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000732,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2485,10 +2050,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000732,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2502,10 +2064,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000732,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2519,10 +2078,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8002b5e,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2536,10 +2092,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8002b5e,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2553,10 +2106,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2570,10 +2120,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2587,10 +2134,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2604,10 +2148,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800030,                    /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2621,10 +2162,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x807a0c4,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2638,10 +2176,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x807785e,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2655,10 +2190,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2672,10 +2204,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80009a4,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2689,10 +2218,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      0,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2706,10 +2232,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80aa920,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2723,10 +2246,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x800093a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2740,10 +2260,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8000f66,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2757,10 +2274,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x802cc6a,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2774,10 +2288,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8075d96,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2791,10 +2302,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8003bd6,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2808,10 +2316,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x80831da,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2825,10 +2330,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0x8089792,                   /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
@@ -2843,10 +2345,7 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
-      0,                           /* mirroring_enabled    */
-      0,                           /* use_bios             */
       0,                           /* idle_loop_target_pc  */
-      1,                           /* iwram_stack_optimize */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */

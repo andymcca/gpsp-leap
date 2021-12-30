@@ -92,7 +92,6 @@ int use_libretro_save_method = 0;
 boot_mode selected_boot_mode = boot_game;
 
 u32 idle_loop_target_pc = 0xFFFFFFFF;
-u32 iwram_stack_optimize = 1;
 u32 translation_gate_target_pc[MAX_TRANSLATION_GATES];
 u32 translation_gate_targets = 0;
 

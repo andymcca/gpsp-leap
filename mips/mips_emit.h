@@ -260,11 +260,14 @@ u32 arm_to_mips_reg[] =
   mips_emit_j(mips_absolute_offset(mips_indirect_branch_##type));             \
   mips_emit_nop()                                                             \
 
-#define block_prologue_size 8
+#define block_prologue_size   16
 
 #define generate_block_prologue()                                             \
   update_trampoline = translation_ptr;                                        \
   mips_emit_j(mips_absolute_offset(mips_update_gba));                         \
+  mips_emit_nop();                                                            \
+  spaccess_trampoline = translation_ptr;                                      \
+  mips_emit_j(mips_absolute_offset(&rom_translation_cache[EWRAM_SPM_OFF]));   \
   mips_emit_nop();                                                            \
   generate_load_imm(reg_pc, stored_pc)                                        \
 
@@ -547,7 +550,8 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
 
 #define generate_block_extra_vars()                                           \
   u32 stored_pc = pc;                                                         \
-  u8 *update_trampoline                                                       \
+  u8 *update_trampoline;                                                      \
+  u8 *spaccess_trampoline;                                                    \
 
 #define generate_block_extra_vars_arm()                                       \
   generate_block_extra_vars();                                                \
@@ -1369,9 +1373,16 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
   arm_block_memory_offset_##offset_type();                                    \
   arm_block_memory_writeback_##access_type(writeback_type);                   \
                                                                               \
-  if((rn == REG_SP) && iwram_stack_optimize)                                  \
+  if(rn == REG_SP)                                                            \
   {                                                                           \
+    /* Assume IWRAM, the most common path by far */                           \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
+    /* Check the 23rd bit to differenciate IW/EW RAMs */                      \
+    mips_emit_srl(reg_temp, reg_a2, 24);                                      \
+    mips_emit_sll(reg_temp, reg_temp, 31);                                    \
+    mips_emit_bgezal(reg_temp,                                                \
+                mips_relative_offset(translation_ptr, spaccess_trampoline));  \
+    /* Delay slot, will be overwritten anyway */                              \
     mips_emit_lui(reg_a0, ((u32)(iwram + 0x8000 + 0x8000) >> 16));            \
     mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
     offset = (u32)(iwram + 0x8000) & 0xFFFF;                                  \
@@ -1696,9 +1707,16 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
   thumb_block_address_preadjust_##pre_op(base_reg);                           \
   thumb_block_address_postadjust_##post_op(base_reg);                         \
                                                                               \
-  if((base_reg == REG_SP) && iwram_stack_optimize)                            \
+  if(base_reg == REG_SP)                                                      \
   {                                                                           \
+    /* Assume IWRAM, the most common path by far */                           \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
+    /* Check the 23rd bit to differenciate IW/EW RAMs */                      \
+    mips_emit_srl(reg_temp, reg_a2, 24);                                      \
+    mips_emit_sll(reg_temp, reg_temp, 31);                                    \
+    mips_emit_bgezal(reg_temp,                                                \
+                mips_relative_offset(translation_ptr, spaccess_trampoline));  \
+    /* Delay slot, will be overwritten anyway */                              \
     mips_emit_lui(reg_a0, ((u32)(iwram + 0x8000 + 0x8000) >> 16));            \
     mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
     offset = (u32)(iwram + 0x8000) & 0xFFFF;                                  \
@@ -2050,6 +2068,7 @@ static void emit_mem_access_loadop(
 #endif
 
 #define SMC_WRITE_OFF    (10*16*4)   /* 10 handlers (16 insts) */
+#define EWRAM_SPM_OFF    (SMC_WRITE_OFF + 4*2)   /* Just a jmp + nop */
 
 // Describes a "plain" memory are, that is, an area that is just accessed
 // as normal memory (with some caveats tho).
@@ -2681,7 +2700,13 @@ void init_emitter() {
   // This is just a trampoline (for the SMC branches)
   mips_emit_j(((u32)&smc_write) >> 2);
   mips_emit_nop();
-  
+
+  // Special trampoline for SP-relative ldm/stm (to EWRAM)
+  generate_load_imm(reg_a1, 0x3FFFC);
+  mips_emit_and(reg_a1, reg_a1, reg_a2);
+  mips_emit_lui(reg_a0, ((u32)(ewram + 0x8000) >> 16));
+  generate_function_return_swap_delay();
+
   // Generate the openload handlers (for accesses to unmapped mem)
   emit_openload_stub(0, false, 0, &translation_ptr);  // ld u8
   emit_openload_stub(1, true,  0, &translation_ptr);  // ld s8

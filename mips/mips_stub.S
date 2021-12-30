@@ -554,6 +554,8 @@ defsymbl(execute_arm_translate_internal)
 .bss
 .align 6
 
+# Ensure iwram+0x8000 and ewram addresses have identical 31..16 bits
+# We place them at 128KB offset to ensure so.
 defsymbl(iwram)
   .space 0x10000
 defsymbl(vram)

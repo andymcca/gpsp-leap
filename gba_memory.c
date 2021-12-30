@@ -2132,10 +2132,7 @@ typedef struct
    u32 flash_device_id;
    int save_type;
    int rtc_enabled;
-   int mirroring_enabled;
-   int use_bios;
    u32 idle_loop_target_pc;
-   u32 iwram_stack_optimize;
    u32 translation_gate_target_1;
    u32 translation_gate_target_2;
    u32 translation_gate_target_3;
@@ -2173,8 +2170,6 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
      if (gbaover[i].idle_loop_target_pc != 0)
         idle_loop_target_pc = gbaover[i].idle_loop_target_pc;
 
-     iwram_stack_optimize = gbaover[i].iwram_stack_optimize;
-     
      flash_device_id      = gbaover[i].flash_device_id;
      if (flash_device_id == FLASH_DEVICE_MACRONIX_128KB)
        flash_bank_cnt = FLASH_SIZE_128KB;
@@ -2268,10 +2263,6 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
                   translation_gate_targets++;
                }
             }
-
-            if(!strcmp(current_variable, "iwram_stack_optimize") &&
-                  !strcmp(current_value, "no\0")) /* \0 for broken toolchain workaround */
-               iwram_stack_optimize = 0;
 
             if(!strcmp(current_variable, "flash_rom_type") &&
               !strcmp(current_value, "128KB"))
@@ -3254,7 +3245,6 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
    memcpy(gpinfo.gamepak_maker, &gamepak_buffers[0][0xB0],  2);
 
    idle_loop_target_pc = 0xFFFFFFFF;
-   iwram_stack_optimize = 1;
    translation_gate_targets = 0;
    flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
    flash_bank_cnt = FLASH_SIZE_64KB;
