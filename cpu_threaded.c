@@ -3048,6 +3048,17 @@ block_exit_type block_exits[MAX_EXITS];
 #define thumb_fix_pc()                                                        \
   pc &= ~0x01                                                                 \
 
+#define update_pc_limits()                                                    \
+if (translation_region == TRANSLATION_REGION_RAM) {                           \
+  if (pc >= 0x3000000) {                                                      \
+    iwram_code_min = MIN(pc & 0x7FFF, iwram_code_min);                        \
+    iwram_code_max = MAX(pc & 0x7FFF, iwram_code_max);                        \
+  } else {                                                                    \
+    ewram_code_min = MIN(pc & 0x3FFFF, ewram_code_min);                       \
+    ewram_code_max = MAX(pc & 0x3FFFF, ewram_code_max);                       \
+  }                                                                           \
+}                                                                             \
+
 s32 translate_block_arm(u32 pc, translation_region_type
  translation_region, u32 smc_enable)
 {
@@ -3081,11 +3092,6 @@ s32 translate_block_arm(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if (pc >= 0x3000000)
-        iwram_code_min = MIN(pc & 0x7FFF, iwram_code_min);
-      else if (pc >= 0x2000000)
-        ewram_code_min = MIN(pc & 0x3FFFF, ewram_code_min);
-
       translation_ptr = ram_translation_ptr;
       translation_cache_limit =
        ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -
@@ -3144,6 +3150,7 @@ s32 translate_block_arm(u32 pc, translation_region_type
       arm_process_cheats();
     }
 
+    update_pc_limits();
     translate_arm_instruction();
     block_data_position++;
 
@@ -3215,11 +3222,6 @@ s32 translate_block_arm(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if (pc >= 0x3000000)
-        iwram_code_max = MAX(pc & 0x7FFF, iwram_code_max);
-      else if (pc >= 0x2000000)
-        ewram_code_max = MAX(pc & 0x3FFFF, ewram_code_max);
-
       ram_translation_ptr = translation_ptr;
       break;
 
@@ -3273,11 +3275,6 @@ s32 translate_block_thumb(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if (pc >= 0x3000000)
-        iwram_code_min = MIN(pc & 0x7FFF, iwram_code_min);
-      else if (pc >= 0x2000000)
-        ewram_code_min = MIN(pc & 0x3FFFF, ewram_code_min);
-
       translation_ptr = ram_translation_ptr;
       translation_cache_limit =
        ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -
@@ -3334,6 +3331,7 @@ s32 translate_block_thumb(u32 pc, translation_region_type
       thumb_process_cheats();
     }
 
+    update_pc_limits();
     translate_thumb_instruction();
     block_data_position++;
 
@@ -3400,11 +3398,6 @@ s32 translate_block_thumb(u32 pc, translation_region_type
   switch(translation_region)
   {
     case TRANSLATION_REGION_RAM:
-      if (pc >= 0x3000000)
-        iwram_code_max = MAX(pc & 0x7FFF, iwram_code_max);
-      else if (pc >= 0x2000000)
-        ewram_code_max = MAX(pc & 0x3FFFF, ewram_code_max);
-
       ram_translation_ptr = translation_ptr;
       break;
 
@@ -3449,16 +3442,20 @@ void flush_translation_cache_ram(void)
   // Proceed to clean the SMC area if needed
   // (also try to memset as little as possible for performance)
   if (iwram_code_max) {
-    if(iwram_code_max > iwram_code_min)
+    if(iwram_code_max > iwram_code_min) {
+      iwram_code_min &= ~15U;
+      iwram_code_max = MIN(iwram_code_max + 8, 0x8000);
       memset(&iwram[iwram_code_min], 0, iwram_code_max - iwram_code_min);
-    else
+    } else
       memset(iwram, 0, 0x8000);
   }
 
   if (ewram_code_max) {
-    if(ewram_code_max > ewram_code_min)
+    if(ewram_code_max > ewram_code_min) {
+      ewram_code_min &= ~15U;
+      ewram_code_max = MIN(ewram_code_max + 8, 0x40000);
       memset(&ewram[0x40000 + ewram_code_min], 0, ewram_code_max - ewram_code_min);
-    else
+    } else
       memset(&ewram[0x40000], 0, 0x40000);
   }
 
