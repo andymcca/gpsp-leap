@@ -3448,11 +3448,19 @@ void flush_translation_cache_ram(void)
 
   // Proceed to clean the SMC area if needed
   // (also try to memset as little as possible for performance)
-  if(iwram_code_max)
-    memset(&iwram[iwram_code_min], 0, iwram_code_max - iwram_code_min);
+  if (iwram_code_max) {
+    if(iwram_code_max > iwram_code_min)
+      memset(&iwram[iwram_code_min], 0, iwram_code_max - iwram_code_min);
+    else
+      memset(iwram, 0, 0x8000);
+  }
 
-  if(ewram_code_max)
-    memset(&ewram[0x40000 + ewram_code_min], 0, ewram_code_max - ewram_code_min);
+  if (ewram_code_max) {
+    if(ewram_code_max > ewram_code_min)
+      memset(&ewram[0x40000 + ewram_code_min], 0, ewram_code_max - ewram_code_min);
+    else
+      memset(&ewram[0x40000], 0, 0x40000);
+  }
 
   iwram_code_min = ~0U;
   iwram_code_max =  0U;
