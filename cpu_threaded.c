@@ -2514,9 +2514,11 @@ void translate_icache_sync() {
 // ARM or Thumb mode.
 
 #define block_lookup_address_pc_arm()                                         \
+  u32 thumb = 0;                                                              \
   pc &= ~0x03
 
 #define block_lookup_address_pc_thumb()                                       \
+  u32 thumb = 1;                                                              \
   pc &= ~0x01                                                                 \
 
 #define block_lookup_address_pc_dual()                                        \
@@ -2641,7 +2643,8 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
     case 0x0:                                                                 \
     case 0x8 ... 0xD:                                                         \
     {                                                                         \
-      u32 hash_target = ((pc * 2654435761U) >> (32 - ROM_BRANCH_HASH_BITS))   \
+      u32 key = pc | thumb;                                                   \
+      u32 hash_target = ((key * 2654435761U) >> (32 - ROM_BRANCH_HASH_BITS))  \
                                               & (ROM_BRANCH_HASH_SIZE - 1);   \
                                                                               \
       hashhdr_type *bhdr;                                                     \
@@ -2650,7 +2653,7 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
       while(blk_offset)                                                       \
       {                                                                       \
         bhdr = (hashhdr_type*)&rom_translation_cache[blk_offset];             \
-        if(bhdr->pc_value == pc)                                              \
+        if(bhdr->pc_value == key)                                             \
         {                                                                     \
           block_address = &rom_translation_cache[blk_offset +                 \
                               sizeof(hashhdr_type) + block_prologue_size];    \
@@ -2668,7 +2671,7 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
                                                                               \
         translation_recursion_level++;                                        \
         bhdr = (hashhdr_type*)rom_translation_ptr;                            \
-        bhdr->pc_value = pc;                                                  \
+        bhdr->pc_value = key;                                                 \
         bhdr->next_entry = 0;                                                 \
         *blk_offset_addr = (u32)(rom_translation_ptr - rom_translation_cache);\
         rom_translation_ptr += sizeof(hashhdr_type);                          \
