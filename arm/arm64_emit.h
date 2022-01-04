@@ -1788,7 +1788,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   thumb_decode_branch();                                                      \
   generate_alu_imm(addi, add, reg_a0, reg_r14, (offset * 2));                 \
   generate_load_pc(reg_r14, ((pc + 2) | 0x01));                               \
-  generate_indirect_branch_cycle_update(dual);                                \
+  generate_indirect_branch_cycle_update(thumb);                               \
   break;                                                                      \
 }                                                                             \
 

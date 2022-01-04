@@ -1923,11 +1923,16 @@ static void trace_instruction(u32 pc, u32 mode)
 #define thumb_blh()                                                           \
 {                                                                             \
   thumb_decode_branch();                                                      \
+  u32 offlo = (offset * 2) & 0xFF;                                            \
+  u32 offhi = (offset * 2) >> 8;                                              \
   generate_update_pc(((pc + 2) | 0x01));                                      \
   thumb_generate_load_reg(reg_a1, REG_LR);                                    \
   thumb_generate_store_reg(reg_a0, REG_LR);                                   \
-  generate_add_reg_reg_imm(reg_a0, reg_a1, (offset * 2), 0);                  \
-  generate_indirect_branch_cycle_update(dual_thumb);                          \
+  generate_add_reg_reg_imm(reg_a0, reg_a1, offlo, 0);                         \
+  if (offhi) {                                                                \
+    generate_add_reg_reg_imm(reg_a0, reg_a0, offhi, arm_imm_lsl_to_rot(8));   \
+  }                                                                           \
+  generate_indirect_branch_cycle_update(thumb);                               \
 }                                                                             \
 
 #define thumb_bx()                                                            \

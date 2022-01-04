@@ -1809,10 +1809,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 #define thumb_blh()                                                           \
 {                                                                             \
   thumb_decode_branch();                                                      \
-  generate_alu_imm(addiu, addu, reg_a0, reg_r14, (offset * 2));               \
+  mips_emit_addiu(reg_a0, reg_r14, (offset * 2));                             \
   generate_load_pc(reg_r14, ((pc + 2) | 0x01));                               \
-  generate_indirect_branch_cycle_update(dual);                                \
-  break;                                                                      \
+  generate_indirect_branch_cycle_update(thumb);                               \
 }                                                                             \
 
 #define thumb_bx()                                                            \
