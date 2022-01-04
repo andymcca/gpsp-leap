@@ -2490,21 +2490,46 @@ void translate_icache_sync() {
 // 0x0000 : this is just data (never translated)
 // 0x00XX : not used (since first byte is zero)
 // 0x0101 : this is code that is not the start of a translated block
-// 0x0105 : first possible tag (we do not use 103 due to arm asm immediates)
-// 0xXXXX : this is the start of a translated block
+// 0xXXXX : this is the start of a translated block, starting from 0xFFFF downwards
+//          LSB is always set (we decrement by two) to ensure both bytes != 0
 //
-// The tag value is a pointer to the ram cache where the translated block starts
-// The tag value must have both bytes set to non-zero, therefore the LSB is
-// always 1 and starts from 0x0101 value.
-// The 15 value is an index to 16 byte blocks in the RAM CACHE, therefore this
-// cache is limited to ~ 2^15 * 16byte ~= 512KB
+// The tag value is an index to a `ramtag_type` structure that sits at the end
+// of the RAM CACHE (grows like a stack). For simplicity we start tags at 0xFFFF
+// and grow like a stack.
 
+#define LAST_TAG_NUM       0x0101
+#define INITIAL_TOP_TAG    0xFFFF
 #define CODE_TAG_BLOCK16   0x0101
 #define CODE_TAG_BLOCK32   0x01010101
-#define INITIAL_TOP_TAG    0x0105
-#define TAG2ADDR(tag)      (&ram_translation_cache[((((tag) - INITIAL_TOP_TAG) >> 1) << 4)])
-#define ADDR2TAG(addr)     ((((((u8*)addr) - &ram_translation_cache[0]) >> 4) << 1) + INITIAL_TOP_TAG)
-#define VALIDTAG(tag)      (tag >= INITIAL_TOP_TAG)
+
+#define VALID_TAG(tagn) (tagn > LAST_TAG_NUM)
+
+#define allocate_tag_arm(location) {   \
+  location[0] = ram_block_tag;         \
+  /* Could be another thumb inst */    \
+  if (!location[1])                    \
+    location[1] = CODE_TAG_BLOCK16;    \
+  ram_block_tag -= 2;                  \
+}
+
+#define allocate_tag_thumb(location) { \
+  location[0] = ram_block_tag;         \
+  ram_block_tag -= 2;                  \
+}
+
+typedef struct
+{
+  u32 offset_arm;     // Cache offset to the ARM-mode compiled block
+  u32 offset_thumb;   // Cache offset to the Thumb-mode compiled block
+} ramtag_type;
+
+static u32 ram_block_tag = INITIAL_TOP_TAG;
+
+inline static ramtag_type* get_ram_tag(u16 tagval) {
+  ramtag_type *tbl = (ramtag_type*)&ram_translation_cache[RAM_TRANSLATION_CACHE_SIZE];
+  s16 tgidx = (s16)(tagval);
+  return &tbl[tgidx >> 1];  /* Since LSB is always 1 and thus unused */
+}
 
 // This function will return a pointer to a translated block of code. If it
 // doesn't exist it will translate it, if it does it will pass it back.
@@ -2521,20 +2546,6 @@ void translate_icache_sync() {
   u32 thumb = 1;                                                              \
   pc &= ~0x01                                                                 \
 
-#define block_lookup_address_pc_dual()                                        \
-  u32 thumb = pc & 0x01;                                                      \
-                                                                              \
-  if(thumb)                                                                   \
-  {                                                                           \
-    pc--;                                                                     \
-    reg[REG_CPSR] |= 0x20;                                                    \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    pc = (pc + 2) & ~0x03;                                                    \
-    reg[REG_CPSR] &= ~0x20;                                                   \
-  }                                                                           \
-
 #define ram_translation_region  TRANSLATION_REGION_RAM
 #define rom_translation_region  TRANSLATION_REGION_ROM
 
@@ -2546,51 +2557,33 @@ void translate_icache_sync() {
   translation_result = translate_block_thumb(pc,                              \
    mem_type##_translation_region, smc_enable)                                 \
 
-#define block_lookup_translate_dual(mem_type, smc_enable)                     \
-  if(thumb)                                                                   \
-  {                                                                           \
-    translation_result = translate_block_thumb(pc,                            \
-     mem_type##_translation_region, smc_enable);                              \
+#define block_lookup_translate_ram(inst_type)                                 \
+{                                                                             \
+  ramtag_type* trentry;                                                       \
+  /* Allocate a tag if not a valid one, and initialize header */              \
+  if (!VALID_TAG(*location)) {                                                \
+    allocate_tag_##inst_type(location);                                       \
+    trentry = get_ram_tag(*location);                                         \
+    trentry->offset_arm = 0;                                                  \
+    trentry->offset_thumb = 0;                                                \
+  } else {                                                                    \
+    trentry = get_ram_tag(*location);                                         \
   }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    translation_result = translate_block_arm(pc,                              \
-     mem_type##_translation_region, smc_enable);                              \
-  }                                                                           \
-
-#define fill_tag_arm(tag)                                                     \
-  location[0] = (tag);                                                        \
-  location[1] = CODE_TAG_BLOCK16
-
-#define fill_tag_thumb(tag)                                                   \
-  *location = (tag)
-
-#define fill_tag_dual(tag)                                                    \
-  if(thumb)                                                                   \
-    fill_tag_thumb(tag);                                                      \
-  else {                                                                      \
-    fill_tag_arm(tag);                                                        \
-  }                                                                           \
-
-#define block_lookup_translate_ram(instruction_type)                          \
-  block_tag = *location;                                                      \
-  if(!VALIDTAG(block_tag))                                                    \
+                                                                              \
+  if (trentry->offset_##inst_type == 0)                                       \
   {                                                                           \
     __label__ redo;                                                           \
     s32 translation_result;                                                   \
                                                                               \
     redo:                                                                     \
                                                                               \
-    /* Pad the start of the block to 16 bytes, see "memory tagging" above */  \
-    while (((uintptr_t)(&ram_translation_ptr[block_prologue_size]             \
-                                          - ram_translation_cache)) % 16)     \
-      ram_translation_ptr++;                                                  \
-                                                                              \
     translation_recursion_level++;                                            \
     block_address = ram_translation_ptr + block_prologue_size;                \
-    fill_tag_##instruction_type(ADDR2TAG(block_address));                     \
+    trentry->offset_##inst_type = block_address - ram_translation_cache;      \
                                                                               \
-    block_lookup_translate_##instruction_type(ram, 1);                        \
+    translation_result = translate_block_##inst_type(                         \
+         pc, ram_translation_region, 1);                                      \
+                                                                              \
     translation_recursion_level--;                                            \
                                                                               \
     /* If the translation failed then pass that failure on if we're in        \
@@ -2608,8 +2601,9 @@ void translate_icache_sync() {
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    block_address = (u8*)TAG2ADDR(block_tag);                                 \
+    block_address = &ram_translation_cache[trentry->offset_##inst_type];      \
   }                                                                           \
+}
 
 u32 translation_recursion_level = 0;
 u32 translation_flush_count = 0;
@@ -2665,7 +2659,7 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
       if(!blk_offset)                                                         \
       {                                                                       \
         __label__ redo;                                                       \
-        s32 translation_result;                                               \
+        s32 result;                                                           \
                                                                               \
         redo:                                                                 \
                                                                               \
@@ -2676,12 +2670,12 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
         *blk_offset_addr = (u32)(rom_translation_ptr - rom_translation_cache);\
         rom_translation_ptr += sizeof(hashhdr_type);                          \
         block_address = rom_translation_ptr + block_prologue_size;            \
-        block_lookup_translate_##type(rom, 0);                                \
+        result = translate_block_##type(pc, rom_translation_region, 0);       \
         translation_recursion_level--;                                        \
                                                                               \
         /* If the translation failed then pass that failure on if we're in    \
          a recursive level, or try again if we've hit the bottom. */          \
-        if(translation_result == -1)                                          \
+        if(result == -1)                                                      \
         {                                                                     \
           if(translation_recursion_level)                                     \
             return NULL;                                                      \
@@ -2717,7 +2711,20 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
 
 block_lookup_address_builder(arm);
 block_lookup_address_builder(thumb);
-block_lookup_address_builder(dual);
+
+u8 function_cc *block_lookup_address_dual(u32 pc)
+{
+  u32 thumb = pc & 0x01;
+  if(thumb) {
+    pc &= ~1;
+    reg[REG_CPSR] |= 0x20;
+    return block_lookup_address_thumb(pc);
+  } else {
+    pc = (pc + 2) & ~0x03;
+    reg[REG_CPSR] &= ~0x20;
+    return block_lookup_address_arm(pc);
+  }
+}
 
 // Potential exit point: If the rd field is pc for instructions is 0x0F,
 // the instruction is b/bl/bx, or the instruction is ldm with PC in the
@@ -3093,9 +3100,9 @@ s32 translate_block_arm(u32 pc, translation_region_type
   {
     case TRANSLATION_REGION_RAM:
       translation_ptr = ram_translation_ptr;
-      translation_cache_limit =
-       ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;
+      translation_cache_limit = &ram_translation_cache[
+         RAM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD
+         - (0x10000 - ram_block_tag) / 2 * sizeof(ramtag_type)];
       break;
 
     case TRANSLATION_REGION_ROM:
@@ -3276,9 +3283,9 @@ s32 translate_block_thumb(u32 pc, translation_region_type
   {
     case TRANSLATION_REGION_RAM:
       translation_ptr = ram_translation_ptr;
-      translation_cache_limit =
-       ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;
+      translation_cache_limit = &ram_translation_cache[
+         RAM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD
+         - (0x10000 - ram_block_tag) / 2 * sizeof(ramtag_type)];
       break;
 
     case TRANSLATION_REGION_ROM:
@@ -3463,6 +3470,7 @@ void flush_translation_cache_ram(void)
   iwram_code_max =  0U;
   ewram_code_min = ~0U;
   ewram_code_max =  0U;
+  ram_block_tag = INITIAL_TOP_TAG;
 }
 
 void flush_translation_cache_rom(void)

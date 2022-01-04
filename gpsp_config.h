@@ -11,15 +11,14 @@
 #if defined(SMALL_TRANSLATION_CACHE)
   #define ROM_TRANSLATION_CACHE_SIZE (1024 * 1024 * 2)
   #define RAM_TRANSLATION_CACHE_SIZE (1024 * 384)
-  #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 2)
 #else
   #define ROM_TRANSLATION_CACHE_SIZE (1024 * 1024 * 10)
   #define RAM_TRANSLATION_CACHE_SIZE (1024 * 512)
-  #define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 8)
 #endif
 
-/* Please note that RAM_TRANSLATION_CACHE_SIZE is limited to 512KB
-   Check cpu_threaded.c for "memory tagging" for more info. */
+/* Should be an upperbound to the maximum number of bytes a single JIT'ed
+   instruction can take. STM/LDM are tipically the biggest ones */
+#define TRANSLATION_CACHE_LIMIT_THRESHOLD (1024 * 2)
 
 /* Hash table size for ROM trans cache lookups */
 #define ROM_BRANCH_HASH_BITS                           16
