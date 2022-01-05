@@ -314,20 +314,30 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
   }
 }
 
-#define arm_load_imm_32bit(ireg, imm)                                         \
-{                                                                             \
-  u32 stores[4];                                                              \
-  u32 rotations[4];                                                           \
-  u32 store_count = arm_disect_imm_32bit(imm, stores, rotations);             \
-  u32 i;                                                                      \
-                                                                              \
-  ARM_MOV_REG_IMM(0, ireg, stores[0], rotations[0]);                          \
-                                                                              \
-  for(i = 1; i < store_count; i++)                                            \
+#if __ARM_ARCH >= 7
+  #define arm_load_imm_32bit(ireg, imm)                                       \
   {                                                                           \
-    ARM_ORR_REG_IMM(0, ireg, ireg, stores[i], rotations[i]);                  \
-  }                                                                           \
-}                                                                             \
+    ARM_MOVW(0, ireg, (imm));                                                 \
+    if ((imm) >> 16) {                                                        \
+      ARM_MOVT(0, ireg, ((imm) >> 16));                                       \
+    }                                                                         \
+  }
+#else
+  #define arm_load_imm_32bit(ireg, imm)                                       \
+  {                                                                           \
+    u32 stores[4];                                                            \
+    u32 rotations[4];                                                         \
+    u32 store_count = arm_disect_imm_32bit(imm, stores, rotations);           \
+    u32 i;                                                                    \
+                                                                              \
+    ARM_MOV_REG_IMM(0, ireg, stores[0], rotations[0]);                        \
+                                                                              \
+    for(i = 1; i < store_count; i++)                                          \
+    {                                                                         \
+      ARM_ORR_REG_IMM(0, ireg, ireg, stores[i], rotations[i]);                \
+    }                                                                         \
+  }
+#endif
 
 
 #define generate_load_pc(ireg, new_pc)                                        \

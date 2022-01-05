@@ -1425,6 +1425,12 @@ typedef union {
 #define ARM_UDIV(p, rd, rm, rn) \
   ARM_UDIV_COND(p, rd, rm, rn, ARMCOND_AL)
 
+#define ARM_MOVW(p, rd, imm) \
+  ARM_EMIT(p, ((ARMCOND_AL << 28) | (0x30 << 20) | (((imm >> 12) & 0xF) << 16) | (imm & 0xFFF) | (rd << 12)))
+
+#define ARM_MOVT(p, rd, imm) \
+  ARM_EMIT(p, ((ARMCOND_AL << 28) | (0x34 << 20) | (((imm >> 12) & 0xF) << 16) | (imm & 0xFFF) | (rd << 12)))
+
 
 #endif /* ARM_CG_H */
 
