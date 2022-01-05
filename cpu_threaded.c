@@ -1958,8 +1958,7 @@ void translate_icache_sync() {
         u32 rdreg = (hiop & 7);                                               \
         u32 aoff = (pc & ~2) + (imm*4) + 4;                                   \
         /* ROM + same page -> optimize as const load */                       \
-        if (translation_region == TRANSLATION_REGION_ROM &&                   \
-            (((aoff + 4) >> 15) == (pc >> 15))) {                             \
+        if (!ram_region && (((aoff + 4) >> 15) == (pc >> 15))) {              \
           u32 value = address32(pc_address_block, (aoff & 0x7FFF));           \
           thumb_load_pc_pool_const(rdreg, value);                             \
         } else {                                                              \
@@ -2546,93 +2545,47 @@ inline static ramtag_type* get_ram_tag(u16 tagval) {
   u32 thumb = 1;                                                              \
   pc &= ~0x01                                                                 \
 
-#define ram_translation_region  TRANSLATION_REGION_RAM
-#define rom_translation_region  TRANSLATION_REGION_ROM
 
-#define block_lookup_translate_arm(mem_type, smc_enable)                      \
-  translation_result = translate_block_arm(pc, mem_type##_translation_region, \
-   smc_enable)                                                                \
-
-#define block_lookup_translate_thumb(mem_type, smc_enable)                    \
-  translation_result = translate_block_thumb(pc,                              \
-   mem_type##_translation_region, smc_enable)                                 \
-
-#define block_lookup_translate_ram(inst_type)                                 \
+#define block_lookup_translate_builder(type)                                  \
+u8 function_cc *block_lookup_translate_##type(u32 pc)                         \
 {                                                                             \
-  ramtag_type* trentry;                                                       \
-  /* Allocate a tag if not a valid one, and initialize header */              \
-  if (!VALID_TAG(*location)) {                                                \
-    allocate_tag_##inst_type(location);                                       \
-    trentry = get_ram_tag(*location);                                         \
-    trentry->offset_arm = 0;                                                  \
-    trentry->offset_thumb = 0;                                                \
-  } else {                                                                    \
-    trentry = get_ram_tag(*location);                                         \
-  }                                                                           \
-                                                                              \
-  if (trentry->offset_##inst_type == 0)                                       \
-  {                                                                           \
-    __label__ redo;                                                           \
-    s32 translation_result;                                                   \
-                                                                              \
-    redo:                                                                     \
-                                                                              \
-    translation_recursion_level++;                                            \
-    block_address = ram_translation_ptr + block_prologue_size;                \
-    trentry->offset_##inst_type = block_address - ram_translation_cache;      \
-                                                                              \
-    translation_result = translate_block_##inst_type(                         \
-         pc, ram_translation_region, 1);                                      \
-                                                                              \
-    translation_recursion_level--;                                            \
-                                                                              \
-    /* If the translation failed then pass that failure on if we're in        \
-       a recursive level, or try again if we've hit the bottom. */            \
-    if(translation_result == -1)                                              \
-    {                                                                         \
-      if(translation_recursion_level)                                         \
-        return NULL;                                                          \
-                                                                              \
-      goto redo;                                                              \
-    }                                                                         \
-                                                                              \
-    if(translation_recursion_level == 0)                                      \
-      translate_icache_sync();                                                \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    block_address = &ram_translation_cache[trentry->offset_##inst_type];      \
-  }                                                                           \
-}
-
-u32 translation_recursion_level = 0;
-u32 translation_flush_count = 0;
-
-
-#define block_lookup_address_builder(type)                                    \
-u8 function_cc *block_lookup_address_##type(u32 pc)                           \
-{                                                                             \
+  u8 pcregion = (pc >> 24);                                                   \
   u16 *location;                                                              \
   u32 block_tag;                                                              \
-  u8 *block_address;                                                          \
                                                                               \
-  /* Starting at the beginning, we allow for one translation cache flush. */  \
-  if(translation_recursion_level == 0){                                       \
-    translation_flush_count = 0;                                              \
-  }	                                                                          \
   block_lookup_address_pc_##type();                                           \
                                                                               \
-  switch(pc >> 24)                                                            \
+  switch(pcregion)                                                            \
   {                                                                           \
     case 0x2:                                                                 \
-      location = (u16 *)(ewram + (pc & 0x3FFFF) + 0x40000);                   \
-      block_lookup_translate_ram(type);                                       \
-      break;                                                                  \
-                                                                              \
     case 0x3:                                                                 \
-      location = (u16 *)(iwram + (pc & 0x7FFF));                              \
-      block_lookup_translate_ram(type);                                       \
-      break;                                                                  \
+    {                                                                         \
+      u16* tagp = (pcregion == 2) ? (u16 *)(ewram + (pc & 0x3FFFF) + 0x40000) \
+                                  : (u16 *)(iwram + (pc & 0x7FFF));           \
+      ramtag_type* trentry;                                                   \
+      /* Allocate a tag if not a valid one, and initialize header */          \
+      if (!VALID_TAG(*tagp)) {                                                \
+        allocate_tag_##type(tagp);                                            \
+        trentry = get_ram_tag(*tagp);                                         \
+        trentry->offset_arm = 0;                                              \
+        trentry->offset_thumb = 0;                                            \
+      } else {                                                                \
+        trentry = get_ram_tag(*tagp);                                         \
+      }                                                                       \
+                                                                              \
+      if (!trentry->offset_##type) {                                          \
+        bool result;                                                          \
+        u8 *blkptr = ram_translation_ptr + block_prologue_size;               \
+        trentry->offset_##type = blkptr - ram_translation_cache;              \
+        result = translate_block_##type(pc, true);                            \
+                                                                              \
+        if (result)                                                           \
+          return blkptr;                                                      \
+      } else {                                                                \
+        return &ram_translation_cache[trentry->offset_##type];                \
+      }                                                                       \
+      return NULL;                                                            \
+    }                                                                         \
                                                                               \
     case 0x0:                                                                 \
     case 0x8 ... 0xD:                                                         \
@@ -2648,69 +2601,40 @@ u8 function_cc *block_lookup_address_##type(u32 pc)                           \
       {                                                                       \
         bhdr = (hashhdr_type*)&rom_translation_cache[blk_offset];             \
         if(bhdr->pc_value == key)                                             \
-        {                                                                     \
-          block_address = &rom_translation_cache[blk_offset +                 \
-                              sizeof(hashhdr_type) + block_prologue_size];    \
-          break;                                                              \
-        }                                                                     \
+          return &rom_translation_cache[                                      \
+                  blk_offset + sizeof(hashhdr_type) + block_prologue_size];   \
+                                                                              \
         blk_offset = bhdr->next_entry;                                        \
         blk_offset_addr = &bhdr->next_entry;                                  \
       }                                                                       \
-      if(!blk_offset)                                                         \
-      {                                                                       \
-        __label__ redo;                                                       \
-        s32 result;                                                           \
                                                                               \
-        redo:                                                                 \
-                                                                              \
-        translation_recursion_level++;                                        \
+      { /* Not found, go ahead and translate, and backfill the hash table */  \
+        u8 *blkptr;                                                           \
+        bool result;                                                          \
         bhdr = (hashhdr_type*)rom_translation_ptr;                            \
         bhdr->pc_value = key;                                                 \
         bhdr->next_entry = 0;                                                 \
         *blk_offset_addr = (u32)(rom_translation_ptr - rom_translation_cache);\
         rom_translation_ptr += sizeof(hashhdr_type);                          \
-        block_address = rom_translation_ptr + block_prologue_size;            \
-        result = translate_block_##type(pc, rom_translation_region, 0);       \
-        translation_recursion_level--;                                        \
+        blkptr = rom_translation_ptr + block_prologue_size;                   \
+        result = translate_block_##type(pc, false);                           \
                                                                               \
-        /* If the translation failed then pass that failure on if we're in    \
-         a recursive level, or try again if we've hit the bottom. */          \
-        if(result == -1)                                                      \
-        {                                                                     \
-          if(translation_recursion_level)                                     \
-            return NULL;                                                      \
-                                                                              \
-          goto redo;                                                          \
-        }                                                                     \
-                                                                              \
-        if(translation_recursion_level == 0)                                  \
-          translate_icache_sync();                                            \
+        if (result)                                                           \
+          return blkptr;                                                      \
       }                                                                       \
-      break;                                                                  \
+      return NULL;                                                            \
     }                                                                         \
-                                                                              \
-    default:                                                                  \
-      /* If we're at the bottom, it means we're actually trying to jump to an \
-         address that we can't handle. Otherwise, it means that code scanned  \
-         has reached an address that can't be handled, which means that we    \
-         have most likely hit an area that doesn't contain code yet (for      \
-         instance, in RAM). If such a thing happens, return -1 and the        \
-         block translater will naively link it (it'll be okay, since it       \
-         should never be hit) */                                              \
-      if(translation_recursion_level == 0)                                    \
-      {                                                                       \
-        printf("bad jump %x (%x)\n", pc, reg[REG_PC]);                        \
-        fflush(stdout);                                                       \
-      }                                                                       \
-      block_address = (u8 *)(-1);                                             \
-      break;                                                                  \
   }                                                                           \
                                                                               \
-  return block_address;                                                       \
+  /* Do not return NULL since it could indeed happen that some branch         \
+     points to some random place (perhaps due to being garbage). This can     \
+     happen when especulatively compiling code in RAM. Perhaps the game       \
+     patches these instructions later, which would trigger a flush */         \
+  return (u8*)(~0);                                                           \
 }                                                                             \
 
-block_lookup_address_builder(arm);
-block_lookup_address_builder(thumb);
+block_lookup_translate_builder(arm);
+block_lookup_translate_builder(thumb);
 
 u8 function_cc *block_lookup_address_dual(u32 pc)
 {
@@ -2725,6 +2649,36 @@ u8 function_cc *block_lookup_address_dual(u32 pc)
     return block_lookup_address_arm(pc);
   }
 }
+
+u8 function_cc *block_lookup_address_arm(u32 pc)
+{
+  for (unsigned i = 0; i < 4; i++) {
+    u8 *ret = block_lookup_translate_arm(pc);
+    if (ret) {
+      translate_icache_sync();
+      return ret;
+    }
+  }
+
+  printf("bad jump %x (%x)\n", pc, reg[REG_PC]);
+  fflush(stdout);
+  return NULL;
+}
+
+u8 function_cc *block_lookup_address_thumb(u32 pc)
+{
+  for (unsigned i = 0; i < 4; i++) {
+    u8 *ret = block_lookup_translate_thumb(pc);
+    if (ret) {
+      translate_icache_sync();
+      return ret;
+    }
+  }
+  printf("bad jump %x (%x)\n", pc, reg[REG_PC]);
+  fflush(stdout);
+  return NULL;
+}
+
 
 // Potential exit point: If the rd field is pc for instructions is 0x0F,
 // the instruction is b/bl/bx, or the instruction is ldm with PC in the
@@ -2815,12 +2769,6 @@ u8 function_cc *block_lookup_address_dual(u32 pc)
     break;                                                                    \
   }                                                                           \
 
-#define arm_link_block()                                                      \
-  if(branch_target == 0x00000008)                                             \
-    translation_target = bios_swi_entrypoint;                                 \
-  else                                                                        \
-    translation_target = block_lookup_address_arm(branch_target);             \
-
 #define arm_instruction_width 4
 
 #define arm_base_cycles()                                                     \
@@ -2889,13 +2837,6 @@ u8 function_cc *block_lookup_address_dual(u32 pc)
   }                                                                           \
 
 #define thumb_set_condition(_condition)                                       \
-
-#define thumb_link_block()                                                    \
-  /* Speed hack to make SWI calls direct jumps */                             \
-  if(branch_target == 0x00000008)                                             \
-    translation_target = bios_swi_entrypoint;                                 \
-  else                                                                        \
-    translation_target = block_lookup_address_thumb(branch_target);           \
 
 #define thumb_instruction_width 2
 
@@ -3056,7 +2997,7 @@ block_exit_type block_exits[MAX_EXITS];
   pc &= ~0x01                                                                 \
 
 #define update_pc_limits()                                                    \
-if (translation_region == TRANSLATION_REGION_RAM) {                           \
+if (ram_region) {                                                             \
   if (pc >= 0x3000000) {                                                      \
     iwram_code_min = MIN(pc & 0x7FFF, iwram_code_min);                        \
     iwram_code_max = MAX(pc & 0x7FFF, iwram_code_max);                        \
@@ -3066,8 +3007,7 @@ if (translation_region == TRANSLATION_REGION_RAM) {                           \
   }                                                                           \
 }                                                                             \
 
-s32 translate_block_arm(u32 pc, translation_region_type
- translation_region, u32 smc_enable)
+bool translate_block_arm(u32 pc, bool ram_region)
 {
   u32 opcode = 0;
   u32 last_opcode;
@@ -3096,21 +3036,16 @@ s32 translate_block_arm(u32 pc, translation_region_type
   if(!pc_address_block)
     pc_address_block = load_gamepak_page(pc_region & 0x3FF);
 
-  switch(translation_region)
-  {
-    case TRANSLATION_REGION_RAM:
-      translation_ptr = ram_translation_ptr;
-      translation_cache_limit = &ram_translation_cache[
-         RAM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD
-         - (0x10000 - ram_block_tag) / 2 * sizeof(ramtag_type)];
-      break;
-
-    case TRANSLATION_REGION_ROM:
-      translation_ptr = rom_translation_ptr;
-      translation_cache_limit =
-       rom_translation_cache + ROM_TRANSLATION_CACHE_SIZE -
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;
-      break;
+  if (ram_region) {
+    translation_ptr = ram_translation_ptr;
+    translation_cache_limit = &ram_translation_cache[
+       RAM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD
+       - (0x10000 - ram_block_tag) / 2 * sizeof(ramtag_type)];
+  } else {
+    translation_ptr = rom_translation_ptr;
+    translation_cache_limit =
+     rom_translation_cache + ROM_TRANSLATION_CACHE_SIZE -
+     TRANSLATION_CACHE_LIMIT_THRESHOLD;
   }
 
   generate_block_prologue();
@@ -3119,7 +3054,7 @@ s32 translate_block_arm(u32 pc, translation_region_type
      of the data processing functions can access it), and its expansion was
      massacreing the compiler. */
 
-  if(smc_enable)
+  if(ram_region)
   {
     scan_block(arm, yes);
   }
@@ -3166,21 +3101,12 @@ s32 translate_block_arm(u32 pc, translation_region_type
        a simple recursive call here won't work, it has to pedal out to
        the beginning. */
 
-    if(translation_ptr > translation_cache_limit)
-    {
-      translation_flush_count++;
-
-      switch(translation_region)
-      {
-        case TRANSLATION_REGION_RAM:
-          flush_translation_cache_ram();
-          break;
-
-        case TRANSLATION_REGION_ROM:
-          flush_translation_cache_rom();
-          break;
-      }
-      return -1;
+    if(translation_ptr > translation_cache_limit) {
+      if (ram_region)
+        flush_translation_cache_ram();
+      else
+        flush_translation_cache_rom();
+      return false;
     }
 
     /* If the next instruction is a block entry point update the
@@ -3226,32 +3152,27 @@ s32 translate_block_arm(u32 pc, translation_region_type
     }
   }
 
-  switch(translation_region)
-  {
-    case TRANSLATION_REGION_RAM:
-      ram_translation_ptr = translation_ptr;
-      break;
-
-    case TRANSLATION_REGION_ROM:
-      rom_translation_ptr = translation_ptr;
-      break;
-  }
+  if (ram_region)
+    ram_translation_ptr = translation_ptr;
+  else
+    rom_translation_ptr = translation_ptr;
 
   for(i = 0; i < external_block_exit_position; i++)
   {
     branch_target = external_block_exits[i].branch_target;
-    arm_link_block();
-    if(!translation_target){
-			return -1;
-		}
+    if(branch_target == 0x00000008)
+      translation_target = bios_swi_entrypoint;
+    else
+      translation_target = block_lookup_translate_arm(branch_target);
+    if (!translation_target)
+      return false;
     generate_branch_patch_unconditional(
-     external_block_exits[i].branch_source, translation_target);
+      external_block_exits[i].branch_source, translation_target);
   }
-  return 0;
+  return true;
 }
 
-s32 translate_block_thumb(u32 pc, translation_region_type
- translation_region, u32 smc_enable)
+bool translate_block_thumb(u32 pc, bool ram_region)
 {
   u32 opcode = 0;
   u32 last_opcode;
@@ -3279,21 +3200,15 @@ s32 translate_block_thumb(u32 pc, translation_region_type
   if(!pc_address_block)
     pc_address_block = load_gamepak_page(pc_region & 0x3FF);
 
-  switch(translation_region)
-  {
-    case TRANSLATION_REGION_RAM:
-      translation_ptr = ram_translation_ptr;
-      translation_cache_limit = &ram_translation_cache[
-         RAM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD
-         - (0x10000 - ram_block_tag) / 2 * sizeof(ramtag_type)];
-      break;
-
-    case TRANSLATION_REGION_ROM:
-      translation_ptr = rom_translation_ptr;
-      translation_cache_limit =
-       rom_translation_cache + ROM_TRANSLATION_CACHE_SIZE -
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;
-      break;
+  if (ram_region) {
+    translation_ptr = ram_translation_ptr;
+    translation_cache_limit = &ram_translation_cache[
+       RAM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD
+       - (0x10000 - ram_block_tag) / 2 * sizeof(ramtag_type)];
+  } else {
+    translation_ptr = rom_translation_ptr;
+    translation_cache_limit = &rom_translation_cache[
+       ROM_TRANSLATION_CACHE_SIZE - TRANSLATION_CACHE_LIMIT_THRESHOLD];
   }
 
   generate_block_prologue();
@@ -3302,7 +3217,7 @@ s32 translate_block_thumb(u32 pc, translation_region_type
      of the data processing functions can access it), and its expansion was
      massacreing the compiler. */
 
-  if(smc_enable)
+  if(ram_region)
   {
     scan_block(thumb, yes);
   }
@@ -3349,19 +3264,11 @@ s32 translate_block_thumb(u32 pc, translation_region_type
 
     if(translation_ptr > translation_cache_limit)
     {
-      translation_flush_count++;
-
-      switch(translation_region)
-      {
-        case TRANSLATION_REGION_RAM:
-          flush_translation_cache_ram();
-          break;
-
-        case TRANSLATION_REGION_ROM:
-          flush_translation_cache_rom();
-          break;
-      }
-      return -1;
+      if (ram_region)
+        flush_translation_cache_ram();
+      else
+        flush_translation_cache_rom();
+      return false;
     }
 
     /* If the next instruction is a block entry point update the
@@ -3402,28 +3309,24 @@ s32 translate_block_thumb(u32 pc, translation_region_type
     }
   }
 
-  switch(translation_region)
-  {
-    case TRANSLATION_REGION_RAM:
-      ram_translation_ptr = translation_ptr;
-      break;
-
-    case TRANSLATION_REGION_ROM:
-      rom_translation_ptr = translation_ptr;
-      break;
-  }
+  if (ram_region)
+    ram_translation_ptr = translation_ptr;
+  else
+    rom_translation_ptr = translation_ptr;
 
   for(i = 0; i < external_block_exit_position; i++)
   {
     branch_target = external_block_exits[i].branch_target;
-    thumb_link_block();
-    if(!translation_target){
-      return -1;
-		}
+    if(branch_target == 0x00000008)
+      translation_target = bios_swi_entrypoint;
+    else
+      translation_target = block_lookup_translate_thumb(branch_target);
+    if (!translation_target)
+      return false;
     generate_branch_patch_unconditional(
-     external_block_exits[i].branch_source, translation_target);
+      external_block_exits[i].branch_source, translation_target);
   }
-  return 0;
+  return true;
 }
 
 void init_bios_hooks(void)

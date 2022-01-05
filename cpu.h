@@ -97,12 +97,6 @@ typedef enum
   REG_MAX           = 64
 } ext_reg_numbers;
 
-typedef enum
-{
-  TRANSLATION_REGION_RAM,
-  TRANSLATION_REGION_ROM,
-} translation_region_type;
-
 extern u32 instruction_count;
 
 void execute_arm(u32 cycles);
@@ -126,10 +120,8 @@ bool cpu_read_savestate(const u8 *src);
 u8 function_cc *block_lookup_address_arm(u32 pc);
 u8 function_cc *block_lookup_address_thumb(u32 pc);
 u8 function_cc *block_lookup_address_dual(u32 pc);
-s32 translate_block_arm(u32 pc, translation_region_type translation_region,
- u32 smc_enable);
-s32 translate_block_thumb(u32 pc, translation_region_type translation_region,
- u32 smc_enable);
+bool translate_block_arm(u32 pc, bool ram_region);
+bool translate_block_thumb(u32 pc, bool ram_region);
 
 #if defined(MMAP_JIT_CACHE)
 extern u8* rom_translation_cache;
