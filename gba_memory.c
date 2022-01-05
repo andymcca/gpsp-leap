@@ -1346,6 +1346,7 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
 
     // WAITCNT
     case 0x204:
+      write_ioreg(REG_WAITCNT, value);
       break;
 
     // Halt

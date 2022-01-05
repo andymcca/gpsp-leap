@@ -150,6 +150,7 @@ typedef enum
   REG_RCNT = 0x9A,
   REG_IE = 0x100,
   REG_IF = 0x101,
+  REG_WAITCNT = 0x102,
   REG_IME = 0x104,
   REG_HALTCNT = 0x180
 } hardware_register;
