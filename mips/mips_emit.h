@@ -1904,8 +1904,8 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
   #define extract_bits(rt, rs, pos, size) \
     mips_emit_ext(rt, rs, pos, size)
   // Extends signed byte to u32
-  #define extend_byte_signed(rt, rs) \
-    mips_emit_seb(rt, rs)
+  #define extend_byte_signed(rd, rs) \
+    mips_emit_seb(rd, rs)
   // Rotates a word using a temp reg if necessary
   #define rotate_right(rdest, rsrc, rtemp, amount) \
     mips_emit_rotr(rdest, rsrc, amount);
@@ -1933,9 +1933,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
     mips_emit_sll(rt, rs, 32 - ((pos) + (size))); \
     mips_emit_srl(rt, rt, 32 - (size))
   // Extends signed byte to u32
-  #define extend_byte_signed(rt, rs) \
-    mips_emit_sll(rt, rs, 24); \
-    mips_emit_sra(rt, rt, 24)
+  #define extend_byte_signed(rd, rs) \
+    mips_emit_sll(rd, rs, 24); \
+    mips_emit_sra(rd, rd, 24)
   // Rotates a word (uses temp reg)
   #define rotate_right(rdest, rsrc, rtemp, amount) \
     mips_emit_sll(rtemp, rsrc, 32 - (amount));     \

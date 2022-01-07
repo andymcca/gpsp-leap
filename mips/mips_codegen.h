@@ -19,38 +19,38 @@
 
 typedef enum
 {
-  mips_reg_zero,
-  mips_reg_at,
-  mips_reg_v0,
-  mips_reg_v1,
-  mips_reg_a0,
-  mips_reg_a1,
-  mips_reg_a2,
-  mips_reg_a3,
-  mips_reg_t0,
-  mips_reg_t1,
-  mips_reg_t2,
-  mips_reg_t3,
-  mips_reg_t4,
-  mips_reg_t5,
-  mips_reg_t6,
-  mips_reg_t7,
-  mips_reg_s0,
-  mips_reg_s1,
-  mips_reg_s2,
-  mips_reg_s3,
-  mips_reg_s4,
-  mips_reg_s5,
-  mips_reg_s6,
-  mips_reg_s7,
-  mips_reg_t8,
-  mips_reg_t9,
-  mips_reg_k0,
-  mips_reg_k1,
-  mips_reg_gp,
-  mips_reg_sp,
-  mips_reg_fp,
-  mips_reg_ra
+  mips_reg_zero =  0,
+  mips_reg_at   =  1,
+  mips_reg_v0   =  2,
+  mips_reg_v1   =  3,
+  mips_reg_a0   =  4,
+  mips_reg_a1   =  5,
+  mips_reg_a2   =  6,
+  mips_reg_a3   =  7,
+  mips_reg_t0   =  8,
+  mips_reg_t1   =  9,
+  mips_reg_t2   = 10,
+  mips_reg_t3   = 11,
+  mips_reg_t4   = 12,
+  mips_reg_t5   = 13,
+  mips_reg_t6   = 14,
+  mips_reg_t7   = 15,
+  mips_reg_s0   = 16,
+  mips_reg_s1   = 17,
+  mips_reg_s2   = 18,
+  mips_reg_s3   = 19,
+  mips_reg_s4   = 20,
+  mips_reg_s5   = 21,
+  mips_reg_s6   = 22,
+  mips_reg_s7   = 23,
+  mips_reg_t8   = 24,
+  mips_reg_t9   = 25,
+  mips_reg_k0   = 26,
+  mips_reg_k1   = 27,
+  mips_reg_gp   = 28,
+  mips_reg_sp   = 29,
+  mips_reg_fp   = 30,
+  mips_reg_ra   = 31
 } mips_reg_number;
 
 typedef enum
@@ -216,12 +216,6 @@ typedef enum
 #define mips_emit_xor(rd, rs, rt)                                             \
   mips_emit_special(xor, rs, rt, rd, 0)                                       \
 
-#define mips_emit_add(rd, rs, rt)                                             \
-  mips_emit_special(and, rs, rt, rd, 0)                                       \
-
-#define mips_emit_sub(rd, rs, rt)                                             \
-  mips_emit_special(sub, rs, rt, rd, 0)                                       \
-
 #define mips_emit_and(rd, rs, rt)                                             \
   mips_emit_special(and, rs, rt, rd, 0)                                       \
 
@@ -359,10 +353,10 @@ typedef enum
 #define mips_emit_ins(rt, rs, pos, size)                                      \
   mips_emit_special3(ins, rs, rt, (pos + size - 1), pos)                      \
 
-#define mips_emit_seb(rt, rd)                                                 \
+#define mips_emit_seb(rd, rt)                                                 \
   mips_emit_special3(bshfl, 0, rt, rd, mips_bshfl_seb)                        \
 
-#define mips_emit_seh(rt, rd)                                                 \
+#define mips_emit_seh(rd, rt)                                                 \
   mips_emit_special3(bshfl, 0, rt, rd, mips_bshfl_seh)                        \
 
 
@@ -407,6 +401,6 @@ typedef enum
   mips_emit_regimm(bltz, rs, offset)                                          \
 
 #define mips_emit_nop()                                                       \
-  mips_emit_sll(reg_zero, reg_zero, 0)                                        \
+  mips_emit_sll(mips_reg_zero, mips_reg_zero, 0)                              \
 
 
