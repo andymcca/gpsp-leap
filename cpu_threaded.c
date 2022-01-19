@@ -2652,7 +2652,8 @@ u8 function_cc *block_lookup_address_dual(u32 pc)
 
 u8 function_cc *block_lookup_address_arm(u32 pc)
 {
-  for (unsigned i = 0; i < 4; i++) {
+  unsigned i;
+  for (i = 0; i < 4; i++) {
     u8 *ret = block_lookup_translate_arm(pc);
     if (ret) {
       translate_icache_sync();
@@ -2667,7 +2668,8 @@ u8 function_cc *block_lookup_address_arm(u32 pc)
 
 u8 function_cc *block_lookup_address_thumb(u32 pc)
 {
-  for (unsigned i = 0; i < 4; i++) {
+  unsigned i;
+  for (i = 0; i < 4; i++) {
     u8 *ret = block_lookup_translate_thumb(pc);
     if (ret) {
       translate_icache_sync();
