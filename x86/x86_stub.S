@@ -387,10 +387,6 @@ defsymbl(execute_load_##rtype)                                               ;\
   ja ext_load_slow##rtype                                                    ;\
   jmp *load_##rtype##_tbl(REG_BASE, FULLREG(cx), ADDR_SIZE_BYTES)            ;\
                                                                              ;\
-ext_load_bios##rtype:                                                        ;\
-  mov %edx, REG_PC(REG_BASE)                        /* Store current PC */   ;\
-  jmp ext_load_slow##rtype                                                   ;\
-                                                                             ;\
 ext_load_iwram##rtype:                                                       ;\
   and $(0x7FFF & addrm), %eax                              /* Addr wrap */   ;\
   movop (IWRAM_OFF+0x8000)(REG_BASE, FULLREG(ax)), %eax     /* Read mem */   ;\
@@ -436,6 +432,7 @@ ext_load_rom##rtype:                                                         ;\
   ret                                                                        ;\
                                                                              ;\
 ext_load_slow##rtype:                                                        ;\
+  mov %edx, REG_PC(REG_BASE)                        /* Store current PC */   ;\
   SETUP_ARGS                                                                 ;\
   CALL_FUNC(slowfn)                                                          ;\
   ret                                                                        ;\
@@ -524,7 +521,7 @@ return_to_main:
   ret
 
 #define load_table(atype)                                                    ;\
-  ADDR_TYPE ext_load_bios##atype          /* 0x00 BIOS                     */;\
+  ADDR_TYPE ext_load_slow##atype          /* 0x00 BIOS                     */;\
   ADDR_TYPE ext_load_slow##atype          /* 0x01 open read                */;\
   ADDR_TYPE ext_load_ewram##atype         /* 0x02 EWRAM                    */;\
   ADDR_TYPE ext_load_iwram##atype         /* 0x03 IWRAM                    */;\
