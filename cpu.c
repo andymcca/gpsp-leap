@@ -959,7 +959,7 @@ const u32 psr_masks[16] =
   }                                                                           \
   if(((_address >> 24) == 0) && (pc >= 0x4000))                               \
   {                                                                           \
-    ror(dest, bios_read_protect, (_address & 0x03) << 3);                     \
+    ror(dest, reg[REG_BUS_VALUE], (_address & 0x03) << 3);                    \
   }                                                                           \
   else                                                                        \
                                                                               \
@@ -1577,7 +1577,7 @@ void raise_interrupt(irq_type irq_raised)
    ((reg[REG_CPSR] & 0x80) == 0))
   {
     // Value after the FIQ returns, should be improved
-    bios_read_protect = 0xe55ec002;
+    reg[REG_BUS_VALUE] = 0xe55ec002;
 
     // Interrupt handler in BIOS
     reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
@@ -3197,7 +3197,7 @@ arm_loop:
                    /* Jump to BIOS SWI handler */
                    default:
                       // After SWI, we read bios[0xE4]
-                      bios_read_protect = 0xe3a02004;
+                      reg[REG_BUS_VALUE] = 0xe3a02004;
                       reg_mode[MODE_SUPERVISOR][6] = pc + 4;
                       collapse_flags();
                       spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
@@ -3684,7 +3684,7 @@ thumb_loop:
                 {
                    default:
                       // After SWI, we read bios[0xE4]
-                      bios_read_protect = 0xe3a02004;
+                      reg[REG_BUS_VALUE] = 0xe3a02004;
                       reg_mode[MODE_SUPERVISOR][6] = pc + 2;
                       spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
                       reg[REG_PC] = 0x00000008;
@@ -3790,8 +3790,8 @@ void init_cpu(void)
 bool cpu_read_savestate(const u8 *src)
 {
   const u8 *cpudoc = bson_find_key(src, "cpu");
-  return bson_read_int32(cpudoc, "bus-value", &bios_read_protect) &&
-         bson_read_int32_array(cpudoc, "regs", reg, REG_IGNORE) &&
+  return bson_read_int32(cpudoc, "bus-value", &reg[REG_BUS_VALUE]) &&
+         bson_read_int32_array(cpudoc, "regs", reg, REG_ARCH_COUNT) &&
          bson_read_int32_array(cpudoc, "spsr", spsr, 6) &&
          bson_read_int32_array(cpudoc, "regmod", (u32*)reg_mode, 7*7);
 }
@@ -3800,10 +3800,10 @@ unsigned cpu_write_savestate(u8 *dst)
 {
   u8 *wbptr, *startp = dst;
   bson_start_document(dst, "cpu", wbptr);
-  bson_write_int32array(dst, "regs", reg, REG_IGNORE);
+  bson_write_int32array(dst, "regs", reg, REG_ARCH_COUNT);
   bson_write_int32array(dst, "spsr", spsr, 6);
   bson_write_int32array(dst, "regmod", reg_mode, 7*7);
-  bson_write_int32(dst, "bus-value", bios_read_protect);
+  bson_write_int32(dst, "bus-value", reg[REG_BUS_VALUE]);
 
   bson_finish_document(dst, wbptr);
   return (unsigned int)(dst - startp);

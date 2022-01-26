@@ -209,7 +209,6 @@ extern u32 gbc_sound_wave_update;
 extern dma_transfer_type dma[DMA_CHAN_CNT];
 
 extern u8 open_gba_bios_rom[1024*16];
-extern u32 bios_read_protect;
 extern u16 palette_ram[512];
 extern u16 oam_ram[512];
 extern u16 palette_ram_converted[512];

@@ -74,7 +74,10 @@ typedef enum
   REG_CPSR          = 16,
   CPU_MODE          = 17,
   CPU_HALT_STATE    = 18,
-  REG_IGNORE        = 19,
+  REG_ARCH_COUNT    = 19,
+
+  // This is saved separately
+  REG_BUS_VALUE     = 19,
 
   // Dynarec signaling and spilling
   // (Not really part of the CPU state)

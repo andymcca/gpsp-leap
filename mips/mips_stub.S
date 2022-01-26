@@ -99,6 +99,7 @@ symbol:
 .equ CPU_MODE,            (17 * 4)
 .equ CPU_HALT_STATE,      (18 * 4)
 
+.equ REG_BUS_VALUE,       (19 * 4)
 .equ REG_N_FLAG,          (20 * 4)
 .equ REG_Z_FLAG,          (21 * 4)
 .equ REG_C_FLAG,          (22 * 4)
@@ -420,8 +421,9 @@ defsymbl(execute_swi)
   cfncall set_cpu_mode, 5         # set the CPU mode to supervisor
   lw $ra, REG_SAVE3($16)
   restore_registers
+  la $2, 0xe3a02004               # Update open BUS value
   jr $ra                          # return
-  nop
+  sw $2, REG_BUS_VALUE($16)
 
 # $4: pc to restore to
 # returns in $4

@@ -2134,7 +2134,7 @@ u32 execute_store_cpsr_body()
 static void function_cc execute_swi(u32 pc)
 {
   // Open bus value after SWI
-  bios_read_protect = 0xe3a02004;
+  reg[REG_BUS_VALUE] = 0xe3a02004;
   reg_mode[MODE_SUPERVISOR][6] = pc;
   spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
   // Move to ARM mode, supervisor mode, disable IRQs

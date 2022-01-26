@@ -34,6 +34,7 @@ _##symbol:
 #define CPU_MODE          (17 * 4)
 #define CPU_HALT_STATE    (18 * 4)
 
+#define REG_BUS_VALUE     (19 * 4)
 #define REG_N_FLAG        (20 * 4)
 #define REG_Z_FLAG        (21 * 4)
 #define REG_C_FLAG        (22 * 4)
@@ -387,6 +388,8 @@ defsymbl(execute_swi_##mode)                                                 ;\
   store_registers_##mode()                /* store regs for mode           */;\
   call_c_function(set_cpu_mode)           /* set the CPU mode to svsr      */;\
   load_registers_arm()                    /* load ARM regs                 */;\
+  ldr r0, =0xe3a02004                     /* Update open BUS value         */;\
+  str r0, [reg_base, #REG_BUS_VALUE]                                         ;\
                                                                              ;\
   restore_flags()                                                            ;\
   add pc, lr, #4                          /* return                        */;\

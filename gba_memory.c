@@ -305,7 +305,6 @@ const u32 gamepak_waitstate_sequential[2][3][3] =
 };
 
 u8 bios_rom[1024 * 16];
-u32 bios_read_protect;
 
 // Up to 128kb, store SRAM, flash ROM, or EEPROM here.
 u8 gamepak_backup[1024 * 128];
@@ -569,7 +568,7 @@ u32 function_cc read_eeprom(void)
     case 0x00:                                                                \
       /* BIOS */                                                              \
       if(reg[REG_PC] >= 0x4000)                                               \
-        ror(value, bios_read_protect, (address & 0x03) << 3);                 \
+        ror(value, reg[REG_BUS_VALUE], (address & 0x03) << 3);                \
       else                                                                    \
         value = readaddress##type(bios_rom, address & 0x3FFF);                \
       break;                                                                  \
@@ -3030,7 +3029,7 @@ void init_memory(void)
 
   rtc_state = RTC_DISABLED;
   memset(rtc_registers, 0, sizeof(rtc_registers));
-  bios_read_protect = 0xe129f000;
+  reg[REG_BUS_VALUE] = 0xe129f000;
 }
 
 void memory_term(void)

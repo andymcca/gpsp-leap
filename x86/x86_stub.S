@@ -84,6 +84,7 @@ _##symbol:
 .equ CPU_MODE,          (17 * 4)
 .equ CPU_HALT_STATE,    (18 * 4)
 
+.equ REG_BUS_VALUE,     (19 * 4)
 .equ REG_N_FLAG,        (20 * 4)
 .equ REG_Z_FLAG,        (21 * 4)
 .equ REG_C_FLAG,        (22 * 4)

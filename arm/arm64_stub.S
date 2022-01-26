@@ -52,6 +52,7 @@ _##symbol:
 #define CPU_MODE          (17 * 4)
 #define CPU_HALT_STATE    (18 * 4)
 
+#define REG_BUS_VALUE     (19 * 4)
 #define REG_N_FLAG        (20 * 4)
 #define REG_Z_FLAG        (21 * 4)
 #define REG_C_FLAG        (22 * 4)
@@ -324,6 +325,8 @@ defsymbl(execute_swi)
   store_registers()
   mov w0, #MODE_SUPERVISOR
   bl set_cpu_mode                         // Set supervisor mode
+  ldr w0, =0xe3a02004
+  str w0, [reg_base, REG_BUS_VALUE]
   ldr lr, [reg_base, #REG_SAVE]
   load_registers()
   ret
