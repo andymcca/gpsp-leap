@@ -85,14 +85,13 @@ void game_name_ext(char *src, char *buffer, char *extension);
 unsigned main_write_savestate(u8* ptr);
 bool main_read_savestate(const u8 *src);
 
-
-u32 file_length(FILE *fp);
-
 extern u32 num_skipped_frames;
 extern int dynarec_enable;
 extern boot_mode selected_boot_mode;
 
+#ifdef TRACE_REGISTERS
 void print_regs(void);
+#endif
 
 #endif
 

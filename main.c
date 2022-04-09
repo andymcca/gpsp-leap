@@ -270,17 +270,7 @@ void reset_gba(void)
   reset_sound();
 }
 
-u32 file_length(FILE *fp)
-{
-  u32 length;
-
-  fseek(fp, 0, SEEK_END);
-  length = ftell(fp);
-  fseek(fp, 0, SEEK_SET);
-
-  return length;
-}
-
+#ifdef TRACE_REGISTERS
 void print_regs(void)
 {
   printf("R0=%08x R1=%08x R2=%08x R3=%08x "
@@ -292,6 +282,7 @@ void print_regs(void)
          reg[8], reg[9], reg[10], reg[11],
          reg[12], reg[13], reg[14]);
 }
+#endif
 
 bool main_read_savestate(const u8 *src)
 {
