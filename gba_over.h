@@ -1532,7 +1532,7 @@ static const ini_t gbaover[] = {
    {
       // Pokemon: Fire Red (G)
       "POKEMON FIRE",              /* gamepak_title        */
-      "BPRG",                      /* gamepak_code         */
+      "BPRD",                      /* gamepak_code         */
       "01",                        /* gamepak_maker        */
       0,                           /* flash_size           */
       FLASH_DEVICE_MACRONIX_128KB, /* flash_device_id      */
