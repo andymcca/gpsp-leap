@@ -1,26 +1,22 @@
 /*  
     Parts used from cpuctrl, Copyright (C) 2005  Hermes/PS2Reality
     Portions Copyright (C) 2009 notaz
-
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
-
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
 */
 
 
 #define _GNU_SOURCE 1
-#include "../common.h"
+#include "common.h"
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/soundcard.h>
@@ -30,6 +26,7 @@
 #include <linux/input.h>
 #include "gp2x.h"
 #include "pollux_dpc_set.h"
+#include <SDL/SDL.h>
 
 static u32 gpsp_gp2x_dev_audio;
 static u32 gpsp_gp2x_dev;
@@ -105,6 +102,13 @@ static void fb_video_init()
   struct fb_fix_screeninfo fbfix;
   unsigned int r;
   int i, ret;
+
+  // Some SDL to try and set the screen mode correctly
+  SDL_Init(SDL_INIT_VIDEO);
+  SDL_Surface *screen;
+  screen = SDL_SetVideoMode(320, 240, 16, SDL_SWSURFACE);
+  SDL_UnlockSurface(screen);
+  SDL_FreeSurface(screen);
 
   fbdev = open("/dev/fb0", O_RDWR);
   if (fbdev < 0) {
@@ -283,72 +287,30 @@ u32 wiz_load_gamepak(char *name)
 
 static int abs_min, abs_max, lzone_step;
 
-static int open_caanoo_pad(void)
-{
-  long keybits[KEY_CNT / sizeof(long) / 8];
-  long absbits[(ABS_MAX+1) / sizeof(long) / 8];
-  struct input_absinfo ainfo;
-  int fd = -1, i;
-
-  memset(keybits, 0, sizeof(keybits));
-  memset(absbits, 0, sizeof(absbits));
-
-  for (i = 0;; i++)
-  {
-    int support = 0, need;
-    int ret;
-    char name[64];
-
-    snprintf(name, sizeof(name), "/dev/input/event%d", i);
-    fd = open(name, O_RDONLY|O_NONBLOCK);
-    if (fd == -1)
-      break;
-
-    /* check supported events */
-    ret = ioctl(fd, EVIOCGBIT(0, sizeof(support)), &support);
-    if (ret == -1) {
-      printf("in_evdev: ioctl failed on %s\n", name);
-      goto skip;
-    }
-
-    need = (1 << EV_KEY) | (1 << EV_ABS);
-    if ((support & need) != need)
-      goto skip;
-
-    ret = ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits);
-    if (ret == -1) {
-      printf("in_evdev: ioctl failed on %s\n", name);
-      goto skip;
-    }
-
-    if (!KEYBITS_BIT(BTN_JOYSTICK))
-      goto skip;
-
-    ret = ioctl(fd, EVIOCGABS(ABS_X), &ainfo);
-    if (ret == -1)
-      goto skip;
-
-    abs_min = ainfo.minimum;
-    abs_max = ainfo.maximum;
-    lzone_step = (abs_max - abs_min) / 2 / 9;
-
-    ioctl(fd, EVIOCGNAME(sizeof(name)), name);
-    printf("using \"%s\" (type %08x)\n", name, support);
-    break;
-
-skip:
-    close(fd);
-    fd = -1;
-  }
-
-  if (fd == -1) {
-    printf("missing input device\n");
-    exit(1);
-  }
-
-  return fd;
-}
 #endif // POLLUX_BUILD
+
+static int get_romdir(char *buff, size_t size)
+{
+  FILE *f;
+  char *s;
+  int r = -1;
+
+  f = fopen("romdir.txt", "r");
+  if (f == NULL)
+    return -1;
+
+  s = fgets(buff, size, f);
+  if (s)
+  {
+    r = strlen(s);
+    while (r > 0 && isspace(buff[r-1]))
+      buff[--r] = 0;
+  }
+
+  fclose(f);
+  return r;
+}
+
 
 void gpsp_plat_init(void)
 {
@@ -360,12 +322,10 @@ void gpsp_plat_init(void)
   warm_init();
 #ifdef POLLUX_BUILD
 #ifdef WIZ_BUILD
-  gpsp_gp2x_indev = open("/dev/GPIO", O_RDONLY);
-#else
-  gpsp_gp2x_indev = open_caanoo_pad();
+  poxOpenInput();
 #endif
   fb_video_init();
-  (void)open_caanoo_pad;
+  //(void)open_caanoo_pad;
 #endif
 
   gp2x_sound_volume(1);
@@ -379,6 +339,7 @@ void gpsp_plat_quit(void)
 #ifdef POLLUX_BUILD
   wiz_gamepak_cleanup();
   close(gpsp_gp2x_indev);
+  poxCloseInput();
   fb_video_exit();
 #endif
   munmap((void *)gpsp_gp2x_memregl, 0x10000);
@@ -404,11 +365,12 @@ void gp2x_sound_volume(u32 volume_up)
   ioctl(gpsp_gp2x_dev_audio, SOUND_MIXER_WRITE_PCM, &volume);
 }
 
-u32 gpsp_plat_joystick_read(void)
+u32 gpsp_gp2x_joystick_read(void)
 {
 #ifdef WIZ_BUILD
   u32 value = 0;
-  read(gpsp_gp2x_indev, &value, 4);
+  /*
+  read(gpsp_gp2x_gpiodev, &value, 4);
   if(value & 0x02)
    value |= 0x05;
   if(value & 0x08)
@@ -417,48 +379,16 @@ u32 gpsp_plat_joystick_read(void)
    value |= 0x50;
   if(value & 0x80)
    value |= 0x41;
+*/
+  poxInputEvent ev;
+  if(poxReadInput(&ev)) {
+	  if(ev.type == POX_KEYDOWN) {
+		//printf("%d \n",ev.code);
+		value=ev.code;
+	  }
+  }
   return value;
-#elif defined(POLLUX_BUILD)
-  // caanoo
-  static const int evdev_to_gp2x[] = {
-    GP2X_A, GP2X_X, GP2X_B, GP2X_Y, GP2X_L, GP2X_R,
-    GP2X_HOME, 0, GP2X_START, GP2X_SELECT, GP2X_PUSH
-  };
-  int keybits[KEY_CNT / sizeof(int)];
-  struct input_absinfo ainfo;
-  int lzone = analog_sensitivity_level * lzone_step;
-  u32 retval = 0;
-  int i, ret;
-
-  ret = ioctl(gpsp_gp2x_indev, EVIOCGKEY(sizeof(keybits)), keybits);
-  if (ret == -1) {
-    perror("EVIOCGKEY ioctl failed");
-    sleep(1);
-    return 0;
-  }
-
-  for (i = 0; i < sizeof(evdev_to_gp2x) / sizeof(evdev_to_gp2x[0]); i++) {
-    if (KEYBITS_BIT(BTN_TRIGGER + i))
-      retval |= evdev_to_gp2x[i];
-  }
-
-  if (lzone != 0)
-    lzone--;
-
-  ret = ioctl(gpsp_gp2x_indev, EVIOCGABS(ABS_X), &ainfo);
-  if (ret != -1) {
-    if      (ainfo.value <= abs_min + lzone) retval |= GP2X_LEFT;
-    else if (ainfo.value >= abs_max - lzone) retval |= GP2X_RIGHT;
-  }
-  ret = ioctl(gpsp_gp2x_indev, EVIOCGABS(ABS_Y), &ainfo);
-  if (ret != -1) {
-    if      (ainfo.value <= abs_min + lzone) retval |= GP2X_UP;
-    else if (ainfo.value >= abs_max - lzone) retval |= GP2X_DOWN;
-  }
-
-  return retval;
 #else
-  // GP2X
   u32 value = (gpsp_gp2x_memregs[0x1198 >> 1] & 0x00FF);
 
   if(value == 0xFD)
@@ -475,39 +405,6 @@ u32 gpsp_plat_joystick_read(void)
 #endif
 }
 
-u32 gpsp_plat_buttons_to_cursor(u32 buttons)
-{
-  gui_action_type new_button = CURSOR_NONE;
-
-  if(buttons & GP2X_A)
-    new_button = CURSOR_BACK;
-
-  if(buttons & GP2X_X)
-    new_button = CURSOR_EXIT;
-
-  if(buttons & GP2X_B)
-    new_button = CURSOR_SELECT;
-
-  if(buttons & GP2X_UP)
-    new_button = CURSOR_UP;
-
-  if(buttons & GP2X_DOWN)
-    new_button = CURSOR_DOWN;
-
-  if(buttons & GP2X_LEFT)
-    new_button = CURSOR_LEFT;
-
-  if(buttons & GP2X_RIGHT)
-    new_button = CURSOR_RIGHT;
-
-  if(buttons & GP2X_L)
-    new_button = CURSOR_L;
-
-  if(buttons & GP2X_R)
-    new_button = CURSOR_R;
-
-  return new_button;
-}
 
 // Fout = (m * Fin) / (p * 2^s)
 void set_FCLK(u32 MHZ)
@@ -542,4 +439,3 @@ void set_FCLK(u32 MHZ)
   gpsp_gp2x_memregs[0x910>>1] = v;
 #endif
 }
-
