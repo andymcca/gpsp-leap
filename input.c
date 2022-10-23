@@ -18,6 +18,10 @@
  */
 
 #include "common.h"
+#include <sys/poll.h>
+#define MAX_DEVNODES	18
+static int pox_evdev = -1;
+
 
 // Special thanks to psp298 for the analog->dpad code!
 
@@ -349,60 +353,58 @@ void init_input()
 #if defined(GP2X_BUILD) || defined(PND_BUILD)
 
 extern u32 fps_debug;
+extern u32 gpsp_gp2x_joystick_read(void);
+//nirvous
+#include <linux/input.h>
+
 
 gui_action_type get_gui_input()
 {
-  gui_action_type new_button = CURSOR_NONE;
-  u32 buttons = gpsp_plat_joystick_read();
-  u32 new_buttons;
-
-  static u32 last_buttons = 0;
-  static u64 button_repeat_timestamp;
-
+  gui_action_type gui_action = CURSOR_NONE;
+  //u32 buttons = gpsp_gp2x_joystick_read();
+  //u32 new_buttons;
+  //static u32 last_buttons = 0;
+  //static u64 button_repeat_timestamp;
   delay_us(25000);
+  poxInputEvent ev;
+  if(poxReadInput(&ev)) {
+	  if(ev.type == POX_KEYDOWN) {
+		//printf("%d \n",ev.code);
+		//value=ev.code;
 
-  new_buttons = (last_buttons ^ buttons) & buttons;
-  last_buttons = buttons;
+		  switch(ev.code)
+			{
+			  case KEY_M:
+				gui_action = CURSOR_EXIT;
+				break;
 
-  new_button = gpsp_plat_buttons_to_cursor(new_buttons);
-  if(new_button != CURSOR_NONE)
-  {
-    get_ticks_us(&button_repeat_timestamp);
-    button_repeat_state = BUTTON_HELD_INITIAL;
-    button_repeat = new_buttons;
-    cursor_repeat = new_button;
+			  case KEY_DOWN:
+				gui_action = CURSOR_DOWN;
+				break;
+
+			  case KEY_UP:
+				gui_action = CURSOR_UP;
+				break;
+
+			  case KEY_LEFT:
+				gui_action = CURSOR_LEFT;
+				break;
+
+			  case KEY_RIGHT:
+				gui_action = CURSOR_RIGHT;
+				break;
+
+			  case KEY_A:
+				gui_action = CURSOR_SELECT;
+				break;
+
+			  case KEY_B:
+				gui_action = CURSOR_BACK;
+				break;
+			}
+		}
   }
-  else
-  {
-    if(buttons & button_repeat)
-    {
-      u64 new_ticks;
-      get_ticks_us(&new_ticks);
-
-      if(button_repeat_state == BUTTON_HELD_INITIAL)
-      {
-        if((new_ticks - button_repeat_timestamp) >
-         BUTTON_REPEAT_START)
-        {
-          new_button = cursor_repeat;
-          button_repeat_timestamp = new_ticks;
-          button_repeat_state = BUTTON_HELD_REPEAT;
-        }
-      }
-
-      if(button_repeat_state == BUTTON_HELD_REPEAT)
-      {
-        if((new_ticks - button_repeat_timestamp) >
-         BUTTON_REPEAT_CONTINUE)
-        {
-          new_button = cursor_repeat;
-          button_repeat_timestamp = new_ticks;
-        }
-      }
-    }
-  }
-
-  return new_button;
+  return gui_action;
 }
 
 u32 button_id_to_gba_mask[] =
@@ -423,46 +425,55 @@ u32 button_id_to_gba_mask[] =
   BUTTON_NONE
 };
 
+u32 key_map(int button)
+{
+  switch(button)
+  {
+    case KEY_L:
+      return BUTTON_L;
+
+    case KEY_R:
+      return BUTTON_R;
+
+    case KEY_DOWN:
+      return BUTTON_DOWN;
+
+    case KEY_UP:
+      return BUTTON_UP;
+
+    case KEY_LEFT:
+      return BUTTON_LEFT;
+
+    case KEY_RIGHT:
+      return BUTTON_RIGHT;
+
+    case KEY_B:
+      return BUTTON_B;
+
+    case KEY_A:
+      return BUTTON_A;
+
+    case KEY_P:
+      return BUTTON_START;
+
+    case KEY_H:
+      return BUTTON_SELECT;
+
+    default:
+      return BUTTON_NONE;
+  }
+}
+
+
 u32 update_input()
 {
-  static u32 rapidfire_flag = 1;
-  static u32 last_buttons;
-  u32 handled_buttons;
-  u32 button_id;
-  u32 new_key = 0;
-  u32 buttons = gpsp_plat_joystick_read();
-  u32 i;
-
-#ifdef GP2X_BUILD
-  if((buttons & GP2X_VOL_DOWN) && (buttons & GP2X_VOL_UP))
-  {
-    buttons &= ~(GP2X_VOL_DOWN | GP2X_VOL_UP);
-    buttons |= GP2X_VOL_MIDDLE;
-  }
-
-  /* for Wiz */
-  if((buttons & GP2X_VOL_DOWN) && (buttons & GP2X_SELECT))
-  {
-    buttons &= ~(GP2X_VOL_DOWN | GP2X_SELECT);
-    buttons |= GP2X_VOL_MIDDLE;
-  }
-
-  last_buttons &= ~(GP2X_VOL_DOWN | GP2X_VOL_UP);
-#endif
-
-  handled_buttons = (last_buttons ^ buttons) & buttons;
-  last_buttons = buttons;
-
-  for(i = 0; i < PLAT_BUTTON_COUNT; i++)
-  {
-    if(handled_buttons & button_plat_mask_to_config[i])
-      button_id = gamepad_config_map[i];
-    else
-      button_id = BUTTON_ID_NONE;
-
-    switch(button_id)
-    {
-      case BUTTON_ID_MENU:
+  poxInputEvent ev;
+  if(poxReadInput(&ev)) {
+	  switch(ev.type) {
+		case POX_KEYDOWN:
+			switch (ev.code) {
+				case KEY_M:
+// Reggie, I R teh copy from the psp update_input
       {
         u16 *screen_copy = copy_screen();
         u32 ret_val = menu(screen_copy);
@@ -470,82 +481,33 @@ u32 update_input()
 
         return ret_val;
       }
+				  // nirvous
+				  //this should really jump to the menu...
+				case 115: //VolumeUp
+				  gp2x_sound_volume(1);
+				  break;
+				case 114: //VolumeDown
+				  gp2x_sound_volume(0);
+				  break;
+			        case 'x':
+				fps_debug ^= 1;
+				break;
+				default:
+				  key |= key_map(ev.code);
+				  trigger_key(key);
+				  break;
+		    }
+		    break;
 
-      case BUTTON_ID_LOADSTATE:
-      {
-        char current_savestate_filename[512];
-        get_savestate_filename_noshot(savestate_slot,
-         current_savestate_filename);
-        load_state(current_savestate_filename);
-        return 1;
-      }
-
-      case BUTTON_ID_SAVESTATE:
-      {
-        char current_savestate_filename[512];
-        u16 *current_screen = copy_screen();
-        get_savestate_filename_noshot(savestate_slot,
-         current_savestate_filename);
-        save_state(current_savestate_filename, current_screen);
-        free(current_screen);
-        return 0;
-      }
-
-      case BUTTON_ID_FASTFORWARD:
-        synchronize_flag ^= 1;
-        return 0;
-
-#ifdef GP2X_BUILD
-      case BUTTON_ID_VOLUP:
-        gp2x_sound_volume(1);
-        break;
-
-      case BUTTON_ID_VOLDOWN:
-        gp2x_sound_volume(0);
-        break;
-#endif
-
-      case BUTTON_ID_FPS:
-        fps_debug ^= 1;
-        break;
-    }
-
-    if(buttons & button_plat_mask_to_config[i])
-    {
-      button_id = gamepad_config_map[i];
-      if(button_id < BUTTON_ID_MENU)
-      {
-        new_key |= button_id_to_gba_mask[button_id];
-      }
-      else
-
-      if((button_id >= BUTTON_ID_RAPIDFIRE_A) &&
-       (button_id <= BUTTON_ID_RAPIDFIRE_L))
-      {
-        rapidfire_flag ^= 1;
-        if(rapidfire_flag)
-        {
-          new_key |= button_id_to_gba_mask[button_id -
-           BUTTON_ID_RAPIDFIRE_A + BUTTON_ID_A];
-        }
-        else
-        {
-          new_key &= ~button_id_to_gba_mask[button_id -
-           BUTTON_ID_RAPIDFIRE_A + BUTTON_ID_A];
-        }
-      }
-    }
-  }
-
-  if((new_key | key) != key)
-    trigger_key(new_key);
-
-  key = new_key;
-
-  io_registers[REG_P1] = (~key) & 0x3FF;
-
-  return 0;
+		case POX_KEYUP:
+			key &= ~(key_map(ev.code));
+			break;
+	   }
+   }
+   io_registers[REG_P1] = (~key) & 0x3FF;
+   return 0;
 }
+
 
 void init_input()
 {
@@ -922,3 +884,91 @@ void input_##type##_savestate(file_tag_type savestate_file)                   \
 input_savestate_builder(read);
 input_savestate_builder(write_mem);
 
+//added by nirvous
+int poxOpenInput()
+{
+	char dev[20];
+	char name[32];
+	int i;
+
+	if(pox_evdev >= 0) {
+		perror("pox_evdev already open");
+		return 0;
+	}
+
+	for(i = 0; i < MAX_DEVNODES; i++) {
+		sprintf(dev, "/dev/input/event%d", i);
+		pox_evdev = open(dev, O_RDONLY);
+		if(pox_evdev < 0) {
+			printf("can't open %s\n", dev);
+			return -1;
+		}
+
+		if(ioctl(pox_evdev, EVIOCGNAME(32), name) < 0) {
+			perror("can't get input device name\n");
+			close(pox_evdev);
+			return -1;
+		}
+
+		if(!strcmp(name, "LF1000 Keyboard")) {
+			printf("found keyboard on %s\n", dev);
+			return pox_evdev;
+		}
+		else { /* not what we want, check another */
+			close(pox_evdev);
+			pox_evdev = -1;
+		}
+	}
+
+	return -1;
+}
+
+//added by nirvous
+void poxCloseInput() {
+	if(pox_evdev >= 0) {
+		close(pox_evdev);
+		pox_evdev = -1;
+	}
+}
+
+//added by nirvous
+int poxReadInput(poxInputEvent *pie) {
+	struct pollfd fds[1];
+
+	if(!pie) return 0;
+	if(pox_evdev < 0) {
+		return 0;
+	}
+
+	fds[0].fd = pox_evdev;
+	fds[0].events = POLLIN;
+
+	if(poll(fds, 1, 0) == -1) {
+		perror("can't poll evdev");
+		return 0;
+	}
+
+	// Capture All events
+	if(fds[0].revents & POLLIN) {
+		struct input_event ev[1];
+
+		int rd = read(pox_evdev, ev, sizeof(struct input_event));
+		if(rd < (int) sizeof(struct input_event)) {
+			perror("read error");
+			return 0;
+		}
+
+		pie->code = ev[0].code;
+		if(ev[0].value == 0) {
+			pie->type = POX_KEYUP;
+			return 1;
+		} else
+		if(ev[0].value == 1) {
+			pie->type = POX_KEYDOWN;
+			return 1;
+		}
+		return 0;
+	}
+
+	return 0;
+}
