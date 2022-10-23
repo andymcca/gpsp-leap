@@ -86,5 +86,25 @@ extern u32 gamepad_config_map[];
 extern u32 global_enable_analog;
 extern u32 analog_sensitivity_level;
 
+#if defined(GP2X_BUILD)
+u32 gpsp_gp2x_joystick_read(void);
+//added by nirvous
+/* Event Types */
+#define POX_KEYUP	1
+#define POX_KEYDOWN	2
+
+typedef struct poxInputEvent_s {
+	int type;
+	int code;
+} poxInputEvent;
+
+int		 poxOpenInput();
+int		 poxReadInput(poxInputEvent *pEvent);
+void		 poxCloseInput();
+void		 poxSetInputCallback(void (*pCallback)(poxInputEvent *pEvent));
+
+
 #endif
 
+
+#endif
