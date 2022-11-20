@@ -1,6 +1,9 @@
 # gpSP makefile
 # Gilead Kutnick - Exophase
 # GP2X port(ion) - Z
+# Retroleap changes - andymcca
+
+# Retroleap Buildroot .mk file needs to set GP2X, WIZ and POLLUX flags to build correctly
 
 # Global definitions
 
@@ -12,11 +15,10 @@ OBJS      = main.o cpu.o memory.u video.o input.o sound.o gp2x.o gui.o        \
 ifeq ($(WIZ),1)
 POLLUX    = 1
 OBJS      += pollux_dpc_set.o
-BIN       = gpsp_wiz
+BIN       = gpsp_retroleap
 endif
 ifeq ($(CAANOO),1)
 POLLUX    = 1
-OBJS      += pollux_dpc_set.o
 BIN       = gpsp_caanoo
 endif
 ifeq ($(BIN),)
@@ -27,7 +29,7 @@ endif
 
 # Platform specific definitions 
 
-VPATH      += .. ../arm
+VPATH      += .. ../arm ../gp2x
 CFLAGS     += -DARM_ARCH -DGP2X_BUILD
 ifeq ($(WIZ),1)
 CFLAGS     += -DWIZ_BUILD
@@ -35,14 +37,25 @@ endif
 ifeq ($(POLLUX),1)
 CFLAGS     += -DPOLLUX_BUILD
 endif
-CFLAGS     += -std=c99 -msoft-float -funsigned-char -Wall -ggdb
+
+# debug build
+#CFLAGS     += -std=c99 -msoft-float -funsigned-char -Wall -ggdb
+
+#optimized build
+# NOTE: -funroll-loops (and -O3) will slow down compiling considerably
+CFLAGS     +=  -O3 -std=c99 -msoft-float -funsigned-char -fno-common           \
+              -fno-builtin                                                    \
+
 ifndef DEBUG
-CFLAGS     += -O2
+#CFLAGS     += -O2
 endif
 
-INCLUDES   = `sdl-config --cflags`
-LIBS       = `sdl-config --libs` \
+# Retroleap - you need to change these to point at sdl-config in the Retroleap toolchain.  May be able to utilise the CROSS_COMPILE env variable
+INCLUDES   = `/home/lubuntu/newbuilds/retroleap/output/host/arm-buildroot-linux-gnueabi/sysroot/usr/bin/sdl-config --cflags`
+LIBS       = `/home/lubuntu/newbuilds/retroleap/output/host/arm-buildroot-linux-gnueabi/sysroot/usr/bin/sdl-config --libs` \
               -lm -ldl -lpthread -lz
+
+
 ifeq ($(WIZ)$(CAANOO),)
 LIBS       += -static
 endif
@@ -76,6 +89,7 @@ $(BIN):	$(OBJS)
 clean:
 	rm -f *.o *.u *.z $(BIN) 
 
+# Caanoo specific - can probably be removed?
 rel: gpsp_caanoo gpsp_caanoo.ini gpsp_caanoo.gpe warm_2.6.24.ko \
 		../COPYING.DOC ../readme.txt readme_gp2x.txt ../game_config.txt
 	rm -rf out
