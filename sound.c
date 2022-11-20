@@ -459,7 +459,7 @@ void update_gbc_sound(u32 cpu_ticks)
     if(((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) >=
      (audio_buffer_size * 2))
     {
-      while(((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) >
+  if (((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) >
        (audio_buffer_size * 3 / 2))
       {
         SDL_CondWait(sound_cv, sound_mutex);
@@ -479,10 +479,8 @@ void update_gbc_sound(u32 cpu_ticks)
         u64 current_ticks;
         u64 next_ticks;
         get_ticks_us(&current_ticks);
-
         next_ticks = ((current_ticks + 16666) / 16667) * 16667;
         delay_us(next_ticks - current_ticks);
-
         get_ticks_us(&frame_count_initial_timestamp);
 */
         /* prevent frameskip, or it will cause more audio,
@@ -612,7 +610,7 @@ void sound_callback(void *userdata, Uint8 *stream, int length)
 
   SDL_LockMutex(sound_mutex);
 
-  while(((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) <
+  if(((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) <
    length && !sound_exit_flag)
   {
     SDL_CondWait(sound_cv, sound_mutex);
@@ -816,4 +814,3 @@ void sound_##type##_savestate(file_tag_type savestate_file)                 \
 
 sound_savestate_builder(read);
 sound_savestate_builder(write_mem);
-
