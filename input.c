@@ -374,7 +374,7 @@ gui_action_type get_gui_input()
 
 		  switch(ev.code)
 			{
-			  case KEY_M:
+			  case KEY_ENTER:
 				gui_action = CURSOR_EXIT;
 				break;
 
@@ -472,7 +472,7 @@ u32 update_input()
 	  switch(ev.type) {
 		case POX_KEYDOWN:
 			switch (ev.code) {
-				case KEY_M:
+				case KEY_ENTER:
 // Reggie, I R teh copy from the psp update_input
       {
         u16 *screen_copy = copy_screen();
@@ -483,13 +483,13 @@ u32 update_input()
       }
 				  // nirvous
 				  //this should really jump to the menu...
-				case 115: //VolumeUp
+				case 22: //VolumeUp
 				  gp2x_sound_volume(1);
 				  break;
-				case 114: //VolumeDown
+				case 32: //VolumeDown
 				  gp2x_sound_volume(0);
 				  break;
-			        case 'x':
+			        case KEY_X:
 				fps_debug ^= 1;
 				break;
 				default:
