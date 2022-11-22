@@ -15,7 +15,7 @@ OBJS      = main.o cpu.o memory.u video.o input.o sound.o gp2x.o gui.o        \
 ifeq ($(WIZ),1)
 POLLUX    = 1
 OBJS      += pollux_dpc_set.o
-BIN       = gpsp_retroleap
+BIN       = gpsp
 endif
 ifeq ($(CAANOO),1)
 POLLUX    = 1
