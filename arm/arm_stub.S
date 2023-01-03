@@ -384,8 +384,12 @@ execute_read_spsr:
 
 execute_spsr_restore:
   save_flags()
-  ldr r1, =spsr                           @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = cpu_mode
+  
+  cmp r2, #0                              @ check if in usermode
+  beq 3f                                  @ if so, ignore
+  
+  ldr r1, =spsr                           @ r1 = spsr
   ldr r1, [r1, r2, lsl #2]                @ r1 = spsr[cpu_mode] (new cpsr)
   str r1, [reg_base, #REG_CPSR]           @ update cpsr
   mov reg_flags, r1                       @ also, update shadow flags
@@ -409,7 +413,9 @@ execute_spsr_restore:
   restore_flags()
   bx r0
 
-
+3:
+  restore_flags()
+  bx r0
 
 @ Setup the mode transition work for calling an SWI.
 
