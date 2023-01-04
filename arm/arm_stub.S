@@ -337,8 +337,10 @@ defsymbl(execute_store_cpsr)
 
 defsymbl(execute_spsr_restore)
   save_flags()
-  add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = cpu_mode
+  cmp r2, #0                              @ if usermode already, do not change
+  beq 2f                                  @ just a regular indirect jump really
+  add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
   ldr r1, [r1, r2, lsl #2]                @ r1 = spsr[cpu_mode] (new cpsr)
   str r1, [reg_base, #REG_CPSR]           @ update cpsr
   mov reg_flags, r1                       @ also, update shadow flags
@@ -349,14 +351,15 @@ defsymbl(execute_spsr_restore)
 
   ldr r1, [reg_base, #REG_CPSR]           @ r1 = cpsr
   tst r1, #0x20                           @ see if Thumb mode is set
-  bne 2f                                  @ if so handle it
+  bne 1f                                  @ if so handle it
 
   load_registers_arm()                    @ restore ARM registers
+2:
   call_c_function(block_lookup_address_arm)
   restore_flags()
   bx r0
 
-2:
+1:
   load_registers_thumb()                  @ load Thumb registers
   call_c_function(block_lookup_address_thumb)
   restore_flags()
