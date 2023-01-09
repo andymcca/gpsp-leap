@@ -498,7 +498,7 @@ void retro_get_system_av_info(struct retro_system_av_info* info)
    info->geometry.base_height = GBA_SCREEN_HEIGHT;
    info->geometry.max_width = GBA_SCREEN_WIDTH;
    info->geometry.max_height = GBA_SCREEN_HEIGHT;
-   info->geometry.aspect_ratio = 0;
+   info->geometry.aspect_ratio = 3.0f / 2.0f;
    info->timing.fps = ((float) GBA_FPS);
    info->timing.sample_rate = GBA_SOUND_FREQUENCY;
 }
