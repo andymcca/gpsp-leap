@@ -27,13 +27,20 @@
 
 typedef u32 cpu_mode_type;
 
-#define MODE_USER         0x0
-#define MODE_IRQ          0x1
-#define MODE_FIQ          0x2
-#define MODE_SUPERVISOR   0x3
-#define MODE_ABORT        0x4
-#define MODE_UNDEFINED    0x5
-#define MODE_INVALID      0x6
+// Bit 4 indicates privilege level
+#define MODE_USER         0x00   // Non-privileged mode
+#define MODE_SYSTEM       0x10   // Privileged modes
+#define MODE_IRQ          0x11
+#define MODE_FIQ          0x12
+#define MODE_SUPERVISOR   0x13
+#define MODE_ABORT        0x14
+#define MODE_UNDEFINED    0x15
+#define MODE_INVALID      0x16
+
+// Discards privilege bit
+#define REG_MODE(m) (reg_mode[(m) & 0xF])
+#define REG_SPSR(m) (spsr[(m) & 0xF])
+#define PRIVMODE(m) ((m) >> 4)
 
 #define CPU_ACTIVE          0
 #define CPU_HALT            1
@@ -163,8 +170,9 @@ void init_bios_hooks(void);
 extern u32 reg_mode[7][7];
 extern u32 spsr[6];
 
-extern const u32 cpu_modes[32];
-extern const u32 psr_masks[16];
+extern const u32 cpu_modes[16];
+extern const u32 cpsr_masks[4][2];
+extern const u32 spsr_masks[4];
 
 extern u32 memory_region_access_read_u8[16];
 extern u32 memory_region_access_read_s8[16];

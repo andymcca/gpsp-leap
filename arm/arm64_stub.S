@@ -89,7 +89,7 @@ _##symbol:
 #define PALCNV_RAM_OFF    0xE00
 
 // Used for SWI handling
-#define MODE_SUPERVISOR       3
+#define MODE_SUPERVISOR       0x13
 #define SUPERVISOR_SPSR      (SPSR_RAM_OFF + 3*4)  // spsr[3]
 #define SUPERVISOR_LR        (REGMODE_RAM_OFF + (3 * (7 * 4)) + (6 * 4))  // reg_mode[3][6]
 
@@ -227,8 +227,9 @@ defsymbl(execute_read_cpsr)
 
 defsymbl(execute_read_spsr)
   ldr w1, [reg_base, #CPU_MODE]           // read cpu mode to w1
+  and w1, w1, #0xF                        // Like REG_SPSR() macro
   add x0, reg_base, #SPSR_RAM_OFF         // ptr to spsr table
-  ldr w0, [x0, x1, lsl #2]                // Read actual value from trable
+  ldr w0, [x0, x1, lsl #2]                // Read actual value from table
   ret
 
 
@@ -236,14 +237,19 @@ defsymbl(execute_read_spsr)
 
 // Input:
 // w0: new cpsr value
-// w1: bitmask of which bits in cpsr to update
-// w2: current PC
+// w1: current PC
+// w2: store bitmask (user-mode)
+// w3: store bitmask (privileged mode)
 
 defsymbl(execute_store_cpsr)
+  ldr w4, [reg_base, #CPU_MODE]           // w4 = cpu_mode
+  tst x4, #0x10                           // Bit 4 is set on privileged modes
+  csel x2, x2, x3, eq                     // Select the correct mask
+
   ldr w4, [reg_base, #REG_CPSR]           // read current CPSR
-  and w3, w0, w1                          // reg_flags = new_cpsr & store_mask
-  bic w4, w4, w1                          // current_cpsr & ~store_mask
-  orr w0, w3, w4                          // w3 = final CPSR value
+  and w3, w0, w2                          // reg_flags = new_cpsr & store_mask
+  bic w4, w4, w2                          // current_cpsr & ~store_mask
+  orr w0, w3, w4                          // w2 = final CPSR value
   extract_flags_reg(w0)                   // Update cached flags too
 
   str lr, [reg_base, #REG_SAVE]
@@ -270,6 +276,7 @@ defsymbl(execute_store_cpsr)
 
 defsymbl(execute_store_spsr)
   ldr w2, [reg_base, #CPU_MODE]           // read cpu mode to w1
+  and w2, w2, #0xF                        // Like REG_SPSR() macro
   add x2, reg_base, x2, lsl #2            // calculate table offset
   ldr w3, [x2, #SPSR_RAM_OFF]             // Read actual value from trable
 
@@ -288,7 +295,8 @@ defsymbl(execute_store_spsr)
 
 defsymbl(execute_spsr_restore)
   ldr w1, [reg_base, #CPU_MODE]           // w1 = cpu_mode
-  cbz w1, 1f                              // Ignore if in user mode
+  and w1, w1, 0xF                         // Fold user and system modes
+  cbz w1, 1f                              // Ignore if in user or system mode
 
   lsl w2, w1, #2                          // We access 32 bit words
   add w2, w2, #SPSR_RAM_OFF

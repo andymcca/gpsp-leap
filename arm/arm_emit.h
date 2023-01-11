@@ -44,7 +44,7 @@ void arm_indirect_branch_thumb(u32 address);
 void arm_indirect_branch_dual_arm(u32 address);
 void arm_indirect_branch_dual_thumb(u32 address);
 
-void execute_store_cpsr(u32 new_cpsr, u32 store_mask, u32 address);
+void execute_store_cpsr(u32 new_cpsr);
 u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address);
 u32 execute_spsr_restore(u32 address);
 
@@ -691,8 +691,8 @@ u32 thumb_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_
   if((io_registers[REG_IE] & io_registers[REG_IF]) &&                         \
    io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))                    \
   {                                                                           \
-    reg_mode[MODE_IRQ][6] = pc + 4;                                           \
-    spsr[MODE_IRQ] = reg[REG_CPSR];                                           \
+    REG_MODE(MODE_IRQ)[6] = pc + 4;                                           \
+    REG_SPSR(MODE_IRQ) = reg[REG_CPSR];                                           \
     reg[REG_CPSR] = 0xD2;                                                     \
     pc = 0x00000018;                                                          \
     set_cpu_mode(MODE_IRQ);                                                   \
@@ -708,7 +708,7 @@ u32 thumb_prepare_load_reg_pc(u8 **tptr, u32 scratch_reg, u32 reg_index, u32 pc_
 
 u32 execute_spsr_restore_body(u32 pc)
 {
-  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
+  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0xF]);
   check_for_interrupts();
 
   return pc;
@@ -1211,6 +1211,7 @@ u32 execute_spsr_restore_body(u32 pc)
   u32 _rd = arm_prepare_store_reg(reg_a0, rd);                                \
   ARM_ADD_REG_IMM(0, reg_a0, reg_base, SPSR_RAM_OFF >> 2, 30);                \
   ARM_LDR_IMM(0, reg_a1, reg_base, CPU_MODE * 4);                             \
+  ARM_AND_REG_IMM(0, reg_a1, reg_a1, 0xF, 0);                                 \
   ARM_LDR_REG_REG_SHIFT(0, _rd, reg_a0, reg_a1, ARMSHIFT_LSL, 2);             \
   arm_complete_store_reg(_rd, rd);                                            \
 }
@@ -1227,12 +1228,12 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   reg[REG_CPSR] = _cpsr;
   if(store_mask & 0xFF)
   {
-    set_cpu_mode(cpu_modes[_cpsr & 0x1F]);
+    set_cpu_mode(cpu_modes[_cpsr & 0xF]);
     if((io_registers[REG_IE] & io_registers[REG_IF]) &&
      io_registers[REG_IME] && ((_cpsr & 0x80) == 0))
     {
-      reg_mode[MODE_IRQ][6] = address + 4;
-      spsr[MODE_IRQ] = _cpsr;
+      REG_MODE(MODE_IRQ)[6] = address + 4;
+      REG_SPSR(MODE_IRQ) = _cpsr;
       reg[REG_CPSR] = 0xD2;
       set_cpu_mode(MODE_IRQ);
       return 0x00000018;
@@ -1288,13 +1289,15 @@ static void trace_instruction(u32 pc, u32 mode)
   generate_load_imm(reg_a0, imm, imm_ror)                                     \
 
 #define arm_psr_store_cpsr()                                                  \
-  arm_load_imm_32bit(reg_a1, psr_masks[psr_field]);                           \
   generate_function_far_call(armfn_store_cpsr);                               \
-  write32(pc)                                                                 \
+  write32(cpsr_masks[psr_pfield][0]);                                         \
+  write32(cpsr_masks[psr_pfield][1]);                                         \
+  write32(pc);                                                                \
 
 #define arm_psr_store_spsr()                                                  \
-  arm_load_imm_32bit(reg_a1, psr_masks[psr_field]);                           \
+  arm_load_imm_32bit(reg_a1, spsr_masks[psr_pfield]);                         \
   ARM_LDR_IMM(0, reg_a2, reg_base, (CPU_MODE * 4));                           \
+  ARM_AND_REG_IMM(0, reg_a2, reg_a2, 0xF, 0);                                 \
   ARM_ADD_REG_IMMSHIFT(0, ARMREG_LR, reg_base, reg_a2, ARMSHIFT_LSL, 2);      \
   ARM_AND_REG_IMMSHIFT(0, reg_a0, reg_a0, reg_a1, ARMSHIFT_LSL, 0);           \
   ARM_LDR_IMM(0, reg_a2, ARMREG_LR, SPSR_RAM_OFF);                            \

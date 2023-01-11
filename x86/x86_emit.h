@@ -1042,17 +1042,17 @@ typedef enum
 
 u32 function_cc execute_spsr_restore(u32 address)
 {
-  if(reg[CPU_MODE] != MODE_USER)
+  if(reg[CPU_MODE] != MODE_USER && reg[CPU_MODE] != MODE_SYSTEM)
   {
-    reg[REG_CPSR] = spsr[reg[CPU_MODE]];
+    reg[REG_CPSR] = REG_SPSR(reg[CPU_MODE]);
     extract_flags();
-    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
+    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0xF]);
 
     if((io_registers[REG_IE] & io_registers[REG_IF]) &&
      io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
     {
-      reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
-      spsr[MODE_IRQ] = reg[REG_CPSR];
+      REG_MODE(MODE_IRQ)[6] = reg[REG_PC] + 4;
+      REG_SPSR(MODE_IRQ) = reg[REG_CPSR];
       reg[REG_CPSR] = 0xD2;
       address = 0x00000018;
       set_cpu_mode(MODE_IRQ);
@@ -1348,6 +1348,7 @@ u32 function_cc execute_spsr_restore(u32 address)
 #define execute_read_spsr(oreg)                                               \
   collapse_flags(oreg, a2);                                                   \
   generate_load_reg(oreg, CPU_MODE);                                          \
+  generate_and_imm(oreg, 0xF);                                                \
   generate_load_spsr(oreg, oreg);                                             \
 
 #define arm_psr_read(op_type, psr_reg)                                        \
@@ -1357,12 +1358,12 @@ u32 function_cc execute_spsr_restore(u32 address)
 // Does mode-change magic (including IRQ checks)
 u32 execute_store_cpsr_body()
 {
-  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
+  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0xF]);
   if((io_registers[REG_IE] & io_registers[REG_IF]) &&
       io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
   {
-    reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
-    spsr[MODE_IRQ] = reg[REG_CPSR];
+    REG_MODE(MODE_IRQ)[6] = reg[REG_PC] + 4;
+    REG_SPSR(MODE_IRQ) = reg[REG_CPSR];
     reg[REG_CPSR] = (reg[REG_CPSR] & 0xFFFFFF00) | 0xD2;
     set_cpu_mode(MODE_IRQ);
     return 0x00000018;
@@ -1380,16 +1381,18 @@ u32 execute_store_cpsr_body()
   generate_load_imm(a0, imm)                                                  \
 
 #define execute_store_cpsr()                                                  \
-  generate_load_imm(a1, psr_masks[psr_field]);                                \
+  generate_load_imm(a1, cpsr_masks[psr_pfield][0]);                           \
+  generate_load_imm(a2, cpsr_masks[psr_pfield][1]);                           \
   generate_store_reg_i32(pc, REG_PC);                                         \
   generate_function_call(execute_store_cpsr)                                  \
 
-/* spsr[reg[CPU_MODE]] = (new_spsr & store_mask) | (old_spsr & (~store_mask))*/
+/* REG_SPSR(reg[CPU_MODE]) = (new_spsr & store_mask) | (old_spsr & (~store_mask))*/
 #define execute_store_spsr()                                                  \
   generate_load_reg(a2, CPU_MODE);                                            \
+  generate_and_imm(a2, 0xF);                                                  \
   generate_load_spsr(a1, a2);                                                 \
-  generate_and_imm(a0,  psr_masks[psr_field]);                                \
-  generate_and_imm(a1, ~psr_masks[psr_field]);                                \
+  generate_and_imm(a0,  spsr_masks[psr_pfield]);                              \
+  generate_and_imm(a1, ~spsr_masks[psr_pfield]);                              \
   generate_or(a0, a1);                                                        \
   generate_store_spsr(a0, a2);                                                \
 
@@ -2135,8 +2138,8 @@ static void function_cc execute_swi(u32 pc)
 {
   // Open bus value after SWI
   reg[REG_BUS_VALUE] = 0xe3a02004;
-  reg_mode[MODE_SUPERVISOR][6] = pc;
-  spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
+  REG_MODE(MODE_SUPERVISOR)[6] = pc;
+  REG_SPSR(MODE_SUPERVISOR) = reg[REG_CPSR];
   // Move to ARM mode, supervisor mode, disable IRQs
   reg[REG_CPSR] = (reg[REG_CPSR] & ~0x3F) | 0x13 | 0x80;
   set_cpu_mode(MODE_SUPERVISOR);

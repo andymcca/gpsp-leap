@@ -108,12 +108,12 @@ extern u8 bit_count[256];
   u32 imm_ror = ((opcode >> 8) & 0x0F) * 2                                    \
 
 #define arm_decode_psr_reg(opcode)                                            \
-  u32 psr_field = (opcode >> 16) & 0x0F;                                      \
+  u32 psr_pfield = ((opcode >> 16) & 1) | ((opcode >> 18) & 2);               \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 rm = opcode & 0x0F                                                      \
 
 #define arm_decode_psr_imm(opcode)                                            \
-  u32 psr_field = (opcode >> 16) & 0x0F;                                      \
+  u32 psr_pfield = ((opcode >> 16) & 1) | ((opcode >> 18) & 2);               \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 imm = opcode & 0xFF;                                                    \
   u32 imm_ror = ((opcode >> 8) & 0x0F) * 2                                    \

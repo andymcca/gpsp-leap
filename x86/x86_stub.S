@@ -445,8 +445,12 @@ load_stubs( s8, movsbl, ~0, 0, read_memory8s)
 
 
 # arg0 (%eax) = new_cpsr
-# arg1 (%edx) = store_mask
+# arg1 (%edx) = store_mask (user mode)
+# arg2 (%ecx) = store_mask (system mode)
 defsymbl(execute_store_cpsr)
+  testl $0x10, CPU_MODE(REG_BASE) # check privileged mode bit
+  cmovne %ecx, %edx               # use system mode mask if set
+
   mov %edx, %esi                  # save store_mask for later
 
   mov %eax, %ecx                  # ecx = new_cpsr

@@ -181,18 +181,18 @@ void print_register_usage(void)
   using_register(arm, rn, op_src)                                             \
 
 #define arm_decode_psr_reg(opcode)                                            \
-  u32 psr_field = (opcode >> 16) & 0x0F;                                      \
+  u32 psr_pfield = ((opcode >> 16) & 1) | ((opcode >> 18) & 2);               \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 rm = opcode & 0x0F;                                                     \
   (void)rd;                                                                   \
   (void)rm;                                                                   \
-  (void)psr_field;                                                            \
+  (void)psr_pfield;                                                           \
   using_register(arm, rd, op_dest);                                           \
   using_register(arm, rm, op_src)                                             \
 
 #define arm_decode_psr_imm(opcode)                                            \
   u32 imm;                                                                    \
-  u32 psr_field = (opcode >> 16) & 0x0F;                                      \
+  u32 psr_pfield = ((opcode >> 16) & 1) | ((opcode >> 18) & 2);               \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   (void)rd;                                                                   \
   ror(imm, opcode & 0xFF, ((opcode >> 8) & 0x0F) * 2);                        \
@@ -718,8 +718,8 @@ void print_register_usage(void)
   if((read_ioreg(REG_IE) & read_ioreg(REG_IF)) &&                             \
    read_ioreg(REG_IME) && ((reg[REG_CPSR] & 0x80) == 0))                      \
   {                                                                           \
-    reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;                                  \
-    spsr[MODE_IRQ] = reg[REG_CPSR];                                           \
+    REG_MODE(MODE_IRQ)[6] = reg[REG_PC] + 4;                                  \
+    REG_SPSR(MODE_IRQ) = reg[REG_CPSR];                                       \
     reg[REG_CPSR] = 0xD2;                                                     \
     reg[REG_PC] = 0x00000018;                                                 \
     arm_update_pc();                                                          \
@@ -730,11 +730,11 @@ void print_register_usage(void)
 #define arm_spsr_restore()                                                    \
   if(rd == 15)                                                                \
   {                                                                           \
-    if(reg[CPU_MODE] != MODE_USER)                                            \
+    if(reg[CPU_MODE] != MODE_USER && reg[CPU_MODE] != MODE_SYSTEM)            \
     {                                                                         \
-      reg[REG_CPSR] = spsr[reg[CPU_MODE]];                                    \
+      reg[REG_CPSR] = REG_SPSR(reg[CPU_MODE]);                                \
       extract_flags();                                                        \
-      set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);                          \
+      set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0xF]);                           \
       check_for_interrupts();                                                 \
     }                                                                         \
     arm_update_pc();                                                          \
@@ -890,33 +890,42 @@ void print_register_usage(void)
   arm_pc_offset(4);                                                           \
 }                                                                             \
 
-const u32 psr_masks[16] =
+// Index by PRS fields (1 and 4 only!) and User-Privileged mode
+// In user mode some bits are read only
+// Bit #4 is always set to one (so all modes are 1XXXX)
+// Reserved bits are always zero and cannot be modified
+const u32 cpsr_masks[4][2] =
 {
-  0x00000000, 0x000000FF, 0x0000FF00, 0x0000FFFF, 0x00FF0000,
-  0x00FF00FF, 0x00FFFF00, 0x00FFFFFF, 0xFF000000, 0xFF0000FF,
-  0xFF00FF00, 0xFF00FFFF, 0xFFFF0000, 0xFFFF00FF, 0xFFFFFF00,
-  0xFFFFFFFF
+  // User, Privileged
+  {0x00000000, 0x00000000},
+  {0x00000020, 0x000000EF},
+  {0xF0000000, 0xF0000000},
+  {0xF0000020, 0xF00000EF}
 };
+
+// SPSR is always a privileged instruction
+const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
 
 #define arm_psr_read(dummy, psr_reg)                                          \
   collapse_flags();                                                           \
   reg[rd] = psr_reg                                                           \
 
 #define arm_psr_store_cpsr(source)                                            \
+  const u32 store_mask = cpsr_masks[psr_pfield][PRIVMODE(reg[CPU_MODE])];     \
   reg[REG_CPSR] = (source & store_mask) | (reg[REG_CPSR] & (~store_mask));    \
   extract_flags();                                                            \
   if(store_mask & 0xFF)                                                       \
   {                                                                           \
-    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);                            \
+    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0xF]);                             \
     check_for_interrupts();                                                   \
   }                                                                           \
 
 #define arm_psr_store_spsr(source)                                            \
-  u32 _psr = spsr[reg[CPU_MODE]];                                             \
-  spsr[reg[CPU_MODE]] = (source & store_mask) | (_psr & (~store_mask))        \
+  const u32 store_mask = spsr_masks[psr_pfield];                              \
+  u32 _psr = REG_SPSR(reg[CPU_MODE]);                                         \
+  REG_SPSR(reg[CPU_MODE]) = (source & store_mask) | (_psr & (~store_mask))    \
 
 #define arm_psr_store(source, psr_reg)                                        \
-  const u32 store_mask = psr_masks[psr_field];                                \
   arm_psr_store_##psr_reg(source)                                             \
 
 #define arm_psr_src_reg reg[rm]
@@ -1518,15 +1527,12 @@ const u32 psr_masks[16] =
 // reg_mode[new_mode][6]. When swapping to/from FIQ retire/load reg[8]
 // through reg[14] to/from reg_mode[MODE_FIQ][0] through reg_mode[MODE_FIQ][6].
 
-const u32 cpu_modes[32] =
+const u32 cpu_modes[16] =
 {
-  MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID,
-  MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID,
-  MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID,
-  MODE_INVALID, MODE_USER, MODE_FIQ, MODE_IRQ, MODE_SUPERVISOR, MODE_INVALID,
-  MODE_INVALID, MODE_INVALID, MODE_ABORT, MODE_INVALID, MODE_INVALID,
-  MODE_INVALID, MODE_INVALID, MODE_UNDEFINED, MODE_INVALID, MODE_INVALID,
-  MODE_USER
+  MODE_USER, MODE_FIQ, MODE_IRQ, MODE_SUPERVISOR,
+  MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_ABORT,
+  MODE_INVALID, MODE_INVALID, MODE_INVALID, MODE_INVALID,
+  MODE_UNDEFINED, MODE_INVALID, MODE_INVALID, MODE_SYSTEM
 };
 
 // ARM/Thumb mode is stored in the flags directly, this is simpler than
@@ -1545,23 +1551,23 @@ void set_cpu_mode(cpu_mode_type new_mode)
   if(new_mode == MODE_FIQ)
   {
      for(i = 8; i < 15; i++)
-        reg_mode[cpu_mode][i - 8] = reg[i];
+        REG_MODE(cpu_mode)[i - 8] = reg[i];
   }
   else
   {
-     reg_mode[cpu_mode][5] = reg[REG_SP];
-     reg_mode[cpu_mode][6] = reg[REG_LR];
+     REG_MODE(cpu_mode)[5] = reg[REG_SP];
+     REG_MODE(cpu_mode)[6] = reg[REG_LR];
   }
 
   if(cpu_mode == MODE_FIQ)
   {
      for(i = 8; i < 15; i++)
-        reg[i] = reg_mode[new_mode][i - 8];
+        reg[i] = REG_MODE(new_mode)[i - 8];
   }
   else
   {
-     reg[REG_SP] = reg_mode[new_mode][5];
-     reg[REG_LR] = reg_mode[new_mode][6];
+     reg[REG_SP] = REG_MODE(new_mode)[5];
+     reg[REG_LR] = REG_MODE(new_mode)[6];
   }
 
   reg[CPU_MODE] = new_mode;
@@ -1580,8 +1586,8 @@ void raise_interrupt(irq_type irq_raised)
     reg[REG_BUS_VALUE] = 0xe55ec002;
 
     // Interrupt handler in BIOS
-    reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
-    spsr[MODE_IRQ] = reg[REG_CPSR];
+    REG_MODE(MODE_IRQ)[6] = reg[REG_PC] + 4;
+    REG_SPSR(MODE_IRQ) = reg[REG_CPSR];
     reg[REG_CPSR] = 0xD2;
     reg[REG_PC] = 0x00000018;
 
@@ -2295,7 +2301,7 @@ arm_loop:
              else
              {
                 /* MRS rd, spsr */
-                arm_psr(reg, read, spsr[reg[CPU_MODE]]);
+                arm_psr(reg, read, REG_SPSR(reg[CPU_MODE]));
              }
              break;
 
@@ -3198,9 +3204,9 @@ arm_loop:
                    default:
                       // After SWI, we read bios[0xE4]
                       reg[REG_BUS_VALUE] = 0xe3a02004;
-                      reg_mode[MODE_SUPERVISOR][6] = pc + 4;
+                      REG_MODE(MODE_SUPERVISOR)[6] = pc + 4;
                       collapse_flags();
-                      spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
+                      REG_SPSR(MODE_SUPERVISOR) = reg[REG_CPSR];
                       reg[REG_PC] = 0x00000008;
                       arm_update_pc();
                       // Move to ARM mode, Supervisor mode and disable IRQs
@@ -3685,8 +3691,8 @@ thumb_loop:
                    default:
                       // After SWI, we read bios[0xE4]
                       reg[REG_BUS_VALUE] = 0xe3a02004;
-                      reg_mode[MODE_SUPERVISOR][6] = pc + 2;
-                      spsr[MODE_SUPERVISOR] = reg[REG_CPSR];
+                      REG_MODE(MODE_SUPERVISOR)[6] = pc + 2;
+                      REG_SPSR(MODE_SUPERVISOR) = reg[REG_CPSR];
                       reg[REG_PC] = 0x00000008;
                       thumb_update_pc();
                       // Move to ARM mode, Supervisor mode and disable IRQs
@@ -3760,9 +3766,11 @@ thumb_loop:
 void init_cpu(void)
 {
   // Initialize CPU registers
+  int i;
   memset(reg, 0, REG_USERDEF * sizeof(u32));
   memset(reg_mode, 0, sizeof(reg_mode));
-  memset(spsr, 0, sizeof(spsr));
+  for (i = 0; i < sizeof(spsr)/sizeof(spsr[0]); i++)
+    spsr[i] = 0x00000010;
 
   reg[CPU_HALT_STATE] = CPU_ACTIVE;
   reg[CHANGED_PC_STATUS] = 0;
@@ -3771,7 +3779,7 @@ void init_cpu(void)
     reg[REG_SP] = 0x03007F00;
     reg[REG_PC] = 0x08000000;
     reg[REG_CPSR] = 0x0000001F;   // system mode
-    reg[CPU_MODE] = MODE_USER;
+    reg[CPU_MODE] = MODE_SYSTEM;
   } else {
     reg[REG_SP] = 0x03007F00;
     reg[REG_PC] = 0x00000000;
@@ -3781,10 +3789,10 @@ void init_cpu(void)
 
   // Stack pointers are set by BIOS, we set them
   // nevertheless, should we not boot from BIOS
-  reg_mode[MODE_USER][5] = 0x03007F00;
-  reg_mode[MODE_IRQ][5] = 0x03007FA0;
-  reg_mode[MODE_FIQ][5] = 0x03007FA0;
-  reg_mode[MODE_SUPERVISOR][5] = 0x03007FE0;
+  REG_MODE(MODE_USER)[5] = 0x03007F00;
+  REG_MODE(MODE_IRQ)[5] = 0x03007FA0;
+  REG_MODE(MODE_FIQ)[5] = 0x03007FA0;
+  REG_MODE(MODE_SUPERVISOR)[5] = 0x03007FE0;
 }
 
 bool cpu_read_savestate(const u8 *src)

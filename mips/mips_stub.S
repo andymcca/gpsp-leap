@@ -115,6 +115,7 @@ symbol:
 
 .equ SPSR_BASE,           (0x100 + 0x400 * 3)
 .equ REGMODE_BASE,        (SPSR_BASE + 24)
+.equ SUPERVISOR_MODE,     (0x13)
 .equ SUPERVISOR_SPSR,     (3 * 4 + SPSR_BASE)
 .equ SUPERVISOR_LR,       ((3 * (7 * 4)) + (6 * 4) + REGMODE_BASE)
 .equ FNPTRS_MEMOPS,       (REGMODE_BASE + 196)
@@ -399,6 +400,7 @@ defsymbl(execute_read_cpsr)
 
 defsymbl(execute_read_spsr)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
+  andi $1, $1, 0xF                # remove privilege bits
   sll $1, $1, 2                   # adjust to word offset size
   addu $2, $1, $16
   jr $ra                          # return
@@ -417,7 +419,7 @@ defsymbl(execute_swi)
   ori $2, (0x13 | 0x80)           # mode supervisor + disable IRQs
   sw $2, REG_CPSR($16)            # write back CPSR
   save_registers
-  li $4, 3                        # 3 is supervisor mode
+  li $4, SUPERVISOR_MODE
   cfncall set_cpu_mode, 5         # set the CPU mode to supervisor
   lw $ra, REG_SAVE3($16)
   restore_registers
@@ -430,8 +432,9 @@ defsymbl(execute_swi)
 
 defsymbl(execute_spsr_restore)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
+  andi $1, $1, 0xF                # Remove privilege bits
 
-  beq $1, $0, no_spsr_restore     # only restore if the cpu isn't usermode
+  beq $1, $0, no_spsr_restore     # only restore if the cpu isn't user/sys mode
   sll $2, $1, 2                   # adjust to word offset size (delay)
 
   addu $2, $2, $16
@@ -452,9 +455,17 @@ no_spsr_restore:
 
 # $4: new cpsr
 # $5: current PC
-# $6: store mask
+# [ra]:   store mask (user)
+# [ra+4]: store mask (privileged)
 
 defsymbl(execute_store_cpsr)
+  lw $6, CPU_MODE($16)            # $6 = cpu_mode
+  andi $6, $6, 0x10               # Get privilege bit
+  srl $6, $6, 2                   # Calculate offset
+  addu $6, $6, $ra
+  lw $6, ($6)                     # Load mask
+  addu $ra, $ra, 8                # Real return address
+
   and $1, $4, $6                  # $1 = new_cpsr & store_mask
   lw $2, REG_CPSR($16)            # $2 = current cpsr
   nor $4, $6, $0                  # $4 = ~store_mask
@@ -492,17 +503,17 @@ defsymbl(execute_store_cpsr)
 
 
 # $4: new spsr
-# $5: current PC (unused)
-# $6: store mask
+# $5: store mask
 
 defsymbl(execute_store_spsr)
   lw $1, CPU_MODE($16)            # $1 = cpu_mode
+  andi $1, $1, 0xF                # Remove privilege bits
   sll $1, $1, 2                   # adjust to word offset size
   addu $1, $1, $16
   lw $2, SPSR_BASE($1)            # $2 = spsr[cpu_mode]
-  and $4, $4, $6                  # $4 = new_spsr & store_mask
-  nor $6, $6, $0                  # $6 = ~store_mask
-  and $2, $2, $6                  # $2 = (spsr & (~store_mask))
+  and $4, $4, $5                  # $4 = new_spsr & store_mask
+  nor $5, $5, $0                  # $5 = ~store_mask
+  and $2, $2, $5                  # $2 = (spsr & (~store_mask))
   or $4, $4, $2                   # $4 = new spsr combined with old
   jr $ra                          # return
   sw $4, SPSR_BASE($1)            # spsr[cpu_mode] = $4 (delay slot)

@@ -65,7 +65,8 @@ _##symbol:
 #define reg_x5            r8
 
 
-#define MODE_SUPERVISOR   3
+#define MODE_SUPERVISOR   0x13
+#define SUPERVISOR_OFFSET 0x03
 
 @ Memory offsets from reg_base to the different buffers
 #define IWRAM_OFF      -0xA8000
@@ -301,11 +302,16 @@ defsymbl(arm_indirect_branch_dual_thumb)
 
 @ Input:
 @ r0: new cpsr value
-@ r1: bitmask of which bits in cpsr to update
-@ r2: current PC
+@ [lr]:   bitmask (user mode)
+@ [lr+4]: bitmask (privileged mode)
+@ [lr+8]: current PC
 
 defsymbl(execute_store_cpsr)
   save_flags()
+  ldr r1, [reg_base, #CPU_MODE]           @ r1 = cpu_mode
+  lsr r1, r1, #4                          @ Load privilege bit
+  ldr r1, [lr, r1, lsl #2]                @ Load mask
+
   and reg_flags, r0, r1                   @ reg_flags = new_cpsr & store_mask
   ldr r0, [reg_base, #REG_CPSR]           @ r0 = cpsr
   bic r0, r0, r1                          @ r0 = cpsr & ~store_mask
@@ -314,7 +320,7 @@ defsymbl(execute_store_cpsr)
   mov r0, reg_flags                       @ also put new cpsr in r0
 
   store_registers_arm()                   @ save ARM registers
-  ldr r2, [lr]                            @ r2 = pc
+  ldr r2, [lr, #8]                        @ r2 = pc
   call_c_function(execute_store_cpsr_body)
   load_registers_arm()                    @ restore ARM registers
 
@@ -322,7 +328,7 @@ defsymbl(execute_store_cpsr)
   bne 1f                                  @ if it's zero, resume
 
   restore_flags()
-  add pc, lr, #4                          @ return
+  add pc, lr, #12                         @ return (skip data)
 
 1:
   call_c_function(block_lookup_address_arm)
@@ -338,8 +344,9 @@ defsymbl(execute_store_cpsr)
 defsymbl(execute_spsr_restore)
   save_flags()
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = cpu_mode
-  cmp r2, #0                              @ if usermode already, do not change
-  beq 2f                                  @ just a regular indirect jump really
+  ands r2, r2, #0xF                       @ Ignore privilege bits
+  beq 2f                                  @ if user/system mode no side effects
+
   add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
   ldr r1, [r1, r2, lsl #2]                @ r1 = spsr[cpu_mode] (new cpsr)
   str r1, [reg_base, #REG_CPSR]           @ update cpsr
@@ -376,12 +383,12 @@ defsymbl(execute_spsr_restore)
 defsymbl(execute_swi_##mode)                                                 ;\
   save_flags()                                                               ;\
   add r1, reg_base, #REGMODE_RAM_OFF      /* r1 = reg_mode                 */;\
-  /* reg_mode[MODE_SUPERVISOR][6] = pc                                     */;\
+  /* REG_MODE(MODE_SUPERVISOR)[6] = pc                                     */;\
   ldr r0, [lr]                            /* load PC                       */;\
-  str r0, [r1, #((MODE_SUPERVISOR * (7 * 4)) + (6 * 4))]                     ;\
+  str r0, [r1, #((SUPERVISOR_OFFSET * (7 * 4)) + (6 * 4))]                   ;\
   collapse_flags_no_update(r0)            /* r0 = cpsr                     */;\
   add r1, reg_base, #SPSR_RAM_OFF         /* r1 = spsr                     */;\
-  str r0, [r1, #(MODE_SUPERVISOR * 4)]    /* spsr[MODE_SUPERVISOR] = cpsr  */;\
+  str r0, [r1, #(SUPERVISOR_OFFSET * 4)]  /* spsr[MODE_SUPERVISOR] = cpsr  */;\
   bic r0, r0, #0x3F                       /* clear mode flag in r0         */;\
   orr r0, r0, #(0x13 | 0x80)              /* supervisor mode + disable IRQ */;\
   str r0, [reg_base, #REG_CPSR]           /* update cpsr                   */;\

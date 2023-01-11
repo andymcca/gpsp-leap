@@ -181,6 +181,10 @@ u32 arm_to_mips_reg[] =
   mips_emit_jal(mips_absolute_offset(function_location));                     \
   mips_emit_nop()                                                             \
 
+#define generate_raw_u32(value)                                               \
+  *((u32 *)translation_ptr) = (value);                                        \
+  translation_ptr += 4                                                        \
+
 #define generate_function_call_swap_delay(function_location)                  \
 {                                                                             \
   u32 delay_instruction = address32(translation_ptr, -4);                     \
@@ -619,12 +623,12 @@ u32 generate_load_rm_sh_##flags_op(u32 rm)                                    \
 
 u32 execute_spsr_restore_body(u32 address)
 {
-  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
+  set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0xF]);
   if((io_registers[REG_IE] & io_registers[REG_IF]) &&
    io_registers[REG_IME] && ((reg[REG_CPSR] & 0x80) == 0))
   {
-    reg_mode[MODE_IRQ][6] = address + 4;
-    spsr[MODE_IRQ] = reg[REG_CPSR];
+    REG_MODE(MODE_IRQ)[6] = address + 4;
+    REG_SPSR(MODE_IRQ) = reg[REG_CPSR];
     reg[REG_CPSR] = 0xD2;
     address = 0x00000018;
     set_cpu_mode(MODE_IRQ);
@@ -1164,12 +1168,12 @@ u32 execute_spsr_restore_body(u32 address)
 
 u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 {
-  set_cpu_mode(cpu_modes[_cpsr & 0x1F]);
+  set_cpu_mode(cpu_modes[_cpsr & 0xF]);
   if((io_registers[REG_IE] & io_registers[REG_IF]) &&
    io_registers[REG_IME] && ((_cpsr & 0x80) == 0))
   {
-    reg_mode[MODE_IRQ][6] = address + 4;
-    spsr[MODE_IRQ] = _cpsr;
+    REG_MODE(MODE_IRQ)[6] = address + 4;
+    REG_SPSR(MODE_IRQ) = _cpsr;
     reg[REG_CPSR] = 0xD2;
     set_cpu_mode(MODE_IRQ);
     return 0x00000018;
@@ -1184,11 +1188,19 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 #define arm_psr_load_new_imm()                                                \
   generate_load_imm(reg_a0, imm)                                              \
 
+#define arm_psr_store_spsr()                                                  \
+  generate_load_imm(reg_a1, spsr_masks[psr_pfield]);                          \
+  generate_function_call_swap_delay(execute_store_spsr)                       \
+
+#define arm_psr_store_cpsr()                                                  \
+  generate_load_pc(reg_a1, (pc));                                             \
+  generate_function_call_swap_delay(execute_store_cpsr);                      \
+  generate_raw_u32(cpsr_masks[psr_pfield][0]);                                \
+  generate_raw_u32(cpsr_masks[psr_pfield][1]);                                \
+
 #define arm_psr_store(op_type, psr_reg)                                       \
   arm_psr_load_new_##op_type();                                               \
-  generate_load_pc(reg_a1, (pc));                                             \
-  generate_load_imm(reg_a2, psr_masks[psr_field]);                            \
-  generate_function_call_swap_delay(execute_store_##psr_reg)                  \
+  arm_psr_store_##psr_reg();                                                  \
 
 #define arm_psr(op_type, transfer_type, psr_reg)                              \
 {                                                                             \
