@@ -76,7 +76,7 @@ extern u32 flush_ram_count;
 extern char main_path[512];
 extern char save_path[512];
 
-u32 update_gba(int remaining_cycles);
+u32 function_cc update_gba(int remaining_cycles);
 void reset_gba(void);
 
 void init_main(void);

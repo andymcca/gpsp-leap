@@ -107,7 +107,7 @@ void init_main(void)
 #endif
 }
 
-u32 update_gba(int remaining_cycles)
+u32 function_cc update_gba(int remaining_cycles)
 {
   irq_type irq_raised = IRQ_NONE;
   int dma_cycles;
