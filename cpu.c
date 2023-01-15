@@ -1545,33 +1545,37 @@ void set_cpu_mode(cpu_mode_type new_mode)
   u32 i;
   cpu_mode_type cpu_mode = reg[CPU_MODE];
 
-  if(cpu_mode == new_mode)
+   if(cpu_mode == new_mode)
      return;
 
-  if(new_mode == MODE_FIQ)
-  {
-     for(i = 8; i < 15; i++)
-        REG_MODE(cpu_mode)[i - 8] = reg[i];
-  }
-  else
-  {
-     REG_MODE(cpu_mode)[5] = reg[REG_SP];
-     REG_MODE(cpu_mode)[6] = reg[REG_LR];
-  }
+  if(cpu_mode == MODE_FIQ)  // Back up FIQ regs and restore new mode regs
+    {
+       for(i = 0; i < 5; i++)
+          {
+          REG_MODE(MODE_FIQ)[i] = reg[i+8];
+          reg[i+8] = REG_MODE(new_mode)[i];
+          }
+    }
 
-  if(cpu_mode == MODE_FIQ)
-  {
-     for(i = 8; i < 15; i++)
-        reg[i] = REG_MODE(new_mode)[i - 8];
-  }
-  else
-  {
-     reg[REG_SP] = REG_MODE(new_mode)[5];
-     reg[REG_LR] = REG_MODE(new_mode)[6];
-  }
+    if(new_mode == MODE_FIQ)  // Back up current regs and restore FIQ regs
+    {
+       for(i = 0; i < 5; i++)
+          {
+          REG_MODE(cpu_mode)[i] = reg[i+8];
+          reg[i+8] = REG_MODE(MODE_FIQ)[i];
+          }
+    }
 
-  reg[CPU_MODE] = new_mode;
+  // Regardless of modes, back up SP/LR to current bank and restore SP/LR from new bank
+    REG_MODE(cpu_mode)[5] = reg[REG_SP];
+    REG_MODE(cpu_mode)[6] = reg[REG_LR];
+    reg[REG_SP] = REG_MODE(new_mode)[5];
+    reg[REG_LR] = REG_MODE(new_mode)[6];
+
+    reg[CPU_MODE] = new_mode;
+
 }
+
 
 void raise_interrupt(irq_type irq_raised)
 {
