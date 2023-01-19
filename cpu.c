@@ -1553,7 +1553,7 @@ void set_cpu_mode(cpu_mode_type new_mode)
        for(i = 0; i < 5; i++)
           {
           REG_MODE(MODE_FIQ)[i] = reg[i+8];
-          reg[i+8] = REG_MODE(new_mode)[i];
+          reg[i+8] = REG_MODE(MODE_USER)[i];
           }
     }
 
@@ -1561,7 +1561,7 @@ void set_cpu_mode(cpu_mode_type new_mode)
     {
        for(i = 0; i < 5; i++)
           {
-          REG_MODE(cpu_mode)[i] = reg[i+8];
+          REG_MODE(MODE_USER)[i] = reg[i+8];
           reg[i+8] = REG_MODE(MODE_FIQ)[i];
           }
     }
