@@ -673,7 +673,7 @@ write_epilogue:
   beq no_alert                                  @ if not we can exit
 
   cmp r0, #2                              @ see if the alert is due to SMC
-  beq smc_dma                           @ if so, goto SMC handler
+  beq smc_write                           @ if so, goto SMC handler
 
   cmp r0, #3                              @ see if the alert is due to IRQ
   beq irq_alert                           @ if so, goto IRQ handler
@@ -722,7 +722,7 @@ no_alert:
   restore_flags()
   add pc, lr, #4                          @ return
 
-smc_dma:
+smc_write:
   call_c_function(flush_translation_cache_ram)
 
 lookup_pc:
