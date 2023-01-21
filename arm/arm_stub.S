@@ -667,25 +667,18 @@ ext_store_oam_ram_u32_safe:
   str r2, [reg_base, #OAM_UPDATED]        @ store anything non zero here
   bx lr                                   @ Return
 
-
+@ try to bring this more in line with the equivalent MIPS function
 write_epilogue:
   cmp r0, #0                              @ check if the write rose an alert
-  beq 4f                                  @ if not we can exit
-
-  collapse_flags(r1)                      @ interrupt needs current flags
+  beq no_alert                                  @ if not we can exit
 
   cmp r0, #2                              @ see if the alert is due to SMC
-  beq smc_write                           @ if so, goto SMC handler
+  beq smc_dma                           @ if so, goto SMC handler
 
-  ldr r1, [reg_base, #REG_CPSR]           @ r1 = cpsr
-  tst r1, #0x20                           @ see if Thumb bit is set
-  bne 1f                                  @ if so do Thumb update
-
-  store_registers_arm()                   @ save ARM registers
-  b alert_loop
-
-1:
-  store_registers_thumb()                 @ save Thumb registers
+  cmp r0, #3                              @ see if the alert is due to IRQ
+  beq irq_alert                           @ if so, goto IRQ handler
+  
+  collapse_flags(r1)                      @ interrupt needs current flags
 
 alert_loop:
   call_c_function(update_gba)             @ update GBA until CPU isn't halted
@@ -700,27 +693,36 @@ alert_loop:
 
   mvn reg_cycles, r0                      @ load new cycle count
   ldr r0, [reg_base, #REG_PC]             @ load new PC
-  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
-  tst r1, #0x20                           @ see if Thumb bit is set
-  bne 2f
+  
+  b lookup_pc 
 
-  load_registers_arm()
-  call_c_function(block_lookup_address_arm)
+@ this code is redundant START?
+@ Not sure - do we need to load registers in lookup_pc?
+@  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
+@  tst r1, #0x20                           @ see if Thumb bit is set
+@  bne 2f
+@
+@  load_registers_arm()
+@  call_c_function(block_lookup_address_arm)
+@  restore_flags()
+@  bx r0                                   @ jump to new ARM block
+@
+@ 2:
+@  load_registers_thumb()
+@  call_c_function(block_lookup_address_thumb)
+@  restore_flags()
+@  bx r0                                   @ jump to new Thumb block
+@ this code is redundant END?
+
+irq_alert:
   restore_flags()
-  bx r0                                   @ jump to new ARM block
+  b lookup_pc                          @ PC has changed, get a new one
 
-2:
-  load_registers_thumb()
-  call_c_function(block_lookup_address_thumb)
-  restore_flags()
-  bx r0                                   @ jump to new Thumb block
-
-4:
+no_alert:
   restore_flags()
   add pc, lr, #4                          @ return
 
-
-smc_write:
+smc_dma:
   call_c_function(flush_translation_cache_ram)
 
 lookup_pc:
