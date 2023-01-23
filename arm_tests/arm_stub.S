@@ -1,22 +1,3 @@
-# gameplaySP
-#
-# Copyright (C) 2021 David Guillen Fandos <david@davidgf.net>
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-
-
 #include "../gpsp_config.h"
 
 #define defsymbl(symbol) \
@@ -66,708 +47,860 @@ _##symbol:
 #define REG_SAVE4         (30 * 4)
 #define REG_SAVE5         (31 * 4)
 
-#define reg_base          x20
-#define reg_cycles        w21
+#define reg_a0            r0
+#define reg_a1            r1
+#define reg_a2            r2
 
-#define reg_c_flag        w22
-#define reg_v_flag        w23
-#define reg_z_flag        w24
-#define reg_n_flag        w25
+#define reg_base          r11
+#define reg_flags         r9
+
+#define reg_cycles        r12
+
+#define reg_x0            r3
+#define reg_x1            r4
+#define reg_x2            r5
+#define reg_x3            r6
+#define reg_x4            r7
+#define reg_x5            r8
 
 
-// Memory offsets from reg_base to the different buffers
-#define RDMAP_OFF      -0xB9000   // 8K pointers (64KB)
-#define IWRAM_OFF      -0xA9000   // 32KB (double for shadow)
-#define VRAM_OFF       -0x99000   // 96KB
-#define EWRAM_OFF      -0x81000   // 256KB (double for shadow)
-#define MEM_TBL_OFF     -0x1000   // Some space for the tables
+#define MODE_SUPERVISOR   0x13
+#define SUPERVISOR_OFFSET 0x03
+
+@ Memory offsets from reg_base to the different buffers
+#define IWRAM_OFF      -0xA8000
+#define VRAM_OFF       -0x98000
+#define EWRAM_OFF      -0x80000
 #define SPSR_RAM_OFF      0x100
-#define REGMODE_RAM_OFF   0x118
-#define OAM_RAM_OFF       0x200
-#define PAL_RAM_OFF       0x600
-#define IOREG_OFF         0xA00
-#define PALCNV_RAM_OFF    0xE00
-
-// Used for SWI handling
-#define MODE_SUPERVISOR       0x13
-#define SUPERVISOR_SPSR      (SPSR_RAM_OFF + 3*4)  // spsr[3]
-#define SUPERVISOR_LR        (REGMODE_RAM_OFF + (3 * (7 * 4)) + (6 * 4))  // reg_mode[3][6]
+#define STORE_TBL_OFF     0x118
+#define REGMODE_RAM_OFF   0x400
+#define OAM_RAM_OFF       0x500
+#define PAL_RAM_OFF       0x900
+#define RDMAP_OFF         0xD00
+#define IOREG_OFF        0x8D00
+#define PAL_CONV_OFF     0x9100
 
 
-// Stores and restores registers to their register storage in RAM
+#if __ARM_ARCH >= 6
+  #define extract_u16(rd, rs) \
+    uxth rd, rs
+#else
+  #define extract_u16(rd, rs) \
+    bic rd, rs, #0xff000000;  \
+    bic rd, rd, #0x00ff0000
+#endif
 
-#define load_registers()                                                     ;\
-  ldp  w6,  w7, [reg_base,  #0]                                              ;\
-  ldp  w8,  w9, [reg_base,  #8]                                              ;\
-  ldp w10, w11, [reg_base, #16]                                              ;\
-  ldp w12, w13, [reg_base, #24]                                              ;\
-  ldp w14, w15, [reg_base, #32]                                              ;\
-  ldp w16, w17, [reg_base, #40]                                              ;\
-  ldp w26, w27, [reg_base, #48]                                              ;\
-  ldr w28,      [reg_base, #56]                                              ;\
+@ Will load the register set from memory into the appropriate cached registers.
+@ See arm_emit.h for listing explanation.
 
-#define store_registers()                                                    ;\
-  stp  w6,  w7, [reg_base,  #0]                                              ;\
-  stp  w8,  w9, [reg_base,  #8]                                              ;\
-  stp w10, w11, [reg_base, #16]                                              ;\
-  stp w12, w13, [reg_base, #24]                                              ;\
-  stp w14, w15, [reg_base, #32]                                              ;\
-  stp w16, w17, [reg_base, #40]                                              ;\
-  stp w26, w27, [reg_base, #48]                                              ;\
-  str w28,      [reg_base, #56]                                              ;\
+#define load_registers_arm()                                                 ;\
+  ldr reg_x0, [reg_base, #REG_R0]                                            ;\
+  ldr reg_x1, [reg_base, #REG_R1]                                            ;\
+  ldr reg_x2, [reg_base, #REG_R6]                                            ;\
+  ldr reg_x3, [reg_base, #REG_R9]                                            ;\
+  ldr reg_x4, [reg_base, #REG_R12]                                           ;\
+  ldr reg_x5, [reg_base, #REG_R14]                                           ;\
 
-
-// Extracts flags from CPSR into the cache flag registers
-
-#define extract_flags_reg(tmpreg)                                            ;\
-  ubfx reg_n_flag, tmpreg, #31, #1                                           ;\
-  ubfx reg_z_flag, tmpreg, #30, #1                                           ;\
-  ubfx reg_c_flag, tmpreg, #29, #1                                           ;\
-  ubfx reg_v_flag, tmpreg, #28, #1                                           ;\
-
-#define extract_flags(tmpreg)                                                ;\
-  ldr tmpreg, [reg_base, #REG_CPSR]                                          ;\
-  extract_flags_reg(tmpreg)                                                  ;\
-
-// Collects cache flag bits and consolidates them to the CPSR reg
-
-#define consolidate_flags(tmpreg)                                            ;\
-  ldr tmpreg, [reg_base, #REG_CPSR]                                          ;\
-  bfi tmpreg, reg_n_flag, #31, #1                                            ;\
-  bfi tmpreg, reg_z_flag, #30, #1                                            ;\
-  bfi tmpreg, reg_c_flag, #29, #1                                            ;\
-  bfi tmpreg, reg_v_flag, #28, #1                                            ;\
-  str tmpreg, [reg_base, #REG_CPSR]                                          ;\
+#define load_registers_thumb()                                               ;\
+  ldm reg_base, {reg_x0, reg_x1, reg_x2, reg_x3, reg_x4, reg_x5}
 
 
-// Update the GBA hardware (video, sound, input, etc)
-// w0: current PC
+@ Will store the register set from cached registers back to memory.
 
-defsymbl(a64_update_gba)
-  str w0, [reg_base, #REG_PC]             // update the PC value
-  str lr, [reg_base, #REG_SAVE]           // Save LR for later if needed
+#define store_registers_arm()                                                ;\
+  str reg_x0, [reg_base, #REG_R0]                                            ;\
+  str reg_x1, [reg_base, #REG_R1]                                            ;\
+  str reg_x2, [reg_base, #REG_R6]                                            ;\
+  str reg_x3, [reg_base, #REG_R9]                                            ;\
+  str reg_x4, [reg_base, #REG_R12]                                           ;\
+  str reg_x5, [reg_base, #REG_R14]                                           ;\
 
-  consolidate_flags(w0)                   // update the CPSR
-  store_registers()                       // save out registers
-
-  mov w0, reg_cycles                      // load remaining cycles
-  bl update_gba                           // update GBA state
-
-  ldr w1, [reg_base, #COMPLETED_FRAME]    // return to main if new frame
-  cbnz w1, return_to_main
-
-  // Resume execution (perhaps from a new PC)
-  mov reg_cycles, w0                      // load new cycle count
-  extract_flags(w2)                       // reload flag cache bits
-
-  ldr w0, [reg_base, #CHANGED_PC_STATUS]  // see if PC has change
-  cbnz w0, 1f                             // go start from new PC
-
-  ldr lr, [reg_base, #REG_SAVE]           // Restore return point
-  load_registers()                        // reload registers
-  ret                                     // resume execution, no PC change
-
-1:  // Resume from new PC
-  ldr w0, [reg_base, #REG_PC]             // load new PC
-  tbnz w2, #5, 2f                         // CPSR.T means in thumb mode
-
-  bl block_lookup_address_arm
-  load_registers()                        // reload registers
-  br x0                                   // jump to new ARM block
-2:
-  bl block_lookup_address_thumb
-  load_registers()                        // reload registers
-  br x0                                   // jump to new Thumb block
-.size a64_update_gba, .-a64_update_gba
+#define store_registers_thumb()                                              ;\
+  stm reg_base, {reg_x0, reg_x1, reg_x2, reg_x3, reg_x4, reg_x5}
 
 
-// Cheat hooks for master function
-// This is called whenever PC == cheats-master-function
-// Just calls the C function to process cheats
+@ Returns an updated persistent cpsr with the cached flags register.
+@ Uses reg as a temporary register and returns the CPSR here.
 
-defsymbl(a64_cheat_hook)
-  store_registers()
-  str lr, [reg_base, #REG_SAVE]
-  bl process_cheats
-  ldr lr, [reg_base, #REG_SAVE]
-  load_registers()
-  ret
+#define collapse_flags_no_update(reg)                                        ;\
+  ldr reg, [reg_base, #REG_CPSR]          /* reg = cpsr                    */;\
+  bic reg, reg, #0xF0000000               /* clear ALU flags in cpsr       */;\
+  and reg_flags, reg_flags, #0xF0000000   /* clear non-ALU flags           */;\
+  orr reg, reg, reg_flags                 /* update cpsr with ALU flags    */;\
 
+@ Updates cpsr using the above macro.
 
-// These are b stubs for performing indirect branches. They are not
-// linked to and don't return, instead they link elsewhere.
+#define collapse_flags(reg)                                                  ;\
+  collapse_flags_no_update(reg)                                              ;\
+  str reg, [reg_base, #REG_CPSR]                                             ;\
 
-// Input:
-// r0: PC to branch to
+@ Loads the saved flags register from the persistent cpsr.
 
-defsymbl(a64_indirect_branch_arm)
-  store_registers()
-  bl block_lookup_address_arm
-  load_registers()
-  br x0
-
-defsymbl(a64_indirect_branch_thumb)
-  store_registers()
-  bl block_lookup_address_thumb
-  load_registers()
-  br x0
-
-defsymbl(a64_indirect_branch_dual)
-  store_registers()
-  bl block_lookup_address_dual
-  load_registers()
-  br x0
+#define extract_flags()                                                      ;\
+  ldr reg_flags, [reg_base, #REG_CPSR]                                       ;\
+  msr cpsr_f, reg_flags                                                      ;\
 
 
-// Read CPSR and SPSR values
+#define save_flags()                                                         ;\
+  mrs reg_flags, cpsr                                                        ;\
 
-defsymbl(execute_read_cpsr)
-  consolidate_flags(w0)                   // Consolidate on ret value
-  ret
+#define restore_flags()                                                      ;\
+  msr cpsr_f, reg_flags                                                      ;\
 
-defsymbl(execute_read_spsr)
-  ldr w1, [reg_base, #CPU_MODE]           // read cpu mode to w1
-  and w1, w1, #0xF                        // Like REG_SPSR() macro
-  add x0, reg_base, #SPSR_RAM_OFF         // ptr to spsr table
-  ldr w0, [x0, x1, lsl #2]                // Read actual value from table
-  ret
+@ Align the stack to 64 bits (ABIs that don't require it, still recommend so)
+#define call_c_saved_regs r2, r3, r12, lr
+
+@ Calls a C function - reloads the stack pointer and saves all caller save
+@ registers which are important to the dynarec.
+
+#define call_c_function(function)                                            ;\
+  stmdb sp!, { call_c_saved_regs }                                           ;\
+  bl function                                                                ;\
+  ldmia sp!, { call_c_saved_regs }                                           ;\
 
 
-// Update the cpsr.
+@ Update the GBA hardware (video, sound, input, etc)
 
-// Input:
-// w0: new cpsr value
-// w1: current PC
-// w2: store bitmask (user-mode)
-// w3: store bitmask (privileged mode)
+@ Input:
+@ r0: current PC
+
+#define return_straight()   bx lr
+#define return_add()        add pc, lr, #4
+
+#define load_pc_straight()  ldr r0, [lr, #-12]
+#define load_pc_add()       ldr r0, [lr]
+
+#define cycles_straight()  mvn r0, reg_cycles
+#define cycles_add()       mov r0, #0
+
+#define arm_update_gba_builder(name, mode, return_op)                        ;\
+                                                                             ;\
+defsymbl(arm_update_gba_##name)                                              ;\
+  load_pc_##return_op()                                                      ;\
+  str r0, [reg_base, #REG_PC]             /* write out the PC              */;\
+                                                                             ;\
+  save_flags()                                                               ;\
+  collapse_flags(r0)                      /* update the flags              */;\
+                                                                             ;\
+  store_registers_##mode()                /* save out registers            */;\
+  cycles_##return_op()                    /* remaining cycles in arg0      */;\
+  call_c_function(update_gba)             /* update GBA state              */;\
+                                                                             ;\
+  ldr r1, [reg_base, #COMPLETED_FRAME]    /* return if new frame           */;\
+  cmp r1, #0                                                                 ;\
+  bne return_to_main                                                         ;\
+                                                                             ;\
+  mvn reg_cycles, r0                      /* load new cycle count          */;\
+                                                                             ;\
+  ldr r0, [reg_base, #CHANGED_PC_STATUS]  /* load PC changed status        */;\
+  cmp r0, #0                              /* see if PC has changed         */;\
+  bne 1f                                  /* go jump/translate             */;\
+                                                                             ;\
+  load_registers_##mode()                 /* reload registers              */;\
+  restore_flags()                                                            ;\
+  return_##return_op()                    /* continue, no PC change        */;\
+                                                                             ;\
+1:                                                                           ;\
+  ldr r1, [reg_base, #REG_CPSR]           /* r1 = flags                    */;\
+  ldr r0, [reg_base, #REG_PC]             /* load new PC                   */;\
+  tst r1, #0x20                           /* see if Thumb bit is set       */;\
+  bne 2f                                  /* if so load Thumb PC           */;\
+                                                                             ;\
+  load_registers_arm()                    /* load ARM regs                 */;\
+  call_c_function(block_lookup_address_arm)                                  ;\
+  restore_flags()                                                            ;\
+  bx r0                                   /* jump to new ARM block         */;\
+2:                                                                           ;\
+  load_registers_thumb()                  /* load Thumb regs               */;\
+  call_c_function(block_lookup_address_thumb)                                ;\
+  restore_flags()                                                            ;\
+  bx r0                                   /* jump to new Thumb block         */;\
+.size arm_update_gba_##name, .-arm_update_gba_##name
+
+arm_update_gba_builder(arm, arm, straight)
+arm_update_gba_builder(thumb, thumb, straight)
+
+arm_update_gba_builder(idle_arm, arm, add)
+arm_update_gba_builder(idle_thumb, thumb, add)
+
+
+@ Cheat hooks for master function
+@ This is called whenever PC == cheats-master-function
+@ Just calls the C function to process cheats
+
+#define cheat_hook_builder(mode)                                             ;\
+defsymbl(mode##_cheat_hook)                                                  ;\
+  save_flags()                                                               ;\
+  store_registers_##mode()                                                   ;\
+  call_c_function(process_cheats)                                            ;\
+  load_registers_##mode()                                                    ;\
+  restore_flags()                                                            ;\
+  bx lr                                                                      ;\
+
+cheat_hook_builder(arm)
+cheat_hook_builder(thumb)
+
+
+@ These are b stubs for performing indirect branches. They are not
+@ linked to and don't return, instead they link elsewhere.
+
+@ Input:
+@ r0: PC to branch to
+
+defsymbl(arm_indirect_branch_arm)
+  save_flags()
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0
+
+defsymbl(arm_indirect_branch_thumb)
+  save_flags()
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0
+
+defsymbl(arm_indirect_branch_dual_arm)
+  save_flags()
+  tst r0, #0x01                           @ check lower bit
+  bne 1f                                  @ if set going to Thumb mode
+  add r0, #2                              @ two LSB are cleared after
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ keep executing arm code
+1:
+  store_registers_arm()                   @ save out ARM registers
+  ldr r1, [reg_base, #REG_CPSR]           @ load cpsr
+  load_registers_thumb()                  @ load in Thumb registers
+  orr r1, r1, #0x20                       @ set Thumb mode
+  str r1, [reg_base, #REG_CPSR]           @ store flags
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0       
+.size arm_indirect_branch_dual_arm, .-arm_indirect_branch_dual_arm
+
+defsymbl(arm_indirect_branch_dual_thumb)
+  save_flags()
+  tst r0, #0x01                           @ check lower bit
+  beq 1f                                  @ if set going to ARM mode
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0                                   @ keep executing thumb code
+1:
+  store_registers_thumb()                 @ save out Thumb registers
+  ldr r1, [reg_base, #REG_CPSR]           @ load cpsr
+  load_registers_arm()                    @ load in ARM registers
+  bic r1, r1, #0x20                       @ clear Thumb mode
+  str r1, [reg_base, #REG_CPSR]           @ store flags
+  add r0, #2                              @ two LSB are cleared after
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0
+.size arm_indirect_branch_dual_thumb, .-arm_indirect_branch_dual_thumb
+
+@ Update the cpsr.
+
+@ Input:
+@ r0: new cpsr value
+@ [lr]:   bitmask (user mode)
+@ [lr+4]: bitmask (privileged mode)
+@ [lr+8]: current PC
 
 defsymbl(execute_store_cpsr)
-  ldr w4, [reg_base, #CPU_MODE]           // w4 = cpu_mode
-  tst x4, #0x10                           // Bit 4 is set on privileged modes
-  csel x2, x2, x3, eq                     // Select the correct mask
+  save_flags()
+  ldr r1, [reg_base, #CPU_MODE]           @ r1 = cpu_mode
+  lsr r1, r1, #4                          @ Load privilege bit
+  ldr r1, [lr, r1, lsl #2]                @ Load mask
 
-  ldr w4, [reg_base, #REG_CPSR]           // read current CPSR
-  and w3, w0, w2                          // reg_flags = new_cpsr & store_mask
-  bic w4, w4, w2                          // current_cpsr & ~store_mask
-  orr w0, w3, w4                          // w2 = final CPSR value
-  extract_flags_reg(w0)                   // Update cached flags too
+  and reg_flags, r0, r1                   @ reg_flags = new_cpsr & store_mask
+  ldr r0, [reg_base, #REG_CPSR]           @ r0 = cpsr
+  bic r0, r0, r1                          @ r0 = cpsr & ~store_mask
+  orr reg_flags, reg_flags, r0            @ reg_flags = new_cpsr | cpsr
 
-  str lr, [reg_base, #REG_SAVE]
-  store_registers()
-  bl execute_store_cpsr_body              // Do the remaining work in C mode
+  mov r0, reg_flags                       @ also put new cpsr in r0
 
-  cbnz w0, 1f                             // If PC has changed due to this
+  store_registers_arm()                   @ save ARM registers
+  ldr r2, [lr, #8]                        @ r2 = pc
+  call_c_function(execute_store_cpsr_body)
+  load_registers_arm()                    @ restore ARM registers
 
-  ldr lr, [reg_base, #REG_SAVE]           // Resume execution where we left it
-  load_registers()
-  ret
+  cmp r0, #0                              @ check new PC
+  bne 1f                                  @ if it's zero, resume
+
+  restore_flags()
+  add pc, lr, #12                         @ return (skip data)
 
 1:
-  // Returned value contains the PC, resume execution there
-  bl block_lookup_address_arm
-  load_registers()
-  br x0                                   // Resume in the returned block
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ return to PC ARM address
 .size execute_store_cpsr, .-execute_store_cpsr
 
+@ Restore the cpsr from the mode spsr and mode shift.
 
-// Write to SPSR
-// w0: new SPSR value
-// w1: store mask
-
-defsymbl(execute_store_spsr)
-  ldr w2, [reg_base, #CPU_MODE]           // read cpu mode to w1
-  and w2, w2, #0xF                        // Like REG_SPSR() macro
-  add x2, reg_base, x2, lsl #2            // calculate table offset
-  ldr w3, [x2, #SPSR_RAM_OFF]             // Read actual value from trable
-
-  and w0, w0, w1                          // new-spsr & mask
-  bic w3, w3, w1                          // old-spsr & ~mask
-  orr w0, w0, w3                          // final spsr value
-
-  str w0, [x2, #SPSR_RAM_OFF]             // Store new SPSR
-  ret
-.size execute_store_spsr, .-execute_store_spsr
-
-// Restore the cpsr from the mode spsr and mode shift.
-
-// Input:
-// r0: current pc
+@ Input:
+@ r0: current pc
 
 defsymbl(execute_spsr_restore)
-  ldr w1, [reg_base, #CPU_MODE]           // w1 = cpu_mode
-  and w1, w1, 0xF                         // Fold user and system modes
-  cbz w1, 1f                              // Ignore if in user or system mode
+  save_flags()
+  ldr r2, [reg_base, #CPU_MODE]           @ r2 = cpu_mode
+  ands r2, r2, #0xF                       @ Ignore privilege bits
+  beq 2f                                  @ if user/system mode no side effects
 
-  lsl w2, w1, #2                          // We access 32 bit words
-  add w2, w2, #SPSR_RAM_OFF
-  ldr w3, [reg_base, x2]                  // w3 = spsr[cpu_mode]
-  str w3, [reg_base, #REG_CPSR]           // update CPSR with SPSR value
-  extract_flags_reg(w3)                   // update cached flag values
+  add r1, reg_base, #SPSR_RAM_OFF         @ r1 = spsr
+  ldr r1, [r1, r2, lsl #2]                @ r1 = spsr[cpu_mode] (new cpsr)
+  str r1, [reg_base, #REG_CPSR]           @ update cpsr
+  mov reg_flags, r1                       @ also, update shadow flags
 
-  // This function call will pass r0 (address) and return it.
-  str lr, [reg_base, #REG_SAVE]
-  store_registers()                       // save ARM registers
-  bl execute_spsr_restore_body
-  ldr lr, [reg_base, #REG_SAVE]
-  load_registers()
+  @ This function call will pass r0 (address) and return it.
+  store_registers_arm()                   @ save ARM registers
+  call_c_function(execute_spsr_restore_body)
+
+  ldr r1, [reg_base, #REG_CPSR]           @ r1 = cpsr
+  tst r1, #0x20                           @ see if Thumb mode is set
+  bne 1f                                  @ if so handle it
+
+  load_registers_arm()                    @ restore ARM registers
+2:
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0
 
 1:
-  ret
-.size execute_spsr_restore, .-execute_spsr_restore
+  load_registers_thumb()                  @ load Thumb registers
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0
 
 
-// Setup the mode transition work for calling an SWI.
+@ Setup the mode transition work for calling an SWI.
 
-// Input:
-// r0: current pc
+@ Input:
+@ r0: current pc
 
-defsymbl(execute_swi)
-  str lr, [reg_base, #REG_SAVE]
-  str w0, [reg_base, #SUPERVISOR_LR]      // Store next PC into supervisor LR
-  consolidate_flags(w1)                   // Calculate current CPSR flags
-  str w1, [reg_base, #SUPERVISOR_SPSR]    // Store them in the SPSR  
-  bic w1, w1, #0x3F                       // Clear mode bits
-  mov w2, #(0x13 | 0x80)                  // Set supervisor mode bits
-  orr w1, w1, w2
-  str w1, [reg_base, #REG_CPSR]           // Update CPSR with new value
-  store_registers()
-  mov w0, #MODE_SUPERVISOR
-  bl set_cpu_mode                         // Set supervisor mode
-  ldr w0, =0xe3a02004
-  str w0, [reg_base, REG_BUS_VALUE]
-  ldr lr, [reg_base, #REG_SAVE]
-  load_registers()
-  ret
-.size execute_swi, .-execute_swi
+#define execute_swi_builder(mode)                                            ;\
+                                                                             ;\
+defsymbl(execute_swi_##mode)                                                 ;\
+  save_flags()                                                               ;\
+  add r1, reg_base, #REGMODE_RAM_OFF      /* r1 = reg_mode                 */;\
+  /* REG_MODE(MODE_SUPERVISOR)[6] = pc                                     */;\
+  ldr r0, [lr]                            /* load PC                       */;\
+  str r0, [r1, #((SUPERVISOR_OFFSET * (7 * 4)) + (6 * 4))]                   ;\
+  collapse_flags_no_update(r0)            /* r0 = cpsr                     */;\
+  add r1, reg_base, #SPSR_RAM_OFF         /* r1 = spsr                     */;\
+  str r0, [r1, #(SUPERVISOR_OFFSET * 4)]  /* spsr[MODE_SUPERVISOR] = cpsr  */;\
+  bic r0, r0, #0x3F                       /* clear mode flag in r0         */;\
+  orr r0, r0, #(0x13 | 0x80)              /* supervisor mode + disable IRQ */;\
+  str r0, [reg_base, #REG_CPSR]           /* update cpsr                   */;\
+                                                                             ;\
+  mov r0, #MODE_SUPERVISOR                                                   ;\
+                                                                             ;\
+  store_registers_##mode()                /* store regs for mode           */;\
+  call_c_function(set_cpu_mode)           /* set the CPU mode to svsr      */;\
+  load_registers_arm()                    /* load ARM regs                 */;\
+  ldr r0, =0xe3a02004                     /* Update open BUS value         */;\
+  str r0, [reg_base, #REG_BUS_VALUE]                                         ;\
+                                                                             ;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                          /* return                        */;\
+
+execute_swi_builder(arm)
+execute_swi_builder(thumb)
+
+
+@ Start program execution. Normally the mode should be Thumb and the
+@ PC should be 0x8000000, however if a save state is preloaded this
+@ will be different.
+
+@ Input:
+@ r0: initial value for cycle counter
+
+@ Uses sp as reg_base; must hold consistently true.
 
 defsymbl(execute_arm_translate_internal)
-  // save registers that will be clobbered
-  sub sp, sp, #96
-  stp x19, x20, [sp,  #0]
-  stp x21, x22, [sp, #16]
-  stp x23, x24, [sp, #32]
-  stp x25, x26, [sp, #48]
-  stp x27, x28, [sp, #64]
-  stp x29, x30, [sp, #80]
-  
-  mov reg_cycles, w0                      // load cycle counter
-  mov reg_base, x1                        // init base_reg
 
-  // Check whether the CPU is sleeping already, we should just wait for IRQs
-  ldr w1, [reg_base, #CPU_HALT_STATE]
-  cmp w1, #0
+  @ save the registers to be able to return later
+  stmdb sp!, { r4, r5, r6, r7, r8, r9, r10, r11, r12, lr }
+
+  mov reg_base, r1                        @ init base_reg
+
+  mvn reg_cycles, r0                      @ load cycle counter
+
+  extract_flags()                         @ load flags
+
+  @ Check whether the CPU is sleeping already, we should just wait for IRQs
+  ldr r1, [reg_base, #CPU_HALT_STATE]
+  cmp r1, #0
   bne alert_loop
 
-  ldr w0, [reg_base, #REG_PC]             // r0 = current pc
-  ldr w1, [reg_base, #REG_CPSR]           // r1 = flags
-  tst w1, #0x20                           // see if Thumb bit is set
-  extract_flags(w2)                       // load flags
+  ldr r0, [reg_base, #REG_PC]             @ r0 = current pc
+  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
+  tst r1, #0x20                           @ see if Thumb bit is set
 
-  bne 1f                                  // if so lookup thumb
+  bne 1f                                  @ if so lookup thumb
 
-  bl block_lookup_address_arm
-  load_registers()
-  br x0                                   // jump to first ARM block
+  call_c_function(block_lookup_address_arm)
+  load_registers_arm()                    @ load ARM registers
+  bx r0                                   @ jump to first ARM block
+
 1:
-  bl block_lookup_address_thumb
-  load_registers()
-  br x0                                   // jump to first Thumb block
+  call_c_function(block_lookup_address_thumb)
+  load_registers_thumb()                  @ load Thumb registers
+  bx r0                                   @ jump to first Thumb block
 
 
-// Epilogue to return to the main thread (whatever called execute_arm_translate)
+@ Epilogue to return to the main thread (whatever called execute_arm_translate)
 
 return_to_main:
-  // restore the saved regs and return
-  ldp x19, x20, [sp,  #0]
-  ldp x21, x22, [sp, #16]
-  ldp x23, x24, [sp, #32]
-  ldp x25, x26, [sp, #48]
-  ldp x27, x28, [sp, #64]
-  ldp x29, x30, [sp, #80]
-  add sp, sp, #96
-  ret
+  @ restore the saved regs and return
+  ldmia sp!, { r4, r5, r6, r7, r8, r9, r10, r11, r12, lr }
+  bx lr
 
+@ Prepares stores for external write function (align + zero extend value)
+#define store_align_8()   and r1, r1, #0xff
+#define store_align_16()  bic r0, r0, #0x01; extract_u16(r1, r1)
+#define store_align_32()  bic r0, r0, #0x03
 
-// Memory read stub routines
+#define mask_addr_8(nbits)                                                   ;\
+  mov r0, r0, lsl #(32 - nbits)            /* isolate bottom n bits in top */;\
+  mov r0, r0, lsr #(32 - nbits)            /* high bits are now clear      */;\
 
-#define execute_load_builder(load_type, ldop, ldmask, tblidx, ldfn)          ;\
-                                                                             ;\
-defsymbl(execute_load_##load_type)                                           ;\
-  tst w0, #(0xf0000000 | ldmask)                                             ;\
-  lsr w3, w0, #24                                                            ;\
-  csinc	w3, wzr, w3, ne                                                      ;\
-  add x4, reg_base, (MEM_TBL_OFF + tblidx*136)                               ;\
-  ldr x3, [x4, x3, lsl #3]                                                   ;\
-  br x3                                                                      ;\
-                                                                             ;\
-ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
-  lsr w3, w1, #24                         /* Are we running the BIOS       */;\
-  cbnz w3, ld_slow_##load_type                                               ;\
-  and w0, w0, #(0x7fff)                   /* BIOS only 16 KB               */;\
-  add x3, reg_base, #(RDMAP_OFF)                                             ;\
-  ldr x3, [x3]                            /* x3 = bios mem buffer          */;\
-  ldop w0, [x3, x0]                       /* load actual value             */;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_ewram_##load_type:                     /* EWRAM area                    */;\
-  and w0, w0, #(0x3ffff)                                                     ;\
-  add x3, reg_base, #EWRAM_OFF                                               ;\
-  ldop w0, [x3, x0]                                                          ;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_iwram_##load_type:                     /* IWRAM area                    */;\
-  and w0, w0, #(0x7fff)                                                      ;\
-  add x3, reg_base, #(IWRAM_OFF+0x8000)                                      ;\
-  ldop w0, [x3, x0]                                                          ;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_ioram_##load_type:                     /* I/O RAM area                  */;\
-  and w0, w0, #(0x3ff)                                                       ;\
-  add x3, reg_base, #(IOREG_OFF)                                             ;\
-  ldop w0, [x3, x0]                                                          ;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_palram_##load_type:                    /* PAL RAM area                  */;\
-  and w0, w0, #(0x3ff)                                                       ;\
-  add x3, reg_base, #(PAL_RAM_OFF)                                           ;\
-  ldop w0, [x3, x0]                                                          ;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_oamram_##load_type:                    /* OAM RAM area                  */;\
-  and w0, w0, #(0x3ff)                                                       ;\
-  add x3, reg_base, #(OAM_RAM_OFF)                                           ;\
-  ldop w0, [x3, x0]                                                          ;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_rdmap_##load_type:                                                        ;\
-  lsr w4, w0, #15                         /* Each block is 32KB            */;\
-  add x3, reg_base, #(RDMAP_OFF)                                             ;\
-  ldr x4, [x3, x4, lsl #3]                /* x4 = table pointer            */;\
-  and w0, w0, #(0x7fff)                   /* 32KB pages                    */;\
-  ldop w0, [x4, x0]                       /* load actual value             */;\
-  ret                                                                        ;\
-                                                                             ;\
-ld_slow_##load_type:                      /* Slow C path                   */;\
-  str w1, [reg_base, #REG_PC]             /* write out PC                  */;\
-  str lr, [reg_base, #REG_SAVE]           /* Save LR                       */;\
-  store_registers()                                                          ;\
-  bl ldfn                                                                    ;\
-  ldr lr, [reg_base, #REG_SAVE]                                              ;\
-  load_registers()                                                           ;\
-  ret                                                                        ;\
-.size execute_load_##load_type, .-execute_load_##load_type
+#define mask_addr_16(nbits)                                                  ;\
+  mov r0, r0, lsl #(32 - nbits)            /* isolate bottom n bits in top */;\
+  mov r0, r0, lsr #(32 - nbits + 1)        /* high bits are now clear      */;\
+  mov r0, r0, lsl #1                       /* LSB is also zero             */;\
 
-#define load_lookup_table(load_type, aload_type)                             ;\
-  .quad ld_slow_##aload_type              /* -1: Unaligned/Bad access      */;\
-  .quad ld_bios_##aload_type              /* 0x00: BIOS                    */;\
-  .quad ld_slow_##aload_type              /* 0x01: Open bus                */;\
-  .quad ld_ewram_##load_type              /* 0x02: ewram                   */;\
-  .quad ld_iwram_##load_type              /* 0x03: iwram                   */;\
-  .quad ld_ioram_##load_type              /* 0x04: I/O regs                */;\
-  .quad ld_palram_##load_type             /* 0x05: palette RAM             */;\
-  .quad ld_rdmap_##load_type              /* 0x06: vram                    */;\
-  .quad ld_oamram_##load_type             /* 0x07: oam ram                 */;\
-  .quad ld_rdmap_##load_type              /* 0x08: gamepak: ignore         */;\
-  .quad ld_rdmap_##load_type              /* 0x09: gamepak: ignore         */;\
-  .quad ld_rdmap_##load_type              /* 0x0A: gamepak: ignore         */;\
-  .quad ld_rdmap_##load_type              /* 0x0B: gamepak: ignore         */;\
-  .quad ld_rdmap_##load_type              /* 0x0C: gamepak: ignore         */;\
-  .quad ld_slow_##aload_type              /* 0x0D: EEPROM                  */;\
-  .quad ld_slow_##aload_type              /* 0x0E: backup                  */;\
-  .quad ld_slow_##aload_type              /* 0x0F: ignore                  */;\
+#define mask_addr_32(nbits)                                                  ;\
+  mov r0, r0, lsl #(32 - nbits)            /* isolate bottom n bits in top */;\
+  mov r0, r0, lsr #(32 - nbits + 2)        /* high bits are now clear      */;\
+  mov r0, r0, lsl #2                       /* 2 LSB are also zero          */;\
 
-// Aligned load is a bit special
-defsymbl(execute_aligned_load32)
-  tst w0, #(0xf0000000)
-  lsr w3, w0, #24
-  csinc	w3, wzr, w3, ne
-  add x4, reg_base, (MEM_TBL_OFF + 5*136)
-  ldr x3, [x4, x3, lsl #3]
-  br x3
-ld_slow_aligned_u32:                      // Slow C path for multiple loads
-  str lr, [reg_base, #REG_SAVE]           // Save LR
-  store_registers()
-  bl read_memory32
-  ldr lr, [reg_base, #REG_SAVE]
-  load_registers()
-  ret
-ld_bios_aligned_u32:
-  and w0, w0, #(0x7fff)                   // Do not verify PC on purpose
-  add x3, reg_base, #(RDMAP_OFF)
-  ldr x3, [x3]
-  ldr w0, [x3, x0]
-  ret
+@ Vram, OAM and palette memories can only be accessed at a 16 bit boundary
+#define mask_addr_bus16_32(nbits) mask_addr_32(nbits)
+#define mask_addr_bus16_16(nbits) mask_addr_16(nbits)
+#define mask_addr_bus16_8(nbits)  mask_addr_16(nbits)
 
+@ Write out to memory.
 
-execute_load_builder( u8,  ldrb, 0, 0, read_memory8)
-execute_load_builder( s8, ldrsb, 0, 1, read_memory8s)
-execute_load_builder(u16,  ldrh, 1, 2, read_memory16)
-execute_load_builder(s16, ldrsh, 1, 3, read_memory16s)
-execute_load_builder(u32,   ldr, 3, 4, read_memory32)
+@ Input:
+@ r0: address
+@ r1: value
+@
+@ The instruction at LR is not an inst but a u32 data that contains the PC
+@ Used for SMC. That's why return is essentially `pc = lr + 4`
 
-
-// Prepares for a external store (calls C code)
-#define store_align_8()            and w1, w1, #0xff
-#define store_align_16()           and w1, w1, #0xffff; bic w0, w0, #1
-#define store_align_32()           bic w0, w0, #3
-
-// Write out to memory.
-
-// Input:
-// w0: address
-// w1: value
-// w2: PC value
-
-#define execute_store_builder(store_type, str_op, str_op16, load_op,          \
-                              stmask, stmask16, tblidx)                      ;\
-                                                                             ;\
-defsymbl(execute_store_u##store_type)                                        ;\
-  lsr w4, w0, #28                                                            ;\
-  lsr w3, w0, #24                                                            ;\
-  cbnz w4, ext_store_u##store_type                                           ;\
-  add x4, reg_base, (MEM_TBL_OFF + 816 + tblidx*128)                         ;\
-  ldr x3, [x4, x3, lsl #3]                                                   ;\
-  br x3                                                                      ;\
+#define execute_store_builder(store_type, str_op, str_op16, load_op)         ;\
                                                                              ;\
 ext_store_u##store_type:                                                     ;\
-ext_store_u##store_type##_safe:                                              ;\
-  str w2, [reg_base, #REG_PC]             /* write out PC                  */;\
-  str lr, [reg_base, #REG_SAVE]           /* Preserve LR                   */;\
+  save_flags()                                                               ;\
+  ldr r2, [lr]                            /* load PC                       */;\
+  str r2, [reg_base, #REG_PC]             /* write out PC                  */;\
   store_align_##store_type()                                                 ;\
-  store_registers()                                                          ;\
-  bl write_memory##store_type                                                ;\
-  cbnz w0, write_epilogue                 /* handle additional write stuff */;\
-  ldr lr, [reg_base, #REG_SAVE]                                              ;\
-  load_registers()                                                           ;\
-  ret                                     /* resume if no side effects     */;\
+  call_c_function(write_memory##store_type)                                  ;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                          /* return                        */;\
+                                                                             ;\
+ext_io_store_u##store_type:                                                  ;\
+  save_flags()                                                               ;\
+  ldr r2, [lr]                            /* load PC                       */;\
+  str r2, [reg_base, #REG_PC]             /* write out PC                  */;\
+  store_align_##store_type()                                                 ;\
+  call_c_function(write_memory##store_type)                                  ;\
+  b write_epilogue                        /* handle additional write stuff */;\
                                                                              ;\
 ext_store_iwram_u##store_type:                                               ;\
-  and w0, w0, #(0x7fff & ~stmask)         /* Mask to mirror memory (+align)*/;\
-  add x3, reg_base, #(IWRAM_OFF+0x8000)   /* x3 = iwram base               */;\
-  str_op w1, [x0, x3]                     /* store data                    */;\
-  sub x3, x3, #0x8000                     /* x3 = iwram smc base           */;\
-  load_op w1, [x0, x3]                    /* w1 = SMC sentinel             */;\
-  cbnz w1, 3f                             /* Check value, should be zero   */;\
-  ret                                     /* return                        */;\
+  save_flags()                                                               ;\
+  mask_addr_##store_type(15)              /* Mask to mirror memory (+align)*/;\
+  add r2, reg_base, #(IWRAM_OFF+0x8000)   /* r2 = iwram base               */;\
+  str_op r1, [r0, r2]                     /* store data                    */;\
+  sub r2, r2, #0x8000                     /* r2 = iwram smc base           */;\
+  load_op r1, [r0, r2]                    /* r1 = SMC sentinel             */;\
+  cmp r1, #0                              /* Check value, should be zero   */;\
+  bne 3f                                  /* if so perform smc write       */;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                          /* return                        */;\
                                                                              ;\
 ext_store_ewram_u##store_type:                                               ;\
-  and w0, w0, #(0x3ffff & ~stmask)        /* Mask to mirror memory (+align)*/;\
-  add x3, reg_base, #EWRAM_OFF            /* x3 = ewram base               */;\
-  str_op w1, [x0, x3]                     /* store data                    */;\
-  add x3, x3, #0x40000                    /* x3 = ewram smc base           */;\
-  load_op w1, [x0, x3]                    /* w1 = SMC sentinel             */;\
-  cbnz w1, 3f                             /* Check value, should be zero   */;\
-  ret                                     /* return                        */;\
+  save_flags()                                                               ;\
+  mask_addr_##store_type(18)              /* Mask to mirror memory (+align)*/;\
+  add r2, reg_base, #EWRAM_OFF            /* r2 = ewram base               */;\
+  str_op r1, [r0, r2]                     /* store data                    */;\
+  add r2, r2, #0x40000                    /* r2 = ewram smc base           */;\
+  load_op r1, [r0, r2]                    /* r1 = SMC sentinel             */;\
+  cmp r1, #0                              /* Check value, should be zero   */;\
+  bne 3f                                  /* if so perform smc write       */;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                          /* return                        */;\
                                                                              ;\
 ext_store_vram_u##store_type:                                                ;\
-ext_store_vram_u##store_type##_safe:                                         ;\
-  and w0, w0, #(0x1ffff & ~stmask16)      /* Mask to mirror memory (+align)*/;\
-  sub w3, w0, #0x8000                     /* Mirrored addr for last bank   */;\
-  cmp w0, #0x18000                        /* Check if exceeds 96KB         */;\
-  csel w0, w3, w0, cs                     /* If it does, pick the mirror   */;\
-  add x3, reg_base, #VRAM_OFF             /* x3 = ewram base               */;\
-  str_op16 w1, [x0, x3]                   /* store data                    */;\
-  ret                                     /* return                        */;\
+  save_flags()                                                               ;\
+  mask_addr_bus16_##store_type(17)        /* Mask to mirror memory (+align)*/;\
+  cmp r0, #0x18000                        /* Check if exceeds 96KB         */;\
+  subcs r0, r0, #0x8000                   /* Mirror to the last bank       */;\
+  add r2, reg_base, #VRAM_OFF             /* r2 = vram base                */;\
+  restore_flags()                                                            ;\
+  str_op16 r1, [r0, r2]                   /* store data                    */;\
+  add pc, lr, #4                          /* return                        */;\
                                                                              ;\
 ext_store_oam_ram_u##store_type:                                             ;\
-ext_store_oam_ram_u##store_type##_safe:                                      ;\
-  and w0, w0, #(0x3ff & ~stmask16)        /* Mask to mirror memory (+align)*/;\
-  add x3, reg_base, #OAM_RAM_OFF          /* x3 = oam ram base             */;\
-  str_op16 w1, [x0, x3]                   /* store data                    */;\
-  str w29, [reg_base, #OAM_UPDATED]       /* write non zero to signal      */;\
-  ret                                     /* return                        */;\
-                                                                             ;\
-ext_store_ioreg_u##store_type:                                               ;\
-  str w2, [reg_base, #REG_PC]             /* write out PC                  */;\
-  str lr, [reg_base, #REG_SAVE]           /* Preserve LR                   */;\
-  and w0, w0, #(0x3ff & ~stmask)                                             ;\
-  store_registers()                                                          ;\
-  bl write_io_register##store_type                                           ;\
-  cbnz w0, write_epilogue                 /* handle additional write stuff */;\
-  ldr lr, [reg_base, #REG_SAVE]                                              ;\
-  load_registers()                                                           ;\
-  ret                                     /* resume if no side effects     */;\
+  mask_addr_bus16_##store_type(10)        /* Mask to mirror memory (+align)*/;\
+  add r2, reg_base, #OAM_RAM_OFF          /* r2 = oam ram base             */;\
+  str_op16 r1, [r0, r2]                   /* store data                    */;\
+  str r2, [reg_base, #OAM_UPDATED]        /* write non zero to signal      */;\
+  add pc, lr, #4                          /* return                        */;\
                                                                              ;\
 3:                                                                           ;\
-  str w2, [reg_base, #REG_PC]             /* write out PC                  */;\
-  store_registers()                       /* store registers               */;\
-  consolidate_flags(w1)                                                      ;\
-  b smc_write                             /* perform smc write             */;\
-.size execute_store_u##store_type, .-execute_store_u##store_type
+  ldr r0, [lr]                            /* load PC                       */;\
+  str r0, [reg_base, #REG_PC]             /* write out PC                  */;\
+  b smc_dma                             /* perform smc write             */;\
 
-// for ignored areas, just return
+@ for ignored areas, just return
 ext_store_ignore:
-  ret                                     // return
+  add pc, lr, #4                          @ return
 
 #define store_lookup_table(store_type)                                       ;\
-  .quad ext_store_ignore                  /* 0x00: BIOS, ignore            */;\
-  .quad ext_store_ignore                  /* 0x01: ignore                  */;\
-  .quad ext_store_ewram_u##store_type     /* 0x02: ewram                   */;\
-  .quad ext_store_iwram_u##store_type     /* 0x03: iwram                   */;\
-  .quad ext_store_ioreg_u##store_type     /* 0x04: I/O regs                */;\
-  .quad ext_store_palette_u##store_type   /* 0x05: palette RAM             */;\
-  .quad ext_store_vram_u##store_type      /* 0x06: vram                    */;\
-  .quad ext_store_oam_ram_u##store_type   /* 0x07: oam ram                 */;\
-  .quad ext_store_u##store_type           /* 0x08: gamepak: ignore         */;\
-  .quad ext_store_u##store_type           /* 0x09: gamepak: ignore         */;\
-  .quad ext_store_u##store_type           /* 0x0A: gamepak: ignore         */;\
-  .quad ext_store_u##store_type           /* 0x0B: gamepak: ignore         */;\
-  .quad ext_store_u##store_type           /* 0x0C: gamepak: ignore         */;\
-  .quad ext_store_u##store_type           /* 0x0D: EEPROM                  */;\
-  .quad ext_store_u##store_type           /* 0x0E: backup                  */;\
-  .quad ext_store_ignore                  /* 0x0F: ignore                  */;\
+  .word ext_store_ignore                  /*   -1: ignore, for > 0x0F      */;\
+  .word ext_store_ignore                  /* 0x00: BIOS, ignore            */;\
+  .word ext_store_ignore                  /* 0x01: ignore                  */;\
+  .word ext_store_ewram_u##store_type     /* 0x02: ewram                   */;\
+  .word ext_store_iwram_u##store_type     /* 0x03: iwram                   */;\
+  .word ext_io_store_u##store_type        /* 0x04: I/O regs                */;\
+  .word ext_store_palette_u##store_type   /* 0x05: palette RAM             */;\
+  .word ext_store_vram_u##store_type      /* 0x06: vram                    */;\
+  .word ext_store_oam_ram_u##store_type   /* 0x07: oam ram                 */;\
+  .word ext_store_u##store_type           /* 0x08: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x09: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x0A: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x0B: gamepak: ignore         */;\
+  .word ext_store_ignore                  /* 0x0C: gamepak: ignore         */;\
+  .word ext_store_u##store_type           /* 0x0D: EEPROM                  */;\
+  .word ext_store_u##store_type           /* 0x0E: backup                  */;\
+  .word ext_store_ignore                  /* 0x0F: ignore                  */;\
 
-execute_store_builder(8,  strb, strh, ldrb, 0, 1, 0)
-execute_store_builder(16, strh, strh, ldrh, 1, 1, 1)
-execute_store_builder(32, str,  str,  ldr,  3, 3, 2)
+execute_store_builder(8,  strb, strh, ldrb)
+execute_store_builder(16, strh, strh, ldrh)
+execute_store_builder(32, str,  str,  ldr )
 
-// Palette writes are special since they are converted on the fly for speed
+@ Palette writes are special since they are converted on the fly for speed
 
 ext_store_palette_u8:
-  bfi w1, w1, #8, #24                     // Duplicate the byte
+  bic r1, r1, #0xff00                     // Duplicate the byte
+  orr r1, r1, lsl #8
 ext_store_palette_u16:
-  and w0, w0, #(0x3fe)
-  add x3, reg_base, #(PAL_RAM_OFF)
-  strh w1, [x3, x0]
+  mask_addr_16(10)                        // Accesses are always 16 bit
+  add r2, reg_base, #PAL_RAM_OFF          // r2 = palette base
+  strh r1, [r0, r2]                       // store data
 
-  ubfx w2, w1, #10, #5                    // Extract blue to red
-  bfi  w2, w1, #11, #5                    // Move red to blue
-  and  w1, w1, #0x03E0                    // Extract green component
-  orr  w1, w2, w1, lsl #1                 // Merge the three components
+  and r2, r1, #0x3E0                      // Convert color point
+  lsl r2, r2, #1
+  orr r2, r1, lsl #11
+  and r1, r1, #0x7C00
+  orr r2, r1, lsr #10
 
-  add x3, reg_base, #(PALCNV_RAM_OFF)
-  strh w1, [x3, x0]
-  ret
+  add r1, reg_base, #PAL_CONV_OFF         // r1 = converted palette ram
+  strh r2, [r0, r1]                       // Converted value write (r2)
+  add pc, lr, #4                          // return
 
 ext_store_palette_u32_safe:
+  sub lr, lr, #4
 ext_store_palette_u32:
-  and w0, w0, #(0x3fc)
-  add x3, reg_base, #(PAL_RAM_OFF)
-  str w1, [x3, x0]
+  mask_addr_32(10)                        // Accesses are always 16 bit
+  add r2, reg_base, #PAL_RAM_OFF          // r2 = palette base
+  str r1, [r0, r2]                        // store data
+  add r2, reg_base, #PAL_CONV_OFF         // r2 = converted palette ram
 
-  and   w2, w1, #0x7C007C00               // Get blue components
-  and   w3, w1, #0x001F001F               // Get red components
-  lsr   w2, w2, #10                       // Place blue in the final register
-  orr   w2, w2, w3, lsl #11               // Merge red
-  and   w3, w1, #0x03E003E0               // Get green component
-  orr   w1, w2, w3, lsl #1                // Merge green
+  lsr r9, r1, #10
+  and r9, r9, #0x1F
+  orr r9, r1, lsl #11
+  bic r1, r1, #0x1F
+  bic r1, r1, #0xFC00
+  orr r9, r1, lsl #1
+  strh r9, [r0, r2]                       // Write first halfword
+  add r0, r0, #2
 
-  add x3, reg_base, #(PALCNV_RAM_OFF)
-  str w1, [x3, x0]
-  ret
+  lsr r1, r1, #16
+  and r9, r1, #0x3E0
+  lsl r9, r9, #1
+  orr r9, r1, lsl #11
+  and r1, r1, #0x7C00
+  orr r9, r1, lsr #10
+  strh r9, [r0, r2]                       // Write second halfword
 
-// This is a store that is executed in a strm case (so no SMC checks in-between)
+  add pc, lr, #4                          // return
 
-defsymbl(execute_aligned_store32)
-  lsr w4, w0, #28
-  lsr w3, w0, #24
-  cbnz w4, ext_store_u32
-  add x4, reg_base, MEM_TBL_OFF + 816 + 3*128
-  ldr x3, [x4, x3, lsl #3]
-  br x3
+
+@ This is a store that is executed in a strm case (so no SMC checks in-between)
+
+ext_store_u32_safe:
+ext_io_store_u32_safe:
+  save_flags()
+  call_c_function(write_memory32)         @ Perform 32bit store
+  restore_flags()
+  bx lr                                   @ Return
+
 ext_store_iwram_u32_safe:
-  and w0, w0, #(0x7fff)                   // Mask to mirror memory (no need to align!)
-  add x3, reg_base, #(IWRAM_OFF+0x8000)   // x3 = iwram base
-  str w1, [x0, x3]                        // store data
-  ret                                     // Return
+  mask_addr_8(15)                         @ Mask to mirror memory (no need to align!)
+  add r2, reg_base, #(IWRAM_OFF+0x8000)   @ r2 = iwram base
+  str r1, [r0, r2]                        @ store data
+  bx lr                                   @ Return
+
 ext_store_ewram_u32_safe:
-  and w0, w0, #(0x3ffff)                  // Mask to mirror memory (no need to align!)
-  add x3, reg_base, #(EWRAM_OFF)          // x3 = ewram base
-  str w1, [x0, x3]                        // store data
-  ret                                     // Return
-ext_store_ioreg_u32_safe:
-  str lr, [reg_base, #REG_SAVE]
-  and w0, w0, #(0x3fc)
-  store_registers()
-  bl write_io_register32
-  cbnz w0, write_epilogue
-  ldr lr, [reg_base, #REG_SAVE]
-  load_registers()
-  ret
-.size execute_aligned_store32, .-execute_aligned_store32
+  mask_addr_8(18)                         @ Mask to mirror memory (no need to align!)
+  add r2, reg_base, #EWRAM_OFF            @ r2 = ewram base
+  str r1, [r0, r2]                        @ store data
+  bx lr                                   @ Return
 
-// This is called whenever an external store with side effects was performed
+ext_store_vram_u32_safe:
+  mask_addr_8(17)                         @ Mask to mirror memory (no need to align!)
+  save_flags()
+  add r2, reg_base, #VRAM_OFF             @ r2 = vram base
+  cmp r0, #0x18000                        @ Check if exceeds 96KB
+  subcs r0, r0, #0x8000                   @ Mirror to the last bank
+  str r1, [r0, r2]                        @ store data
+  restore_flags()
+  bx lr                                   @ Return
+
+ext_store_oam_ram_u32_safe:
+  mask_addr_8(10)                         @ Mask to mirror memory (no need to align!)
+  add r2, reg_base, #OAM_RAM_OFF          @ r2 = oam ram base
+  str r1, [r0, r2]                        @ store data
+  str r2, [reg_base, #OAM_UPDATED]        @ store anything non zero here
+  bx lr                                   @ Return
+
+@ try to bring this more in line with the equivalent MIPS function
 write_epilogue:
-  consolidate_flags(w1)                   // update the CPSR before update
+  cmp r0, #0                              @ check if the write rose an alert
+  beq no_alert                                  @ if not we can exit
 
-  cmp w0, #2                              // see if the alert is due to SMC
-  beq smc_write                           // if so, goto SMC handler
+  cmp r0, #2                              @ see if the alert is due to SMC
+  beq smc_dma                           @ if so, goto SMC handler
+
+  cmp r0, #3                              @ see if the alert is due to IRQ
+  beq irq_alert                           @ if so, goto IRQ handler
+  
+  collapse_flags(r1)                      @ interrupt needs current flags
 
 alert_loop:
-  mov w0, reg_cycles                      // load remaining cycles
-  bl update_gba                           // update GBA until CPU isn't halted
-  mov reg_cycles, w0                      // load new cycle count
+  call_c_function(update_gba)             @ update GBA until CPU isn't halted
 
-  ldr w1, [reg_base, #COMPLETED_FRAME]    // Check whether a frame was completed
-  cbnz w1, return_to_main                 // and return to caller function.
+  ldr r1, [reg_base, #COMPLETED_FRAME]    @ Check whether a frame was completed
+  cmp r1, #0
+  bne return_to_main
 
-  ldr w1, [reg_base, #CPU_HALT_STATE]     // Check whether the CPU is halted
-  cbnz w1, alert_loop                     // and keep looping until it is
+  ldr r1, [reg_base, #CPU_HALT_STATE]     @ Check whether the CPU is halted
+  cmp r1, #0
+  bne alert_loop                          @ Keep looping until it is
 
-  ldr w0, [reg_base, #REG_PC]             // load new PC
-  b lookup_pc                             // Resume execution at that PC
+  mvn reg_cycles, r0                      @ load new cycle count
+  
+  b lookup_pc 
 
+irq_alert:
+  @ restore_flags()
+  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
+  tst r1, #0x20                           @ see if Thumb bit is set
+  beq irq_arm                       @ if not lookup ARM
+  load_registers_thumb()  
+  b lookup_pc                          @ PC has changed, get a new one
 
-smc_write:
-  bl flush_translation_cache_ram
-  ldr w0, [reg_base, #REG_PC]             // load "current new" PC
+irq_arm:
+  load_registers_arm()
+  b lookup_pc                          @ PC has changed, get a new one
 
-// Resume execution at PC (at w0)
+no_alert:
+  restore_flags()
+  add pc, lr, #4                          @ return
+
+smc_dma:
+  call_c_function(flush_translation_cache_ram)
+
 lookup_pc:
-  ldr w1, [reg_base, #REG_CPSR]           // w1 = flags
-  extract_flags_reg(w1)
-  tbnz w1, #5, 2f                         // see if Thumb bit is set
+  ldr r0, [reg_base, #REG_PC]             @ r0 = new pc
+  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
+  tst r1, #0x20                           @ see if Thumb bit is set
+  beq lookup_pc_arm                       @ if not lookup ARM
 
-  // Lookup and jump to the right mode block
-  bl block_lookup_address_arm
-  load_registers()
-  br x0
-2:
-  bl block_lookup_address_thumb
-  load_registers()
-  br x0
+lookup_pc_thumb:
+  load_registers_thumb()
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  bx r0                                   @ jump to new Thumb block
+
+lookup_pc_arm:
+  load_registers_arm()
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  bx r0                                   @ jump to new ARM block
+
+
+#define exec_ld_op_s8(mirrorbits)                                            ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrsb r0, [r2, r0]
+
+#define exec_ld_op_u8(mirrorbits)                                            ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrb r0, [r2, r0]
+
+#define exec_ld_op_s16(mirrorbits)                                           ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrsh r0, [r2, r0]
+
+#define exec_ld_op_u16(mirrorbits)                                           ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  mov r0, r0, lsr #(32 - mirrorbits)                                         ;\
+  ldrh r0, [r2, r0]
+
+#define exec_ld_op_u32(mirrorbits)                                           ;\
+  mov r0, r0, lsl #(32 - mirrorbits)                                         ;\
+  ldr r0, [r2, r0, lsr #(32 - mirrorbits)]                                   ;\
+
+
+#define execute_load_builder(load_type, albits, load_function)               ;\
+                                                                             ;\
+ld_bios_##load_type:                      /* BIOS area, need to verify PC  */;\
+  save_flags()                                                               ;\
+  ldr r1, [lr]                            /* r1 = PC                       */;\
+  mov r2, r1, lsr #15                     /* r2 = High addr bits from PC   */;\
+  cmp r2, #0                                                                 ;\
+  bne 10f                                 /* Jump to slow handler          */;\
+  ldr r2, [reg_base, #RDMAP_OFF]          /* r2 = read_mem[0]              */;\
+  exec_ld_op_##load_type(15)              /* Clear upper bits (15 LSB)     */;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_ewram_##load_type:                     /* EWRAM area                    */;\
+  add r2, reg_base, #EWRAM_OFF                                               ;\
+  exec_ld_op_##load_type(18)              /* Clear upper bits (18 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_iwram_##load_type:                     /* IWRAM area                    */;\
+  add r2, reg_base, #(IWRAM_OFF+0x8000)                                      ;\
+  exec_ld_op_##load_type(15)              /* Clear upper bits (15 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_ioram_##load_type:                     /* I/O RAM area                  */;\
+  add r2, reg_base, #IOREG_OFF                                               ;\
+  exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_palram_##load_type:                    /* Palette RAM area              */;\
+  add r2, reg_base, #PAL_RAM_OFF                                             ;\
+  exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+ld_oamram_##load_type:                    /* OAM RAM area                  */;\
+  add r2, reg_base, #OAM_RAM_OFF                                             ;\
+  exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+/* ROM area (or VRAM): uses generic memory handlers */                       ;\
+ld_rdmap_##load_type:                                                        ;\
+  add r2, reg_base, #RDMAP_OFF            /* r2 = memory_map_read          */;\
+  mov r1, r0, lsr #15                     /* r1 = page index of address    */;\
+  ldr r2, [r2, r1, lsl #2]                /* r2 = base addr                */;\
+                                                                             ;\
+  exec_ld_op_##load_type(15)              /* Pages are 32KB big            */;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+/* Slow load path, for open/unmapped loads                                 */;\
+ld_slow_##load_type:                                                         ;\
+  save_flags()                                                               ;\
+  ldr r1, [lr]                            /* r1 = PC                       */;\
+10:                                                                          ;\
+  str r1, [reg_base, #REG_PC]             /* update PC                     */;\
+  call_c_function(load_function)                                             ;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                          /* return                        */;\
+
+
+#define load_table_gen(load_type)                                            ;\
+  .long ld_slow_##load_type               /* -1 (for regions above F)      */;\
+  .long ld_bios_##load_type               /* 0 BIOS                        */;\
+  .long ld_slow_##load_type               /* 1 Bad region                  */;\
+  .long ld_ewram_##load_type              /* 2 EWRAM                       */;\
+  .long ld_iwram_##load_type              /* 3 IWRAM                       */;\
+  .long ld_ioram_##load_type              /* 4 I/O                         */;\
+  .long ld_palram_##load_type             /* 5 Palette RAM, via map        */;\
+  .long ld_rdmap_##load_type              /* 6 VRAM area                   */;\
+  .long ld_oamram_##load_type             /* 7 OAM RAM                     */;\
+  .long ld_rdmap_##load_type              /* 8 ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* 9 ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* A ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* B ROM, via map                */;\
+  .long ld_rdmap_##load_type              /* C ROM, via map                */;\
+  .long ld_slow_##load_type               /* D ROM or EEPROM/FLASH         */;\
+  .long ld_slow_##load_type               /* E EEPROM/FLASH                */;\
+  .long ld_slow_##load_type               /* F Bad region                  */;\
+
+.pool
+
+execute_load_builder(u8,  0, read_memory8  )
+execute_load_builder(s8,  0, read_memory8s )
+execute_load_builder(u16, 1, read_memory16 )
+execute_load_builder(s16, 1, read_memory16s)
+execute_load_builder(u32, 2, read_memory32 )
 
 .data
 .align 4
+
 defsymbl(ldst_handler_functions)
-  load_lookup_table(u8,   u8)
-  load_lookup_table(s8,   s8)
-  load_lookup_table(u16, u16)
-  load_lookup_table(s16, s16)
-  load_lookup_table(u32, u32)
-  load_lookup_table(u32, aligned_u32)
   store_lookup_table(8)
   store_lookup_table(16)
   store_lookup_table(32)
   store_lookup_table(32_safe)
+  load_table_gen(u8)
+  load_table_gen(s8)
+  load_table_gen(u16)
+  load_table_gen(s16)
+  load_table_gen(u32)
 
 .bss
 .align 4
 
-defsymbl(memory_map_read)
-  .space 0x10000
 defsymbl(iwram)
   .space 0x10000
 defsymbl(vram)
   .space 0x18000
 defsymbl(ewram)
   .space 0x80000
-defsymbl(ldst_lookup_tables)
-  .space 4096
 defsymbl(reg)
   .space 0x100
 defsymbl(spsr)
   .space 24
+@ Place lookup tables here for easy access via base_reg too
+defsymbl(ldst_lookup_tables)
+  .space 4*17*4   @ store
+  .space 5*17*4   @ loads
+  .space 132      @ Padding for alignment
 defsymbl(reg_mode)
   .space 196
-  .space 36  // Padding
+  .space 60       @ More padding!
 defsymbl(oam_ram)
   .space 0x400
 defsymbl(palette_ram)
   .space 0x400
+defsymbl(memory_map_read)
+  .space 0x8000
 defsymbl(io_registers)
   .space 0x400
 defsymbl(palette_ram_converted)
   .space 0x400
 
+@ Vita and 3DS (and of course mmap) map their own cache sections through some
+@ platform-speficic mechanisms.
+#if !defined(MMAP_JIT_CACHE) && !defined(VITA) && !defined(_3DS)
 
+@ Make this section executable!
+.text
+.section .jit,"awx",%nobits
+.align 4
+defsymbl(rom_translation_cache)
+  .space ROM_TRANSLATION_CACHE_SIZE
+.size rom_translation_cache, .-rom_translation_cache
+defsymbl(ram_translation_cache)
+  .space RAM_TRANSLATION_CACHE_SIZE
+.size ram_translation_cache, .-ram_translation_cache
+
+#endif
