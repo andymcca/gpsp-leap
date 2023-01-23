@@ -1,4 +1,3 @@
-
 #include "../gpsp_config.h"
 
 #define defsymbl(symbol) \
@@ -215,7 +214,7 @@ defsymbl(arm_update_gba_##name)                                              ;\
   load_registers_thumb()                  /* load Thumb regs               */;\
   call_c_function(block_lookup_address_thumb)                                ;\
   restore_flags()                                                            ;\
-  bx r0                                   /* jump to new ARM block         */;\
+  bx r0                                   /* jump to new Thumb block         */;\
 .size arm_update_gba_##name, .-arm_update_gba_##name
 
 arm_update_gba_builder(arm, arm, straight)
@@ -426,6 +425,8 @@ defsymbl(execute_arm_translate_internal)
 
   mvn reg_cycles, r0                      @ load cycle counter
 
+  extract_flags()                         @ load flags
+
   @ Check whether the CPU is sleeping already, we should just wait for IRQs
   ldr r1, [reg_base, #CPU_HALT_STATE]
   cmp r1, #0
@@ -437,15 +438,13 @@ defsymbl(execute_arm_translate_internal)
 
   bne 1f                                  @ if so lookup thumb
 
-  load_registers_arm()                    @ load ARM registers
   call_c_function(block_lookup_address_arm)
-  extract_flags()                         @ load flags
+  load_registers_arm()                    @ load ARM registers
   bx r0                                   @ jump to first ARM block
 
 1:
-  load_registers_thumb()                  @ load Thumb registers
   call_c_function(block_lookup_address_thumb)
-  extract_flags()                         @ load flags
+  load_registers_thumb()                  @ load Thumb registers
   bx r0                                   @ jump to first Thumb block
 
 
@@ -552,7 +551,7 @@ ext_store_oam_ram_u##store_type:                                             ;\
 3:                                                                           ;\
   ldr r0, [lr]                            /* load PC                       */;\
   str r0, [reg_base, #REG_PC]             /* write out PC                  */;\
-  b smc_write                             /* perform smc write             */;\
+  b smc_dma                             /* perform smc write             */;\
 
 @ for ignored areas, just return
 ext_store_ignore:
@@ -667,25 +666,18 @@ ext_store_oam_ram_u32_safe:
   str r2, [reg_base, #OAM_UPDATED]        @ store anything non zero here
   bx lr                                   @ Return
 
-
+@ try to bring this more in line with the equivalent MIPS function
 write_epilogue:
   cmp r0, #0                              @ check if the write rose an alert
-  beq 4f                                  @ if not we can exit
-
-  collapse_flags(r1)                      @ interrupt needs current flags
+  beq no_alert                                  @ if not we can exit
 
   cmp r0, #2                              @ see if the alert is due to SMC
-  beq smc_write                           @ if so, goto SMC handler
+  beq smc_dma                           @ if so, goto SMC handler
 
-  ldr r1, [reg_base, #REG_CPSR]           @ r1 = cpsr
-  tst r1, #0x20                           @ see if Thumb bit is set
-  bne 1f                                  @ if so do Thumb update
-
-  store_registers_arm()                   @ save ARM registers
-  b alert_loop
-
-1:
-  store_registers_thumb()                 @ save Thumb registers
+  cmp r0, #3                              @ see if the alert is due to IRQ
+  beq irq_alert                           @ if so, goto IRQ handler
+  
+  collapse_flags(r1)                      @ interrupt needs current flags
 
 alert_loop:
   call_c_function(update_gba)             @ update GBA until CPU isn't halted
@@ -699,28 +691,26 @@ alert_loop:
   bne alert_loop                          @ Keep looping until it is
 
   mvn reg_cycles, r0                      @ load new cycle count
-  ldr r0, [reg_base, #REG_PC]             @ load new PC
+  
+  b lookup_pc 
+
+irq_alert:
+  @ restore_flags()
   ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
   tst r1, #0x20                           @ see if Thumb bit is set
-  bne 2f
+  beq irq_arm                       @ if not lookup ARM
+  load_registers_thumb()  
+  b lookup_pc                          @ PC has changed, get a new one
 
+irq_arm:
   load_registers_arm()
-  call_c_function(block_lookup_address_arm)
-  restore_flags()
-  bx r0                                   @ jump to new ARM block
+  b lookup_pc                          @ PC has changed, get a new one
 
-2:
-  load_registers_thumb()
-  call_c_function(block_lookup_address_thumb)
-  restore_flags()
-  bx r0                                   @ jump to new Thumb block
-
-4:
+no_alert:
   restore_flags()
   add pc, lr, #4                          @ return
 
-
-smc_write:
+smc_dma:
   call_c_function(flush_translation_cache_ram)
 
 lookup_pc:
@@ -730,11 +720,13 @@ lookup_pc:
   beq lookup_pc_arm                       @ if not lookup ARM
 
 lookup_pc_thumb:
+  load_registers_thumb()
   call_c_function(block_lookup_address_thumb)
   restore_flags()
   bx r0                                   @ jump to new Thumb block
 
 lookup_pc_arm:
+  load_registers_arm()
   call_c_function(block_lookup_address_arm)
   restore_flags()
   bx r0                                   @ jump to new ARM block
@@ -912,4 +904,3 @@ defsymbl(ram_translation_cache)
 .size ram_translation_cache, .-ram_translation_cache
 
 #endif
-
