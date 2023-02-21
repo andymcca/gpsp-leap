@@ -1,5 +1,5 @@
 
-LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro/libretro-common/
+LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro/libretro-common
 INCFLAGS   := -I$(CORE_DIR)/libretro -I$(LIBRETRO_COMM_DIR)/include  -I$(CORE_DIR)/
 
 SOURCES_ASM := $(CORE_DIR)/bios_data.S
