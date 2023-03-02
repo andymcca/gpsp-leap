@@ -1,9 +1,9 @@
-GPSP for Retroleap
-==================
+GPSP for ARM
+=============
 
-This is a fork of the standalone version of gpSP, aimed at Retroleap (https://github.com/mac2612/retroleap), specifically the Leapster Explorer.
+This is a fork of notaz' standalone version of gpSP, the focus of which will be ARM devices, specifically the Leapster Explorer (via Retroleap www.github.com/retroleap).  The Explorer spec is an ARMv5te CPU running at 393Mhz (overclockable to 533Mhz) and 64MB RAM.
 
-The aim of this fork is to improve upon the original fork for LF1000 by nirvous (https://github.com/nirvous/gpsp_lf1000), whilst also backporting changes made in the Libretro port (https://github.com/libretro/gpsp) which has seen many improvements in recent years.
+The aim of this fork is to improve upon the original fork for LF1000 by nirvous (https://github.com/nirvous/gpsp_lf1000), whilst also backporting changes made in other forks and also the Libretro port (https://github.com/libretro/gpsp) which have seen many improvements in recent years.
 
 Notable work so far -
 
