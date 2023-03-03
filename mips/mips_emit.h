@@ -2099,7 +2099,7 @@ typedef struct {
 static void emit_pmemld_stub(
   unsigned memop_number, const t_stub_meminfo *meminfo,
   bool signext, unsigned size,
-  unsigned alignment, bool aligned,
+  unsigned alignment, bool aligned, bool must_swap,
   u8 **tr_ptr)
 {
   u8 *translation_ptr = *tr_ptr;
@@ -2158,28 +2158,31 @@ static void emit_pmemld_stub(
   }
   
   if (region >= 8 && region <= 12) {
-    u8 *jmppatch;
     // ROM area: might need to load the ROM on-demand
     mips_emit_srl(reg_rv, reg_a0, 15);  // 32KB page number
     mips_emit_sll(reg_rv, reg_rv,  2);  // (word indexed)
-    mips_emit_addu(reg_rv, reg_rv, reg_base);  // base + offset
+    mips_emit_addu(reg_rv, reg_rv, reg_base);    // base + offset
+    mips_emit_lw(reg_rv, reg_rv, 0x8000);        // base[offset-0x8000] is readmap ptr
+    mips_emit_andi(reg_temp, reg_a0, memmask);   // Get the lowest 15 bits [can go in delay slot]
 
-    mips_emit_lw(reg_rv, reg_rv, 0x8000);        // base[offset-0x8000]
-    mips_emit_b_filler(bne, reg_rv, reg_zero, jmppatch);  // if not null, can skip load page
-    mips_emit_andi(reg_temp, reg_a0, memmask);   // Get the lowest 15 bits [delay]
+    if (must_swap) {   // Do not emit if the ROM is fully loaded, save some cycles
+      u8 *jmppatch;
+      mips_emit_b_filler(bne, reg_rv, reg_zero, jmppatch);  // if not null, can skip load page
+      generate_swap_delay();
 
-    // This code call the C routine to map the relevant ROM page
-    emit_save_regs(aligned);
-    mips_emit_sw(mips_reg_ra, reg_base, ReOff_SaveR3);
-    extract_bits(reg_a0, reg_a0, 15, 10);    // a0 = (addr >> 15) & 0x3ff
-    genccall(&load_gamepak_page);
-    mips_emit_sw(reg_temp, reg_base, ReOff_SaveR1);
+      // This code call the C routine to map the relevant ROM page
+      emit_save_regs(aligned);
+      mips_emit_sw(mips_reg_ra, reg_base, ReOff_SaveR3);
+      extract_bits(reg_a0, reg_a0, 15, 10);    // a0 = (addr >> 15) & 0x3ff
+      genccall(&load_gamepak_page);            // Returns valid pointer in rv
+      mips_emit_sw(reg_temp, reg_base, ReOff_SaveR1);
 
-    mips_emit_lw(reg_temp, reg_base, ReOff_SaveR1);
-    emit_restore_regs(aligned);
-    mips_emit_lw(mips_reg_ra, reg_base, ReOff_SaveR3);
+      mips_emit_lw(reg_temp, reg_base, ReOff_SaveR1);
+      emit_restore_regs(aligned);
+      mips_emit_lw(mips_reg_ra, reg_base, ReOff_SaveR3);
 
-    generate_branch_patch_conditional(jmppatch, translation_ptr);
+      generate_branch_patch_conditional(jmppatch - 4, translation_ptr);
+    }
     // Now we can proceed to load, place addr in the right register
     mips_emit_addu(reg_rv, reg_rv, reg_temp);
   } else if (region == 14) {
@@ -2620,7 +2623,7 @@ typedef void (*sthldr_t)(
 typedef void (*ldhldr_t)(
   unsigned memop_number, const t_stub_meminfo *meminfo,
   bool signext, unsigned size,
-  unsigned alignment, bool aligned,
+  unsigned alignment, bool aligned, bool must_swap,
   u8 **tr_ptr);
 
 // Generates a patch handler for a given access size
@@ -2684,7 +2687,7 @@ static void emit_phand(
 // - memop patcher: Patches a memop whenever it accesses the wrong mem region
 // - mem stubs: There's stubs for load & store, and every memory region
 //    and possible operand size and misaligment (+sign extensions)
-void init_emitter() {
+void init_emitter(bool must_swap) {
   int i;
   // Initialize memory to a debuggable state
   rom_cache_watermark = INITIAL_ROM_WATERMARK;
@@ -2756,20 +2759,20 @@ void init_emitter() {
   for (i = 0; i < sizeof(ldinfo)/sizeof(ldinfo[0]); i++) {
     ldhldr_t handler = (ldhldr_t)ldinfo[i].emitter;
     /*          region  info      signext sz al  isaligned */
-    handler(0, &ldinfo[i], false, 0, 0, false, &translation_ptr);  // ld u8
-    handler(1, &ldinfo[i], true,  0, 0, false, &translation_ptr);  // ld s8
+    handler(0, &ldinfo[i], false, 0, 0, false, must_swap, &translation_ptr);  // ld u8
+    handler(1, &ldinfo[i], true,  0, 0, false, must_swap, &translation_ptr);  // ld s8
 
-    handler(2, &ldinfo[i], false, 1, 0, false, &translation_ptr);  // ld u16
-    handler(3, &ldinfo[i], false, 1, 1, false, &translation_ptr);  // ld u16u1
-    handler(4, &ldinfo[i], true,  1, 0, false, &translation_ptr);  // ld s16
-    handler(5, &ldinfo[i], true,  1, 1, false, &translation_ptr);  // ld s16u1
+    handler(2, &ldinfo[i], false, 1, 0, false, must_swap, &translation_ptr);  // ld u16
+    handler(3, &ldinfo[i], false, 1, 1, false, must_swap, &translation_ptr);  // ld u16u1
+    handler(4, &ldinfo[i], true,  1, 0, false, must_swap, &translation_ptr);  // ld s16
+    handler(5, &ldinfo[i], true,  1, 1, false, must_swap, &translation_ptr);  // ld s16u1
 
-    handler(6, &ldinfo[i], false, 2, 0, false, &translation_ptr);  // ld u32
-    handler(7, &ldinfo[i], false, 2, 1, false, &translation_ptr);  // ld u32u1
-    handler(8, &ldinfo[i], false, 2, 2, false, &translation_ptr);  // ld u32u2
-    handler(9, &ldinfo[i], false, 2, 3, false, &translation_ptr);  // ld u32u3
+    handler(6, &ldinfo[i], false, 2, 0, false, must_swap, &translation_ptr);  // ld u32
+    handler(7, &ldinfo[i], false, 2, 1, false, must_swap, &translation_ptr);  // ld u32u1
+    handler(8, &ldinfo[i], false, 2, 2, false, must_swap, &translation_ptr);  // ld u32u2
+    handler(9, &ldinfo[i], false, 2, 3, false, must_swap, &translation_ptr);  // ld u32u3
 
-    handler(10,&ldinfo[i], false, 2, 0, true,  &translation_ptr);  // aligned ld u32
+    handler(10,&ldinfo[i], false, 2, 0, true,  must_swap, &translation_ptr);  // aligned ld u32
   }
 
   const t_stub_meminfo stinfo [] = {

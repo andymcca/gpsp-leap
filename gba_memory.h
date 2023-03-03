@@ -200,6 +200,7 @@ s32 load_bios(char *name);
 void update_backup(void);
 void init_memory(void);
 void init_gamepak_buffer(void);
+bool gamepak_must_swap(void);
 void memory_term(void);
 u8 *load_gamepak_page(u32 physical_index);
 

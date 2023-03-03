@@ -38,6 +38,7 @@ _##symbol:
 // otherwise), where we use our own convention call. However calls to C code must
 // follow the calling convention. x86 is built with regparm=2 to avoid stack usage.
 #if defined(__x86_64__) || defined(__amd64__)
+  #define JUMP_CX_ZERO     jrcxz
   #define ADDR_TYPE        .quad
   #define ADDR_SIZE_BYTES      8
   #define STACK_REG         %rsp
@@ -62,6 +63,7 @@ _##symbol:
   #endif
   #define SETUP_ARGS        mov %eax, CARG1_REG; mov %edx, CARG2_REG;
 #else
+  #define JUMP_CX_ZERO     jecxz
   #define ADDR_TYPE        .long
   #define ADDR_SIZE_BYTES      4
   #define STACK_REG         %esp
@@ -422,13 +424,14 @@ ext_load_io##rtype:                                                          ;\
   ret                                                                        ;\
                                                                              ;\
 ext_load_rom##rtype:                                                         ;\
-  mov %eax, %ecx                                 /* ecx = address */         ;\
-  shr $15, %ecx                                  /* ecx = address >> 15 */   ;\
+  mov %eax, %edx                                 /* edx = address */         ;\
+  shr $15, %edx                                  /* edx = address >> 15 */   ;\
                                                  /* Read rdmap pointer */    ;\
-  mov RDMAP_OFF(REG_BASE, FULLREG(cx), ADDR_SIZE_BYTES), FULLREG(dx)         ;\
-  mov %eax, %ecx                                 /* ecx = address */         ;\
-  and $0x7FFF, %ecx                              /* ecx = address LSB */     ;\
-  movop (FULLREG(dx), FULLREG(cx)), %eax         /* Read mem */              ;\
+  mov RDMAP_OFF(REG_BASE, FULLREG(dx), ADDR_SIZE_BYTES), FULLREG(cx)         ;\
+  JUMP_CX_ZERO ext_load_slow##rtype              /* page not loaded, slow */ ;\
+  mov %eax, %edx                                 /* edx = address */         ;\
+  and $0x7FFF, %edx                              /* edx = address LSB */     ;\
+  movop (FULLREG(cx), FULLREG(dx)), %eax         /* Read mem */              ;\
   ret                                                                        ;\
                                                                              ;\
 ext_load_slow##rtype:                                                        ;\

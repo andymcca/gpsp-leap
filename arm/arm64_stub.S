@@ -443,6 +443,7 @@ ld_rdmap_##load_type:                                                        ;\
   lsr w4, w0, #15                         /* Each block is 32KB            */;\
   add x3, reg_base, #(RDMAP_OFF)                                             ;\
   ldr x4, [x3, x4, lsl #3]                /* x4 = table pointer            */;\
+  cbz x4, ld_slow_##load_type             /* not mapped, go slow */          ;\
   and w0, w0, #(0x7fff)                   /* 32KB pages                    */;\
   ldop w0, [x4, x0]                       /* load actual value             */;\
   ret                                                                        ;\

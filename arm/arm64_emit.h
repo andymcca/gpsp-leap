@@ -1869,7 +1869,7 @@ extern void* ldst_handler_functions[16*4 + 17*6];
 extern void* ldst_lookup_tables[16*4 + 17*6];
 
 
-void init_emitter() {
+void init_emitter(bool must_swap) {
   rom_cache_watermark = INITIAL_ROM_WATERMARK;
   init_bios_hooks();
 

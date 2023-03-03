@@ -1981,14 +1981,24 @@ void *div6, *divarm7;
   generate_indirect_branch_no_cycle_update(type)                              \
 
 
-extern u32 ldst_handler_functions[9][17];
-extern u32 ldst_lookup_tables[9][17];
+extern u32 st_handler_functions[4][17];
+extern u32 ld_handler_functions[5][17];
+extern u32 ld_swap_handler_functions[5][17];
 
-void init_emitter(void) {
+// Tables used by the memory handlers (placed near reg_base)
+extern u32 ld_lookup_tables[5][17];
+extern u32 st_lookup_tables[4][17];
+
+void init_emitter(bool must_swap) {
   int i;
 
   // Generate handler table
-  memcpy(ldst_lookup_tables, ldst_handler_functions, sizeof(ldst_lookup_tables));
+  memcpy(st_lookup_tables, st_handler_functions, sizeof(st_lookup_tables));
+  // Issue faster paths if swapping is not required
+  if (must_swap)
+    memcpy(ld_lookup_tables, ld_swap_handler_functions, sizeof(ld_lookup_tables));
+  else
+    memcpy(ld_lookup_tables, ld_handler_functions, sizeof(ld_lookup_tables));
 
   rom_cache_watermark = INITIAL_ROM_WATERMARK;
   u8 *translation_ptr = (u8*)&rom_translation_cache[0];

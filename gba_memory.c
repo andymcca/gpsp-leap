@@ -318,6 +318,8 @@ dma_transfer_type dma[4];
 u8 *gamepak_buffers[32];    /* Pointers to malloc'ed blocks */
 u32 gamepak_buffer_count;   /* Value between 1 and 32 */
 u32 gamepak_size;           /* Size of the ROM in bytes */
+// We allocate in 1MB chunks.
+const unsigned gamepak_buffer_blocksize = 1024*1024;
 
 // LRU queue with the loaded blocks and what they map to
 struct {
@@ -2965,7 +2967,7 @@ void init_gamepak_buffer(void)
   gamepak_buffer_count = 0;
   while (gamepak_buffer_count < ROM_BUFFER_SIZE)
   {
-    void *ptr = malloc(1024*1024);
+    void *ptr = malloc(gamepak_buffer_blocksize);
     if (!ptr)
       break;
     gamepak_buffers[gamepak_buffer_count++] = (u8*)ptr;
@@ -2980,6 +2982,13 @@ void init_gamepak_buffer(void)
 
   gamepak_lru_head = 0;
   gamepak_lru_tail = 32 * gamepak_buffer_count - 1;
+}
+
+bool gamepak_must_swap(void)
+{
+  // Returns whether the current gamepak buffer is not big enough to hold
+  // the full gamepak ROM. In these cases the device must swap.
+  return gamepak_buffer_count * gamepak_buffer_blocksize < gamepak_size;
 }
 
 void init_memory(void)
@@ -3182,7 +3191,7 @@ static s32 load_gamepak_raw(const char *name)
     gamepak_size = (gamepak_size + 0x7FFF) & ~0x7FFF;
 
     // Load stuff in 1MB chunks
-    u32 buf_blocks = (gamepak_size + 1024*1024-1) / (1024*1024);
+    u32 buf_blocks = (gamepak_size + gamepak_buffer_blocksize-1) / (gamepak_buffer_blocksize);
     u32 rom_blocks = gamepak_size >> 15;
     u32 ldblks = buf_blocks < gamepak_buffer_count ?
                     buf_blocks : gamepak_buffer_count;
@@ -3194,7 +3203,7 @@ static s32 load_gamepak_raw(const char *name)
     for (i = 0; i < ldblks; i++)
     {
       // Load 1MB chunk and map it
-      filestream_read(gamepak_file_large, gamepak_buffers[i], 1024*1024);
+      filestream_read(gamepak_file_large, gamepak_buffers[i], gamepak_buffer_blocksize);
       for (j = 0; j < 32 && i*32 + j < rom_blocks; j++)
       {
         u32 phyn = i*32 + j;

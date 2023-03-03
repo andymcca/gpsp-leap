@@ -2260,7 +2260,7 @@ static void function_cc execute_swi(u32 pc)
 extern void* x86_table_data[9][16];
 extern void* x86_table_info[9][16];
 
-void init_emitter(void) {
+void init_emitter(bool must_swap) {
   memcpy(x86_table_info, x86_table_data, sizeof(x86_table_data));
 
   rom_cache_watermark = INITIAL_ROM_WATERMARK;

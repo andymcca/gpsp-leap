@@ -164,7 +164,7 @@ void flush_translation_cache_rom(void);
 void flush_translation_cache_ram(void);
 void dump_translation_cache(void);
 void init_caches(void);
-void init_emitter(void);
+void init_emitter(bool);
 void init_bios_hooks(void);
 
 extern u32 reg_mode[7][7];

@@ -803,7 +803,20 @@ ld_oamram_##load_type:                    /* OAM RAM area                  */;\
   exec_ld_op_##load_type(10)              /* Clear upper bits (10 LSB)     */;\
   add pc, lr, #4                                                             ;\
                                                                              ;\
-/* ROM area (or VRAM): uses generic memory handlers */                       ;\
+/* ROM area: uses generic memory handlers to handle swapping */              ;\
+ld_rdmap_slow_##load_type:                                                   ;\
+  save_flags()                                                               ;\
+  add r2, reg_base, #RDMAP_OFF            /* r2 = memory_map_read          */;\
+  mov r1, r0, lsr #15                     /* r1 = page index of address    */;\
+  ldr r2, [r2, r1, lsl #2]                /* r2 = base addr                */;\
+  cmp r2, #0                                                                 ;\
+  beq 9f                                  /* Page miss, go slow            */;\
+                                                                             ;\
+  exec_ld_op_##load_type(15)              /* Pages are 32KB big            */;\
+  restore_flags()                                                            ;\
+  add pc, lr, #4                                                             ;\
+                                                                             ;\
+/* ROM/VRAM area: uses generic memory handlers, assumes is mapped */         ;\
 ld_rdmap_##load_type:                                                        ;\
   add r2, reg_base, #RDMAP_OFF            /* r2 = memory_map_read          */;\
   mov r1, r0, lsr #15                     /* r1 = page index of address    */;\
@@ -815,6 +828,7 @@ ld_rdmap_##load_type:                                                        ;\
 /* Slow load path, for open/unmapped loads                                 */;\
 ld_slow_##load_type:                                                         ;\
   save_flags()                                                               ;\
+9:                                                                           ;\
   ldr r1, [lr]                            /* r1 = PC                       */;\
 10:                                                                          ;\
   str r1, [reg_base, #REG_PC]             /* update PC                     */;\
@@ -823,7 +837,7 @@ ld_slow_##load_type:                                                         ;\
   add pc, lr, #4                          /* return                        */;\
 
 
-#define load_table_gen(load_type)                                            ;\
+#define load_table_gen(load_type, rdmapfn)                                   ;\
   .long ld_slow_##load_type               /* -1 (for regions above F)      */;\
   .long ld_bios_##load_type               /* 0 BIOS                        */;\
   .long ld_slow_##load_type               /* 1 Bad region                  */;\
@@ -833,11 +847,11 @@ ld_slow_##load_type:                                                         ;\
   .long ld_palram_##load_type             /* 5 Palette RAM, via map        */;\
   .long ld_rdmap_##load_type              /* 6 VRAM area                   */;\
   .long ld_oamram_##load_type             /* 7 OAM RAM                     */;\
-  .long ld_rdmap_##load_type              /* 8 ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* 9 ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* A ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* B ROM, via map                */;\
-  .long ld_rdmap_##load_type              /* C ROM, via map                */;\
+  .long ld_##rdmapfn##_##load_type        /* 8 ROM, via map                */;\
+  .long ld_##rdmapfn##_##load_type        /* 9 ROM, via map                */;\
+  .long ld_##rdmapfn##_##load_type        /* A ROM, via map                */;\
+  .long ld_##rdmapfn##_##load_type        /* B ROM, via map                */;\
+  .long ld_##rdmapfn##_##load_type        /* C ROM, via map                */;\
   .long ld_slow_##load_type               /* D ROM or EEPROM/FLASH         */;\
   .long ld_slow_##load_type               /* E EEPROM/FLASH                */;\
   .long ld_slow_##load_type               /* F Bad region                  */;\
@@ -853,16 +867,23 @@ execute_load_builder(u32, 2, read_memory32 )
 .data
 .align 4
 
-defsymbl(ldst_handler_functions)
+defsymbl(st_handler_functions)
   store_lookup_table(8)
   store_lookup_table(16)
   store_lookup_table(32)
   store_lookup_table(32_safe)
-  load_table_gen(u8)
-  load_table_gen(s8)
-  load_table_gen(u16)
-  load_table_gen(s16)
-  load_table_gen(u32)
+defsymbl(ld_handler_functions)
+  load_table_gen(u8,  rdmap)
+  load_table_gen(s8,  rdmap)
+  load_table_gen(u16, rdmap)
+  load_table_gen(s16, rdmap)
+  load_table_gen(u32, rdmap)
+defsymbl(ld_swap_handler_functions)
+  load_table_gen(u8,  rdmap_slow)
+  load_table_gen(s8,  rdmap_slow)
+  load_table_gen(u16, rdmap_slow)
+  load_table_gen(s16, rdmap_slow)
+  load_table_gen(u32, rdmap_slow)
 
 .bss
 .align 4
@@ -878,8 +899,9 @@ defsymbl(reg)
 defsymbl(spsr)
   .space 24
 @ Place lookup tables here for easy access via base_reg too
-defsymbl(ldst_lookup_tables)
+defsymbl(st_lookup_tables)
   .space 4*17*4   @ store
+defsymbl(ld_lookup_tables)
   .space 5*17*4   @ loads
   .space 132      @ Padding for alignment
 defsymbl(reg_mode)
