@@ -1374,7 +1374,11 @@ static void trace_instruction(u32 pc, u32 mode)
   cycle_count += 2;                                                           \
   generate_load_call_##mem_type();                                            \
   write32(pc);                                                                \
-  arm_generate_store_reg_pc_no_flags(reg_rv, rd)                              \
+  arm_generate_store_reg_pc_no_flags(reg_rv, rd);                             \
+  if(rd == REG_PC)                                                            \
+  {                                                                           \
+    generate_indirect_branch_arm();                                           \
+  }
 
 #define arm_access_memory_store(mem_type)                                     \
   cycle_count++;                                                              \
