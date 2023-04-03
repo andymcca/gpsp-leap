@@ -1442,9 +1442,9 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
 #define thumb_access_memory(access_type, op_type, address, reg_op,            \
  mem_type)                                                                    \
 {                                                                             \
+  thumb_pc_offset(2);                                                         \
   thumb_decode_##op_type();                                                   \
   access_type##_memory_##mem_type(address, reg_op);                           \
-  thumb_pc_offset(2);                                                         \
 }                                                                             \
 
 #define thumb_block_address_preadjust_no_op()                                 \
@@ -3464,7 +3464,7 @@ thumb_loop:
 
           case 0x48 ... 0x4F:
              /* LDR r0..7, [pc + imm] */
-             thumb_access_memory(load, imm, (pc & ~2) + (imm * 4) + 4, reg[(opcode >> 8) & 7], u32);
+             thumb_access_memory(load, imm, ((pc-2) & ~2) + (imm * 4) + 4, reg[(opcode >> 8) & 7], u32);
              break;
 
           case 0x50:
