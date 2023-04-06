@@ -504,8 +504,17 @@ ext_io_store_u##store_type:                                                  ;\
   save_flags()                                                               ;\
   ldr r2, [lr]                            /* load PC                       */;\
   str r2, [reg_base, #REG_PC]             /* write out PC                  */;\
-  store_align_##store_type()                                                 ;\
-  call_c_function(write_memory##store_type)                                  ;\
+                                                                             ;\
+  ldr r2, [reg_base, #REG_CPSR]           /* load CPSR                     */;\
+  tst r2, #0x20                           /* check Thumb bit is set        */;\
+  bne 1f                                  /* Store arm/thumb regs          */;\
+  store_registers_arm()                                                      ;\
+  b 2f                                                                       ;\
+1:                                                                           ;\
+  store_registers_thumb()                                                    ;\
+2:                                                                           ;\
+  mask_addr_##store_type(10)              /* Mask to IO memory (+align)    */;\
+  call_c_function(write_io_register##store_type)                             ;\
   b write_epilogue                        /* handle additional write stuff */;\
                                                                              ;\
 ext_store_iwram_u##store_type:                                               ;\
@@ -669,23 +678,17 @@ ext_store_oam_ram_u32_safe:
 
 
 write_epilogue:
-  cmp r0, #0                              @ check if the write rose an alert
-  beq 4f                                  @ if not we can exit
+  cmp r0, #0                              @ if nothing happened, we can resume
+  beq no_alert
 
-  collapse_flags(r1)                      @ interrupt needs current flags
+  cmp r0, #3                              @ check if the write rose an alert
+  beq irq_alert                           @ triggered an IRQ, go execute it
 
-  cmp r0, #2                              @ see if the alert is due to SMC
+  cmp r0, #2                              @ see if the alert is due to SMC (via DMA)
   beq smc_write                           @ if so, goto SMC handler
 
-  ldr r1, [reg_base, #REG_CPSR]           @ r1 = cpsr
-  tst r1, #0x20                           @ see if Thumb bit is set
-  bne 1f                                  @ if so do Thumb update
-
-  store_registers_arm()                   @ save ARM registers
-  b alert_loop
-
-1:
-  store_registers_thumb()                 @ save Thumb registers
+  collapse_flags(r1)                      @ interrupt needs current flags
+  mvn r0, reg_cycles                      @ setup for update_gba
 
 alert_loop:
   call_c_function(update_gba)             @ update GBA until CPU isn't halted
@@ -715,28 +718,44 @@ alert_loop:
   restore_flags()
   bx r0                                   @ jump to new Thumb block
 
-4:
+
+no_alert:
   restore_flags()
-  add pc, lr, #4                          @ return
+  add pc, lr, #4                          @ return, skip inlined PC
 
 
 smc_write:
   call_c_function(flush_translation_cache_ram)
 
-lookup_pc:
+  @ Resume regular execution (except we might need to recompile due to flush)
   ldr r0, [reg_base, #REG_PC]             @ r0 = new pc
   ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
   tst r1, #0x20                           @ see if Thumb bit is set
-  beq lookup_pc_arm                       @ if not lookup ARM
+  beq 3f                                  @ if not lookup ARM
 
-lookup_pc_thumb:
   call_c_function(block_lookup_address_thumb)
   restore_flags()
   bx r0                                   @ jump to new Thumb block
-
-lookup_pc_arm:
+3:
   call_c_function(block_lookup_address_arm)
   restore_flags()
+  bx r0                                   @ jump to new ARM block
+
+irq_alert:
+  @ Resume regular execution, usually ARM mode, need to reload registers
+  ldr r0, [reg_base, #REG_PC]             @ r0 = new pc
+  ldr r1, [reg_base, #REG_CPSR]           @ r1 = flags
+  tst r1, #0x20                           @ see if Thumb bit is set
+  beq 4f                                  @ if not lookup ARM
+
+  call_c_function(block_lookup_address_thumb)
+  restore_flags()
+  load_registers_thumb()
+  bx r0                                   @ jump to new Thumb block
+4:
+  call_c_function(block_lookup_address_arm)
+  restore_flags()
+  load_registers_arm()
   bx r0                                   @ jump to new ARM block
 
 
