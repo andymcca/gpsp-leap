@@ -537,7 +537,6 @@ ext_store_u##store_type##_safe:                                              ;\
   store_align_##store_type()                                                 ;\
   store_registers()                                                          ;\
   bl write_memory##store_type                                                ;\
-  cbnz w0, write_epilogue                 /* handle additional write stuff */;\
   ldr lr, [reg_base, #REG_SAVE]                                              ;\
   load_registers()                                                           ;\
   ret                                     /* resume if no side effects     */;\
