@@ -1546,12 +1546,11 @@ static void trace_instruction(u32 pc, u32 mode)
   arm_block_memory_writeback_##access_type(writeback_type);                   \
   ARM_BIC_REG_IMM(0, reg_s0, reg_s0, 0x03, 0);                                \
   arm_generate_store_reg(reg_s0, REG_SAVE);                                   \
-                                                                              \
+  cycle_count++;                                                              \
   for(i = 0; i < 16; i++)                                                     \
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
-    {                                                                         \
-      cycle_count++;                                                          \
+    {                                                                         \                                                         
       arm_generate_load_reg(reg_s0, REG_SAVE);                                \
       generate_add_reg_reg_imm(reg_a0, reg_s0, offset, 0);                    \
       if(reg_list & ~((2 << i) - 1))                                          \
@@ -1865,12 +1864,11 @@ static void trace_instruction(u32 pc, u32 mode)
   thumb_block_address_preadjust_##pre_op();                                   \
   thumb_block_address_postadjust_##post_op(base_reg);                         \
   thumb_generate_store_reg(reg_s0, REG_SAVE);                                 \
-                                                                              \
+  cycle_count++;                                                              \                                                                              
   for(i = 0; i < 8; i++)                                                      \
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
     {                                                                         \
-      cycle_count++;                                                          \
       thumb_generate_load_reg(reg_s0, REG_SAVE);                              \
       generate_add_reg_reg_imm(reg_a0, reg_s0, offset, 0);                    \
       if(reg_list & ~((2 << i) - 1))                                          \
