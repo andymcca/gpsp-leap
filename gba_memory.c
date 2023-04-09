@@ -1118,7 +1118,6 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
         reg[CPU_HALT_STATE] = CPU_STOP;
 
       return CPU_ALERT_HALT;
-      break;
 
     default:
       address8(io_registers, address) = value;
@@ -2301,16 +2300,16 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
 
 typedef enum
 {
-  DMA_REGION_IWRAM,
-  DMA_REGION_EWRAM,
-  DMA_REGION_VRAM,
-  DMA_REGION_PALETTE_RAM,
-  DMA_REGION_OAM_RAM,
-  DMA_REGION_IO,
-  DMA_REGION_GAMEPAK,
-  DMA_REGION_EXT,
-  DMA_REGION_BIOS,
-  DMA_REGION_NULL
+  DMA_REGION_IWRAM        = 0,
+  DMA_REGION_EWRAM        = 1,
+  DMA_REGION_VRAM         = 2,
+  DMA_REGION_PALETTE_RAM  = 3,
+  DMA_REGION_OAM_RAM      = 4,
+  DMA_REGION_IO           = 5,
+  DMA_REGION_EXT          = 6,
+  DMA_REGION_GAMEPAK      = 7,
+  DMA_REGION_BIOS         = 8,
+  DMA_REGION_NULL         = 9
 } dma_region_type;
 
 const dma_region_type dma_region_map[17] =
@@ -2334,21 +2333,10 @@ const dma_region_type dma_region_map[17] =
   DMA_REGION_NULL           // 0x10 - Not possible (undefined?)
 };
 
-#define dma_print(src_op, dest_op, transfer_size, wb)                         \
-  printf("dma from %x (%s) to %x (%s) for %x (%s) (%s) (%d) (pc %x)\n",       \
-   src_ptr, #src_op, dest_ptr, #dest_op, length, #transfer_size, #wb,         \
+#define dma_print(src_op, dest_op, tfsize)                                    \
+  printf("dma from %x (%s) to %x (%s) for %x (%s) (%d) (pc %x)\n",            \
+   src_ptr, #src_op, dest_ptr, #dest_op, length, #tfsize,                     \
    dma->irq, reg[15]);                                                        \
-
-#define dma_smc_vars_src()                                                    \
-
-#define dma_smc_vars_dest()                                                   \
-  u32 smc_trigger = 0                                                         \
-
-#define dma_vars_iwram(type)                                                  \
-  dma_smc_vars_##type()                                                       \
-
-#define dma_vars_ewram(type)                                                  \
-  dma_smc_vars_##type()
 
 #define dma_oam_ram_dest()                                                    \
   reg[OAM_UPDATED] = 1                                                        \
@@ -2356,6 +2344,8 @@ const dma_region_type dma_region_map[17] =
 #define dma_vars_oam_ram(type)                                                \
   dma_oam_ram_##type()                                                        \
 
+#define dma_vars_iwram(type)
+#define dma_vars_ewram(type)
 #define dma_vars_io(type)
 #define dma_vars_vram(type)
 #define dma_vars_palette_ram(type)
@@ -2391,387 +2381,300 @@ const dma_region_type dma_region_map[17] =
     }                                                                         \
   }                                                                           \
 
-#define dma_read_iwram(type, transfer_size)                                   \
-  read_value = readaddress##transfer_size(iwram + 0x8000, type##_ptr & 0x7FFF)\
+#define dma_read_iwram(type, tfsize)                                          \
+  read_value = readaddress##tfsize(iwram + 0x8000, type##_ptr & 0x7FFF)       \
 
-#define dma_read_vram(type, transfer_size) {                                  \
+#define dma_read_vram(type, tfsize) {                                         \
   u32 rdaddr = type##_ptr & 0x1FFFF;                                          \
   if (rdaddr >= 0x18000) rdaddr -= 0x8000;                                    \
-  read_value = readaddress##transfer_size(vram, rdaddr);                      \
+  read_value = readaddress##tfsize(vram, rdaddr);                             \
 }
 
-#define dma_read_io(type, transfer_size)                                      \
-  read_value = readaddress##transfer_size(io_registers, type##_ptr & 0x3FF)   \
+#define dma_read_io(type, tfsize)                                             \
+  read_value = readaddress##tfsize(io_registers, type##_ptr & 0x3FF)          \
 
-#define dma_read_oam_ram(type, transfer_size)                                 \
-  read_value = readaddress##transfer_size(oam_ram, type##_ptr & 0x3FF)        \
+#define dma_read_oam_ram(type, tfsize)                                        \
+  read_value = readaddress##tfsize(oam_ram, type##_ptr & 0x3FF)               \
 
-#define dma_read_palette_ram(type, transfer_size)                             \
-  read_value = readaddress##transfer_size(palette_ram, type##_ptr & 0x3FF)    \
+#define dma_read_palette_ram(type, tfsize)                                    \
+  read_value = readaddress##tfsize(palette_ram, type##_ptr & 0x3FF)           \
 
-#define dma_read_ewram(type, transfer_size)                                   \
-  read_value = readaddress##transfer_size(ewram, type##_ptr & 0x3FFFF)        \
+#define dma_read_ewram(type, tfsize)                                          \
+  read_value = readaddress##tfsize(ewram, type##_ptr & 0x3FFFF)               \
 
-#define dma_read_gamepak(type, transfer_size)                                 \
+#define dma_read_gamepak(type, tfsize)                                        \
   dma_gamepak_check_region(type);                                             \
-  read_value = readaddress##transfer_size(type##_address_block,               \
+  read_value = readaddress##tfsize(type##_address_block,                      \
    type##_ptr & 0x7FFF)                                                       \
 
 // DMAing from the BIOS is funny, just returns 0..
 
-#define dma_read_bios(type, transfer_size)                                    \
+#define dma_read_bios(type, tfsize)                                           \
   read_value = 0                                                              \
 
-#define dma_read_ext(type, transfer_size)                                     \
-  read_value = read_memory##transfer_size(type##_ptr)                         \
+#define dma_read_ext(type, tfsize)                                            \
+  read_value = read_memory##tfsize(type##_ptr)                                \
 
-#define dma_write_iwram(type, transfer_size)                                  \
-  address##transfer_size(iwram + 0x8000, type##_ptr & 0x7FFF) =               \
-                                          eswap##transfer_size(read_value);   \
-  smc_trigger |= address##transfer_size(iwram, type##_ptr & 0x7FFF)           \
+#define dma_write_iwram(type, tfsize)                                         \
+  address##tfsize(iwram + 0x8000, type##_ptr & 0x7FFF) =                      \
+                                          eswap##tfsize(read_value);          \
+  smc_trigger |= address##tfsize(iwram, type##_ptr & 0x7FFF)                  \
 
-#define dma_write_vram(type, transfer_size) {                                 \
+#define dma_write_vram(type, tfsize) {                                        \
   u32 wraddr = type##_ptr & 0x1FFFF;                                          \
   if (wraddr >= 0x18000) wraddr -= 0x8000;                                    \
-  address##transfer_size(vram, wraddr) = eswap##transfer_size(read_value);    \
+  address##tfsize(vram, wraddr) = eswap##tfsize(read_value);                  \
 }
 
-#define dma_write_io(type, transfer_size)                                     \
-  write_io_register##transfer_size(type##_ptr & 0x3FF, read_value)            \
+#define dma_write_io(type, tfsize)                                            \
+  write_io_register##tfsize(type##_ptr & 0x3FF, read_value)                   \
 
-#define dma_write_oam_ram(type, transfer_size)                                \
-  address##transfer_size(oam_ram, type##_ptr & 0x3FF) =                       \
-                                  eswap##transfer_size(read_value)            \
+#define dma_write_oam_ram(type, tfsize)                                       \
+  address##tfsize(oam_ram, type##_ptr & 0x3FF) = eswap##tfsize(read_value)    \
 
-#define dma_write_palette_ram(type, transfer_size)                            \
-  write_palette##transfer_size(type##_ptr & 0x3FF, read_value)                \
+#define dma_write_palette_ram(type, tfsize)                                   \
+  write_palette##tfsize(type##_ptr & 0x3FF, read_value)                       \
 
-#define dma_write_ext(type, transfer_size)                                    \
-  write_memory##transfer_size(type##_ptr, read_value)                         \
+#define dma_write_ext(type, tfsize)                                           \
+  write_memory##tfsize(type##_ptr, read_value)                                \
 
-#define dma_write_ewram(type, transfer_size)                                  \
-  address##transfer_size(ewram, type##_ptr & 0x3FFFF) =                       \
-                                  eswap##transfer_size(read_value);           \
-  smc_trigger |= address##transfer_size(ewram,                                \
-   (type##_ptr & 0x3FFFF) + 0x40000)                                          \
-
-#define dma_epilogue_iwram()                                                  \
-  if(smc_trigger)                                                             \
-  {                                                                           \
-    /* Special return code indicating to retranslate to the CPU code */       \
-    return_value = CPU_ALERT_SMC;                                             \
-  }                                                                           \
-
-#define dma_epilogue_ewram()                                                  \
-  if(smc_trigger)                                                             \
-  {                                                                           \
-    /* Special return code indicating to retranslate to the CPU code */       \
-    return_value = CPU_ALERT_SMC;                                             \
-  }                                                                           \
-
-#define dma_epilogue_vram()                                                   \
-
-#define dma_epilogue_io()                                                     \
-
-#define dma_epilogue_oam_ram()                                                \
-
-#define dma_epilogue_palette_ram()                                            \
-
-#define dma_epilogue_GAMEPAK()                                                \
-
-#define dma_epilogue_ext()                                                    \
+#define dma_write_ewram(type, tfsize)                                         \
+  address##tfsize(ewram, type##_ptr & 0x3FFFF) = eswap##tfsize(read_value);   \
+  smc_trigger |= address##tfsize(ewram, (type##_ptr & 0x3FFFF) + 0x40000)     \
 
 #define print_line()                                                          \
-  dma_print(src_op, dest_op, transfer_size, wb);                              \
+  dma_print(src_op, dest_op, tfsize);                                         \
 
-#define dma_transfer_loop_region(src_region_type, dest_region_type, src_op,   \
- dest_op, transfer_size, wb)                                                  \
+#define dma_tfloop(src_region_type, dest_region_type, src_op, dest_op, tfsize)\
 {                                                                             \
   dma_vars_##src_region_type(src);                                            \
   dma_vars_##dest_region_type(dest);                                          \
                                                                               \
   for(i = 0; i < length; i++)                                                 \
   {                                                                           \
-    dma_read_##src_region_type(src, transfer_size);                           \
-    dma_write_##dest_region_type(dest, transfer_size);                        \
+    dma_read_##src_region_type(src, tfsize);                                  \
+    dma_write_##dest_region_type(dest, tfsize);                               \
     src_ptr += src_op;                                                        \
     dest_ptr += dest_op;                                                      \
   }                                                                           \
-  dma->source_address = src_ptr;                                              \
-  if (wb)                                                                     \
-    dma->dest_address = dest_ptr;                                             \
-  dma_epilogue_##dest_region_type();                                          \
   break;                                                                      \
 }                                                                             \
 
-#define dma_tf_loop_builder(transfer_size)                                    \
-cpu_alert_type dma_tf_loop##transfer_size(                                    \
+#define dma_tf_loop_builder(tfsize)                                           \
+                                                                              \
+cpu_alert_type dma_tf_loop##tfsize(                                           \
   u32 src_ptr, u32 dest_ptr, int src_strd, int dest_strd,                     \
   bool wb, u32 length, dma_transfer_type *dma)                                \
 {                                                                             \
   u32 i;                                                                      \
   u32 read_value;                                                             \
-  cpu_alert_type return_value = CPU_ALERT_NONE;                               \
-  u32 src_region = src_ptr >> 24;                                             \
-  u32 dest_region = dest_ptr >> 24;                                           \
+  u32 smc_trigger = 0;                                                        \
+  u32 src_region = MIN(src_ptr >> 24, 16);                                    \
+  u32 dest_region = MIN(dest_ptr >> 24, 16);                                  \
   dma_region_type src_region_type = dma_region_map[src_region];               \
   dma_region_type dest_region_type = dma_region_map[dest_region];             \
                                                                               \
   switch(src_region_type | (dest_region_type << 4))                           \
   {                                                                           \
+    default:                                                                  \
+      /* Do nothing (read-only destination or unmapped area...) */            \
+      return CPU_ALERT_NONE;                                                  \
+                                                                              \
     case (DMA_REGION_BIOS | (DMA_REGION_IWRAM << 4)):                         \
-      dma_transfer_loop_region(bios, iwram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, iwram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_IWRAM << 4)):                        \
-      dma_transfer_loop_region(iwram, iwram, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, iwram, src_strd, dest_strd, tfsize);                  \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_IWRAM << 4)):                        \
-      dma_transfer_loop_region(ewram, iwram, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, iwram, src_strd, dest_strd, tfsize);                  \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_IWRAM << 4)):                         \
-      dma_transfer_loop_region(vram, iwram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, iwram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_IWRAM << 4)):                  \
-      dma_transfer_loop_region(palette_ram, iwram, src_strd, dest_strd,       \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, iwram, src_strd, dest_strd, tfsize);            \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_IWRAM << 4)):                      \
-      dma_transfer_loop_region(oam_ram, iwram, src_strd, dest_strd,           \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, iwram, src_strd, dest_strd, tfsize);                \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_IWRAM << 4)):                           \
-      dma_transfer_loop_region(io, iwram, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, iwram, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_IWRAM << 4)):                      \
-      dma_transfer_loop_region(gamepak, iwram, src_strd, dest_strd,           \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, iwram, src_strd, dest_strd, tfsize);                \
                                                                               \
     case (DMA_REGION_EXT | (DMA_REGION_IWRAM << 4)):                          \
-      dma_transfer_loop_region(ext, iwram, src_strd, dest_strd,               \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ext, iwram, src_strd, dest_strd, tfsize);                    \
                                                                               \
     case (DMA_REGION_BIOS | (DMA_REGION_EWRAM << 4)):                         \
-      dma_transfer_loop_region(bios, ewram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, ewram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_EWRAM << 4)):                        \
-      dma_transfer_loop_region(iwram, ewram, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, ewram, src_strd, dest_strd, tfsize);                  \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_EWRAM << 4)):                        \
-      dma_transfer_loop_region(ewram, ewram, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, ewram, src_strd, dest_strd, tfsize);                  \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_EWRAM << 4)):                         \
-      dma_transfer_loop_region(vram, ewram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, ewram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_EWRAM << 4)):                  \
-      dma_transfer_loop_region(palette_ram, ewram, src_strd, dest_strd,       \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, ewram, src_strd, dest_strd, tfsize);            \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_EWRAM << 4)):                      \
-      dma_transfer_loop_region(oam_ram, ewram, src_strd, dest_strd,           \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, ewram, src_strd, dest_strd, tfsize);                \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_EWRAM << 4)):                           \
-      dma_transfer_loop_region(io, ewram, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, ewram, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_EWRAM << 4)):                      \
-      dma_transfer_loop_region(gamepak, ewram, src_strd, dest_strd,           \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, ewram, src_strd, dest_strd, tfsize);                \
                                                                               \
     case (DMA_REGION_EXT | (DMA_REGION_EWRAM << 4)):                          \
-      dma_transfer_loop_region(ext, ewram, src_strd, dest_strd,               \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ext, ewram, src_strd, dest_strd, tfsize);                    \
                                                                               \
     case (DMA_REGION_BIOS | (DMA_REGION_VRAM << 4)):                          \
-      dma_transfer_loop_region(bios, vram, src_strd, dest_strd,               \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, vram, src_strd, dest_strd, tfsize);                    \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_VRAM << 4)):                         \
-      dma_transfer_loop_region(iwram, vram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, vram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_VRAM << 4)):                         \
-      dma_transfer_loop_region(ewram, vram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, vram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_VRAM << 4)):                          \
-      dma_transfer_loop_region(vram, vram, src_strd, dest_strd,               \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, vram, src_strd, dest_strd, tfsize);                    \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_VRAM << 4)):                   \
-      dma_transfer_loop_region(palette_ram, vram, src_strd, dest_strd,        \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, vram, src_strd, dest_strd, tfsize);             \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_VRAM << 4)):                       \
-      dma_transfer_loop_region(oam_ram, vram, src_strd, dest_strd,            \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, vram, src_strd, dest_strd, tfsize);                 \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_VRAM << 4)):                            \
-      dma_transfer_loop_region(io, vram, src_strd, dest_strd,                 \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, vram, src_strd, dest_strd, tfsize);                      \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_VRAM << 4)):                       \
-      dma_transfer_loop_region(gamepak, vram, src_strd, dest_strd,            \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, vram, src_strd, dest_strd,tfsize);                  \
                                                                               \
     case (DMA_REGION_EXT | (DMA_REGION_VRAM << 4)):                           \
-      dma_transfer_loop_region(ext, vram, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ext, vram, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_BIOS | (DMA_REGION_PALETTE_RAM << 4)):                   \
-      dma_transfer_loop_region(bios, palette_ram, src_strd, dest_strd,        \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, palette_ram, src_strd, dest_strd, tfsize);             \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_PALETTE_RAM << 4)):                  \
-      dma_transfer_loop_region(iwram, palette_ram, src_strd, dest_strd,       \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, palette_ram, src_strd, dest_strd, tfsize);            \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_PALETTE_RAM << 4)):                  \
-      dma_transfer_loop_region(ewram, palette_ram, src_strd, dest_strd,       \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, palette_ram, src_strd, dest_strd, tfsize);            \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_PALETTE_RAM << 4)):                   \
-      dma_transfer_loop_region(vram, palette_ram, src_strd, dest_strd,        \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, palette_ram, src_strd, dest_strd, tfsize);             \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_PALETTE_RAM << 4)):            \
-      dma_transfer_loop_region(palette_ram, palette_ram, src_strd, dest_strd, \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, palette_ram, src_strd, dest_strd, tfsize);      \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_PALETTE_RAM << 4)):                \
-      dma_transfer_loop_region(oam_ram, palette_ram, src_strd, dest_strd,     \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, palette_ram, src_strd, dest_strd, tfsize);          \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_PALETTE_RAM << 4)):                     \
-      dma_transfer_loop_region(io, palette_ram, src_strd, dest_strd,          \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, palette_ram, src_strd, dest_strd, tfsize);               \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_PALETTE_RAM << 4)):                \
-      dma_transfer_loop_region(gamepak, palette_ram, src_strd, dest_strd,     \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, palette_ram, src_strd, dest_strd, tfsize);          \
                                                                               \
     case (DMA_REGION_EXT | (DMA_REGION_PALETTE_RAM << 4)):                    \
-      dma_transfer_loop_region(ext, palette_ram, src_strd, dest_strd,         \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ext, palette_ram, src_strd, dest_strd, tfsize);              \
                                                                               \
     case (DMA_REGION_BIOS | (DMA_REGION_OAM_RAM << 4)):                       \
-      dma_transfer_loop_region(bios, oam_ram, src_strd, dest_strd,            \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, oam_ram, src_strd, dest_strd, tfsize);                 \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_OAM_RAM << 4)):                      \
-      dma_transfer_loop_region(iwram, oam_ram, src_strd, dest_strd,           \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, oam_ram, src_strd, dest_strd, tfsize);                \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_OAM_RAM << 4)):                      \
-      dma_transfer_loop_region(ewram, oam_ram, src_strd, dest_strd,           \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, oam_ram, src_strd, dest_strd, tfsize);                \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_OAM_RAM << 4)):                       \
-      dma_transfer_loop_region(vram, oam_ram, src_strd, dest_strd,            \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, oam_ram, src_strd, dest_strd, tfsize);                 \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_OAM_RAM << 4)):                \
-      dma_transfer_loop_region(palette_ram, oam_ram, src_strd, dest_strd,     \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, oam_ram, src_strd, dest_strd, tfsize);          \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_OAM_RAM << 4)):                    \
-      dma_transfer_loop_region(oam_ram, oam_ram, src_strd, dest_strd,         \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, oam_ram, src_strd, dest_strd, tfsize);              \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_OAM_RAM << 4)):                         \
-      dma_transfer_loop_region(io, oam_ram, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, oam_ram, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_OAM_RAM << 4)):                    \
-      dma_transfer_loop_region(gamepak, oam_ram, src_strd, dest_strd,         \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, oam_ram, src_strd, dest_strd, tfsize);              \
                                                                               \
     case (DMA_REGION_EXT | (DMA_REGION_OAM_RAM << 4)):                        \
-      dma_transfer_loop_region(ext, oam_ram, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ext, oam_ram, src_strd, dest_strd, tfsize);                  \
                                                                               \
     case (DMA_REGION_BIOS | (DMA_REGION_IO << 4)):                            \
-      dma_transfer_loop_region(bios, io, src_strd, dest_strd,                 \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, io, src_strd, dest_strd, tfsize);                      \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_IO << 4)):                           \
-      dma_transfer_loop_region(iwram, io, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, io, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_IO << 4)):                           \
-      dma_transfer_loop_region(ewram, io, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, io, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_IO << 4)):                            \
-      dma_transfer_loop_region(vram, io, src_strd, dest_strd,                 \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, io, src_strd, dest_strd, tfsize);                      \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_IO << 4)):                     \
-      dma_transfer_loop_region(palette_ram, io, src_strd, dest_strd,          \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, io, src_strd, dest_strd, tfsize);               \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_IO << 4)):                         \
-      dma_transfer_loop_region(oam_ram, io, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, io, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_IO << 4)):                              \
-      dma_transfer_loop_region(io, io, src_strd, dest_strd,                   \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, io, src_strd, dest_strd, tfsize);                        \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_IO << 4)):                         \
-      dma_transfer_loop_region(gamepak, io, src_strd, dest_strd,              \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, io, src_strd, dest_strd, tfsize);                   \
                                                                               \
     case (DMA_REGION_EXT | (DMA_REGION_IO << 4)):                             \
-      dma_transfer_loop_region(ext, io, src_strd, dest_strd,                  \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ext, io, src_strd, dest_strd, tfsize);                       \
                                                                               \
     case (DMA_REGION_BIOS | (DMA_REGION_EXT << 4)):                           \
-      dma_transfer_loop_region(bios, ext, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(bios, ext, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_IWRAM | (DMA_REGION_EXT << 4)):                          \
-      dma_transfer_loop_region(iwram, ext, src_strd, dest_strd,               \
-       transfer_size, wb);                                                    \
+      dma_tfloop(iwram, ext, src_strd, dest_strd, tfsize);                    \
                                                                               \
     case (DMA_REGION_EWRAM | (DMA_REGION_EXT << 4)):                          \
-      dma_transfer_loop_region(ewram, ext, src_strd, dest_strd,               \
-       transfer_size, wb);                                                    \
+      dma_tfloop(ewram, ext, src_strd, dest_strd, tfsize);                    \
                                                                               \
     case (DMA_REGION_VRAM | (DMA_REGION_EXT << 4)):                           \
-      dma_transfer_loop_region(vram, ext, src_strd, dest_strd,                \
-       transfer_size, wb);                                                    \
+      dma_tfloop(vram, ext, src_strd, dest_strd, tfsize);                     \
                                                                               \
     case (DMA_REGION_PALETTE_RAM | (DMA_REGION_EXT << 4)):                    \
-      dma_transfer_loop_region(palette_ram, ext, src_strd, dest_strd,         \
-       transfer_size, wb);                                                    \
+      dma_tfloop(palette_ram, ext, src_strd, dest_strd, tfsize);              \
                                                                               \
     case (DMA_REGION_OAM_RAM | (DMA_REGION_EXT << 4)):                        \
-      dma_transfer_loop_region(oam_ram, ext, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(oam_ram, ext, src_strd, dest_strd, tfsize);                  \
                                                                               \
     case (DMA_REGION_IO | (DMA_REGION_EXT << 4)):                             \
-      dma_transfer_loop_region(io, ext, src_strd, dest_strd,                  \
-       transfer_size, wb);                                                    \
+      dma_tfloop(io, ext, src_strd, dest_strd, tfsize);                       \
                                                                               \
     case (DMA_REGION_GAMEPAK | (DMA_REGION_EXT << 4)):                        \
-      dma_transfer_loop_region(gamepak, ext, src_strd, dest_strd,             \
-       transfer_size, wb);                                                    \
+      dma_tfloop(gamepak, ext, src_strd, dest_strd, tfsize);                  \
                                                                               \
-    case (DMA_REGION_EXT | (DMA_REGION_EXT << 3)):                            \
-      dma_transfer_loop_region(ext, ext, src_strd, dest_strd,                 \
-       transfer_size, wb);                                                    \
+    case (DMA_REGION_EXT | (DMA_REGION_EXT << 4)):                            \
+      dma_tfloop(ext, ext, src_strd, dest_strd, tfsize);                      \
   }                                                                           \
-  return return_value;                                                        \
+                                                                              \
+  dma->source_address = src_ptr;                                              \
+  if (wb)   /* Update destination pointer if requested */                     \
+    dma->dest_address = dest_ptr;                                             \
+                                                                              \
+  return smc_trigger ? CPU_ALERT_SMC : CPU_ALERT_NONE;                        \
 }                                                                             \
 
 dma_tf_loop_builder(16);
