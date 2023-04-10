@@ -1573,14 +1573,11 @@ void set_cpu_mode(cpu_mode_type new_mode)
   reg[CPU_MODE] = new_mode;
 }
 
-void raise_interrupt(irq_type irq_raised)
+cpu_alert_type check_interrupts()
 {
-  // The specific IRQ must be enabled in IE, master IRQ enable must be on,
-  // and it must be on in the flags.
-  write_ioreg(REG_IF, read_ioreg(REG_IF) | irq_raised);
-
-  if((read_ioreg(REG_IE) & irq_raised) && read_ioreg(REG_IME) &&
-   ((reg[REG_CPSR] & 0x80) == 0))
+  // Check any IRQ flag pending, IME and CPSR-IRQ enabled
+  u16 umirq = read_ioreg(REG_IE) & io_registers[REG_IF];
+  if(!(reg[REG_CPSR] & 0x80) && read_ioreg(REG_IME) && umirq)
   {
     // Value after the FIQ returns, should be improved
     reg[REG_BUS_VALUE] = 0xe55ec002;
@@ -1594,7 +1591,18 @@ void raise_interrupt(irq_type irq_raised)
     set_cpu_mode(MODE_IRQ);
     reg[CPU_HALT_STATE] = CPU_ACTIVE;
     reg[CHANGED_PC_STATUS] = 1;
+    return CPU_ALERT_IRQ;
   }
+  return CPU_ALERT_NONE;
+}
+
+void raise_interrupt(irq_type irq_raised)
+{
+  // The specific IRQ must be enabled in IE, master IRQ enable must be on,
+  // and it must be on in the flags.
+  write_ioreg(REG_IF, read_ioreg(REG_IF) | irq_raised);
+
+  check_interrupts();
 }
 
 #ifndef HAVE_DYNAREC

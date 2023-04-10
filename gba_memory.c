@@ -1339,6 +1339,11 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
     case 0x130:
       break;
 
+    // REG_IE
+    case 0x200:
+      write_ioreg(REG_IE, value);
+      return check_interrupts();
+
     // Interrupt flag
     case 0x202:
       write_ioreg(REG_IF, read_ioreg(REG_IF) & (~value));
@@ -1348,6 +1353,11 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
     case 0x204:
       write_ioreg(REG_WAITCNT, value);
       break;
+
+    // REG_IME
+    case 0x208:
+      write_ioreg(REG_IME, value);
+      return check_interrupts();
 
     // Halt
     case 0x300:
