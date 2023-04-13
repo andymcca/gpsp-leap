@@ -288,7 +288,6 @@ void translate_icache_sync() {
   check_pc_region(pc);                                                        \
   opcode = address32(pc_address_block, (pc & 0x7FFF));                        \
   condition = block_data[block_data_position].condition;                      \
-  emit_trace_arm_instruction(pc);                                             \
                                                                               \
   if((condition != last_condition) || (condition >= 0x20))                    \
   {                                                                           \
@@ -306,6 +305,7 @@ void translate_icache_sync() {
       arm_conditional_block_header();                                         \
     }                                                                         \
   }                                                                           \
+  emit_trace_arm_instruction(pc);                                             \
                                                                               \
   switch((opcode >> 20) & 0xFF)                                               \
   {                                                                           \
