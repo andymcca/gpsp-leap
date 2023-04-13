@@ -2079,7 +2079,8 @@ static void emit_mem_access_loadop(
 #endif
 
 #define SMC_WRITE_OFF    (10*16*4)   /* 10 handlers (16 insts) */
-#define EWRAM_SPM_OFF    (SMC_WRITE_OFF + 4*2)   /* Just a jmp + nop */
+#define IOEPILOGUE_OFF   (SMC_WRITE_OFF + 4*2)   /* Trampolines are two insts */
+#define EWRAM_SPM_OFF    (IOEPILOGUE_OFF + 4*2)
 
 // Describes a "plain" memory are, that is, an area that is just accessed
 // as normal memory (with some caveats tho).
@@ -2557,14 +2558,16 @@ static void emit_saveaccess_stub(u8 **tr_ptr) {
 
     if (strop < 3) {
       mips_emit_sw(reg_a2, reg_base, ReOff_RegPC);   // Save PC (delay)
-      mips_emit_j(((u32)&write_io_epilogue) >> 2);
-      mips_emit_nop();
+      // If I/O writes returns non-zero, means we need to process side-effects.
+      mips_emit_b(bne, reg_zero, reg_rv, branch_offset(&rom_translation_cache[IOEPILOGUE_OFF]));
+      mips_emit_lw(mips_reg_ra, reg_base, ReOff_SaveR3);   // (in delay slot but not used)
+      emit_restore_regs(false);
     } else {
       mips_emit_nop();
       mips_emit_lw(mips_reg_ra, reg_base, ReOff_SaveR3);
       emit_restore_regs(true);
-      generate_function_return_swap_delay();
     }
+    generate_function_return_swap_delay();
   }
 
   *tr_ptr = translation_ptr;
@@ -2711,8 +2714,11 @@ void init_emitter(bool must_swap) {
   emit_phand(&translation_ptr, 2, 13 * 16, false);  // st u32
   emit_phand(&translation_ptr, 2, 14 * 16, false);  // st aligned 32
 
-  // This is just a trampoline (for the SMC branches)
+  // Trampoline area
   mips_emit_j(((u32)&smc_write) >> 2);
+  mips_emit_nop();
+
+  mips_emit_j(((u32)&write_io_epilogue) >> 2);
   mips_emit_nop();
 
   // Special trampoline for SP-relative ldm/stm (to EWRAM)

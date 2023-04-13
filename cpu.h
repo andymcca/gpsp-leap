@@ -46,13 +46,12 @@ typedef u32 cpu_mode_type;
 #define CPU_HALT            1
 #define CPU_STOP            2
 
-typedef enum
-{
-  CPU_ALERT_NONE = 0,
-  CPU_ALERT_HALT = 1,
-  CPU_ALERT_SMC  = 2,
-  CPU_ALERT_IRQ  = 3
-} cpu_alert_type;
+typedef u8 cpu_alert_type;
+
+#define CPU_ALERT_NONE         0
+#define CPU_ALERT_HALT   (1 << 0)
+#define CPU_ALERT_SMC    (1 << 1)
+#define CPU_ALERT_IRQ    (1 << 2)
 
 typedef u16 irq_type;
 
@@ -110,8 +109,9 @@ typedef enum
 extern u32 instruction_count;
 
 void execute_arm(u32 cycles);
-cpu_alert_type check_interrupts(void);
-void raise_interrupt(irq_type irq_raised);
+void check_and_raise_interrupts(void);
+cpu_alert_type check_interrupt(void);
+cpu_alert_type flag_interrupt(irq_type irq_raised);
 void set_cpu_mode(cpu_mode_type new_mode);
 
 u32 function_cc execute_load_u8(u32 address);

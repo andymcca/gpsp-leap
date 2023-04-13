@@ -113,6 +113,10 @@ symbol:
 .equ GP_SAVE,             (30 * 4)
 .equ GP_SAVE_HI,          (31 * 4)
 
+.equ CPU_ALERT_HALT,      (1 << 0)
+.equ CPU_ALERT_SMC,       (1 << 1)
+.equ CPU_ALERT_IRQ,       (1 << 2)
+
 .equ SPSR_BASE,           (0x100 + 0x400 * 3)
 .equ REGMODE_BASE,        (SPSR_BASE + 24)
 .equ SUPERVISOR_MODE,     (0x13)
@@ -319,17 +323,26 @@ defsymbl(mips_indirect_branch_dual)
   nop
 
 
+# Called on I/O writes that have side-effects
 defsymbl(write_io_epilogue)
-  beq $2, $0, no_alert            # 0 means nothing happened
-  addiu $4, $2, -2                # see if return value is 2 (delay slot)
-  beq $4, $0, smc_dma             # is it an SMC alert? (return value = 2)
-  nop
-  addiu $4, $2, -3                # see if return value is 3
-  beq $4, $0, irq_alert           # is it an IRQ alert? (return value = 3)
-  nop
-  collapse_flags                  # make sure flags are good for update_gba
+  # Check for SMC, IRQ, and HALT bits
+  move $19, $2                    # destroy $19 (saved ~reg_pc) since we won't return
+  collapse_flags                  # CPSR needs to be updated
 
+  andi $4, $19, CPU_ALERT_SMC     # check if SMC code happened
+  beqz $4, 1f                     # skip if no SMC happened
+  cfncall flush_translation_cache_ram, 4
 
+1:
+  andi $4, $19, CPU_ALERT_IRQ     # check if IRQ was raised
+  beqz $4, 2f                     # skip if no IRQ was raised
+  cfncall check_and_raise_interrupts, 9
+
+2:
+  andi $4, $19, CPU_ALERT_HALT    # check if CPU is halted
+  beqz $4, lookup_pc              # continue running if not halted
+
+  # Purposely fallthrough to alert_loop, wait for CPU wakeup
 
 alert_loop:
   move $4, reg_cycles             # Remaining cycles as asg0
@@ -343,51 +356,33 @@ alert_loop:
   bne $1, $0, alert_loop          # see if it hasn't changed
   nop
 
-  lw $4, REG_PC($16)              # $4 = new PC
-
-  j lookup_pc
-  nop
-
-irq_alert:
-  restore_registers
-  j lookup_pc                     # PC has changed, get a new one
-  nop
-
-no_alert:
-  restore_registers
-  lw $ra, REG_SAVE3($16)          # restore return
-  jr $ra                          # we can return
-  nop
-
-smc_dma:
-  cfncall flush_translation_cache_ram, 4
-  j lookup_pc
-  nop
-
-defsymbl(smc_write)
-  save_registers
-  sw $6, REG_PC($16)              # save PC
-  cfncall flush_translation_cache_ram, 4
+  # Fall through to lookup_pc to resume execution
 
 lookup_pc:
-  lw $2, REG_CPSR($16)            # $2 = cpsr
-  andi $2, $2, 0x20               # isolate mode bit
-  beq $2, $0, lookup_pc_arm       # if T bit is zero use arm handler
-  nop
+  extract_flags                   # $1 contains CPSR now
+lookup_pc_noflags:
+  andi $1, $1, 0x20               # isolate mode bit
+  beq $1, $0, 1f                  # if T bit is zero use arm handler
+  lw $4, REG_PC($16)              # load PC as arg 0
 
-lookup_pc_thumb:
-  lw $4, REG_PC($16)                     # load PC as arg 0
   cfncall block_lookup_address_thumb, 2  # get Thumb address
   restore_registers
   jr $2                                  # jump to result
   nop
-
-lookup_pc_arm:
-  lw $4, REG_PC($16)                   # load PC as arg 0
+1:
   cfncall block_lookup_address_arm, 1  # get ARM address
   restore_registers
   jr $2                                # jump to result
   nop
+
+
+defsymbl(smc_write)
+  sw $6, REG_PC($16)              # save PC
+  save_registers
+  cfncall flush_translation_cache_ram, 4
+  b lookup_pc_noflags
+  lw $1, REG_CPSR($16)            # (delay)
+
 
 # Return the current cpsr
 
@@ -622,6 +617,7 @@ fnptrs:
   .long execute_spsr_restore_body      # 6
   .long execute_store_cpsr_body        # 7
   .long process_cheats                 # 8
+  .long check_and_raise_interrupts     # 9
 
 #if !defined(MMAP_JIT_CACHE)
 

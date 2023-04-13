@@ -79,6 +79,10 @@ _##symbol:
     call fnm(name)
 #endif
 
+.equ CPU_ALERT_HALT,    (1 << 0)
+.equ CPU_ALERT_SMC,     (1 << 1)
+.equ CPU_ALERT_IRQ,     (1 << 2)
+
 .equ REG_SP,            (13 * 4)
 .equ REG_LR,            (14 * 4)
 .equ REG_PC,            (15 * 4)
@@ -239,14 +243,27 @@ ext_store_backup8:
   ret
 
 
-
+# Handle I/O write side-effects:
+#  SMC: Flush RAM caches
+#  IRQ: Perform CPU mode change
+#  HLT: spin in the alert_loop until an IRQ is triggered
 write_epilogue:
-  cmp $0, %eax                # 0 return means nothing happened
-  jz no_alert                 # if so we can leave
+  mov %eax, REG_SAVE(REG_BASE)# Save ret value for later use
+  collapse_flags              # Consolidate CPSR
+  test $CPU_ALERT_SMC, %eax   # Check for CPU_ALERT_SMC bit
+  jz 1f                       # skip if not set
+  CALL_FUNC(flush_translation_cache_ram)
 
-  collapse_flags              # make sure flags are good for function call
-  cmp $2, %eax                # see if it was an SMC trigger
-  je smc_write
+1:
+  testl $CPU_ALERT_IRQ, REG_SAVE(REG_BASE) # Check for CPU_ALERT_IRQ bit
+  jz 2f                       # skip if not set
+  CALL_FUNC(check_and_raise_interrupts)
+
+2:
+  testl $CPU_ALERT_HALT, REG_SAVE(REG_BASE) # Check for CPU_ALERT_HALT bit
+  jz lookup_pc                # if not halt, continue executing
+
+  # explicit fallthrough to alert_loop, while CPU is halted
 
 alert_loop:
   mov REG_CYCLES, CARG1_REG   # Load remaining cycles as arg0
@@ -265,8 +282,6 @@ alert_loop:
 
   jmp lookup_pc               # pc has definitely changed
 
-no_alert:
-  ret
 
 ext_store_eeprom:
   CALL_FUNC(write_eeprom)     # perform eeprom write
@@ -336,8 +351,9 @@ ext_##fname##_io##wsize:                                                     ;\
   and $(0x3FF & addrm), %eax                               /* Addr wrap */   ;\
   SETUP_ARGS                                                                 ;\
   CALL_FUNC(write_io_register##wsize)                    /* Call C code */   ;\
-  jmp write_epilogue                            /* Might need an update */   ;\
-
+  cmp $0, %eax                                /* Check for side-effects */   ;\
+  jnz write_epilogue                             /* Act on SMC and IRQs */   ;\
+  ret                                                                        ;\
 
 write_stubs(store,         32, l, reg32, reg32, ~3, noop)
 write_stubs(store,         16, w, reg16, reg16, ~1, noop)

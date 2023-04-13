@@ -240,8 +240,12 @@ u32 function_cc update_gba(int remaining_cycles)
       write_ioreg(REG_DISPSTAT, dispstat);
     }
 
-    if(irq_raised)
-      raise_interrupt(irq_raised);
+    // Flag any V/H blank interrupts.
+    if (irq_raised)
+      flag_interrupt(irq_raised);
+
+    // Raise any pending interrupts. This changes the CPU mode.
+    check_and_raise_interrupts();
 
     execute_cycles = MAX(video_count, 0);
 

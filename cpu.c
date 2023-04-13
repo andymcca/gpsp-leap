@@ -1573,11 +1573,21 @@ void set_cpu_mode(cpu_mode_type new_mode)
   reg[CPU_MODE] = new_mode;
 }
 
-cpu_alert_type check_interrupts()
+#define cpu_has_interrupt()                                 \
+  (!(reg[REG_CPSR] & 0x80) && read_ioreg(REG_IME) &&        \
+    (read_ioreg(REG_IE) & io_registers[REG_IF]))
+
+// Returns whether the CPU has a pending interrupt.
+cpu_alert_type check_interrupt() {
+  return (cpu_has_interrupt()) ? CPU_ALERT_IRQ : CPU_ALERT_NONE;
+}
+
+// Checks for pending IRQs and raises them. This changes the CPU mode
+// which means that it must be called with a valid CPU state.
+void check_and_raise_interrupts()
 {
   // Check any IRQ flag pending, IME and CPSR-IRQ enabled
-  u16 umirq = read_ioreg(REG_IE) & io_registers[REG_IF];
-  if(!(reg[REG_CPSR] & 0x80) && read_ioreg(REG_IME) && umirq)
+  if (cpu_has_interrupt())
   {
     // Value after the FIQ returns, should be improved
     reg[REG_BUS_VALUE] = 0xe55ec002;
@@ -1591,18 +1601,19 @@ cpu_alert_type check_interrupts()
     set_cpu_mode(MODE_IRQ);
     reg[CPU_HALT_STATE] = CPU_ACTIVE;
     reg[CHANGED_PC_STATUS] = 1;
-    return CPU_ALERT_IRQ;
   }
-  return CPU_ALERT_NONE;
 }
 
-void raise_interrupt(irq_type irq_raised)
+// This function marks a pending interrupt but does not raise it.
+// It simply updates IF register and returns whether the IRQ needs
+// to be raised (that is, IE/IME/CPSR enable the IRQ).
+// Safe to call via dynarec without proper registers saved.
+cpu_alert_type flag_interrupt(irq_type irq_raised)
 {
-  // The specific IRQ must be enabled in IE, master IRQ enable must be on,
-  // and it must be on in the flags.
+  // Flag interrupt
   write_ioreg(REG_IF, read_ioreg(REG_IF) | irq_raised);
 
-  check_interrupts();
+  return check_interrupt();
 }
 
 #ifndef HAVE_DYNAREC
@@ -3233,7 +3244,7 @@ skip_instruction:
 
        if (pc == idle_loop_target_pc && cycles_remaining > 0) cycles_remaining = 0;
 
-       if(cpu_alert)
+       if (cpu_alert & (CPU_ALERT_HALT | CPU_ALERT_IRQ))
          goto alert;
 
     } while(cycles_remaining > 0);
@@ -3746,7 +3757,7 @@ thumb_loop:
 
        if (pc == idle_loop_target_pc && cycles_remaining > 0) cycles_remaining = 0;
 
-       if(cpu_alert)
+       if (cpu_alert & (CPU_ALERT_HALT | CPU_ALERT_IRQ))
           goto alert;
 
     } while(cycles_remaining > 0);
@@ -3758,16 +3769,8 @@ thumb_loop:
     continue;
 
     alert:
-
-    if(cpu_alert != CPU_ALERT_IRQ) {
+      /* CPU stopped or switch to IRQ handler */
       collapse_flags();
-
-      while(reg[CPU_HALT_STATE] != CPU_ACTIVE) {
-        cycles_remaining = update_gba(cycles_remaining);
-        if (reg[COMPLETED_FRAME])
-          return;
-      }
-    }
   }
 }
 

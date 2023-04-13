@@ -66,6 +66,10 @@ _##symbol:
 #define REG_SAVE4         (30 * 4)
 #define REG_SAVE5         (31 * 4)
 
+#define CPU_ALERT_HALT_B        0
+#define CPU_ALERT_SMC_B         1
+#define CPU_ALERT_IRQ_B         2
+
 #define reg_base          x20
 #define reg_cycles        w21
 
@@ -73,6 +77,7 @@ _##symbol:
 #define reg_v_flag        w23
 #define reg_z_flag        w24
 #define reg_n_flag        w25
+#define reg_save0         w19
 
 
 // Memory offsets from reg_base to the different buffers
@@ -355,24 +360,24 @@ defsymbl(execute_arm_translate_internal)
 
   // Check whether the CPU is sleeping already, we should just wait for IRQs
   ldr w1, [reg_base, #CPU_HALT_STATE]
-  cmp w1, #0
-  bne alert_loop
+  cbnz w1, alert_loop
 
-  ldr w0, [reg_base, #REG_PC]             // r0 = current pc
-  ldr w1, [reg_base, #REG_CPSR]           // r1 = flags
-  tst w1, #0x20                           // see if Thumb bit is set
-  extract_flags(w2)                       // load flags
+  ldr w0, [reg_base, #REG_PC]             // load current PC
 
-  bne 1f                                  // if so lookup thumb
+// Resume execution at PC (at w0)
+lookup_pc:
+  ldr w1, [reg_base, #REG_CPSR]           // w1 = flags
+  extract_flags_reg(w1)
+  tbnz w1, #5, 2f                         // see if Thumb bit is set
 
+  // Lookup and jump to the right mode block
   bl block_lookup_address_arm
   load_registers()
-  br x0                                   // jump to first ARM block
-1:
+  br x0
+2:
   bl block_lookup_address_thumb
   load_registers()
-  br x0                                   // jump to first Thumb block
-
+  br x0
 
 // Epilogue to return to the main thread (whatever called execute_arm_translate)
 
@@ -588,11 +593,13 @@ ext_store_ioreg_u##store_type:                                               ;\
   load_registers()                                                           ;\
   ret                                     /* resume if no side effects     */;\
                                                                              ;\
-3:                                                                           ;\
+3: /* SMC write (iwram/ewram) */                                             ;\
   str w2, [reg_base, #REG_PC]             /* write out PC                  */;\
   store_registers()                       /* store registers               */;\
   consolidate_flags(w1)                                                      ;\
-  b smc_write                             /* perform smc write             */;\
+  bl flush_translation_cache_ram                                             ;\
+  ldr w0, [reg_base, #REG_PC]             /* load "current new" PC         */;\
+  b lookup_pc                             /* continue execution            */;\
 .size execute_store_u##store_type, .-execute_store_u##store_type
 
 // for ignored areas, just return
@@ -680,7 +687,6 @@ ext_store_ioreg_u32_safe:
   and w0, w0, #(0x3fc)
   store_registers()
   bl write_io_register32
-  cbnz w0, write_epilogue
   ldr lr, [reg_base, #REG_SAVE]
   load_registers()
   ret
@@ -688,10 +694,20 @@ ext_store_ioreg_u32_safe:
 
 // This is called whenever an external store with side effects was performed
 write_epilogue:
-  consolidate_flags(w1)                   // update the CPSR before update
+  mov reg_save0, w0                       // Save reg for later
+  consolidate_flags(w1)                   // Update CPSR for IRQ/
+  tbz w0, #CPU_ALERT_SMC_B, 1f            // Skip if SMC did not happen
+  bl flush_translation_cache_ram          // Flush RAM if bit is set
 
-  cmp w0, #2                              // see if the alert is due to SMC
-  beq smc_write                           // if so, goto SMC handler
+1:
+  tbz reg_save0, #CPU_ALERT_IRQ_B, 2f     // Skip if IRQ did not happen
+  bl check_and_raise_interrupts
+
+2:
+  ldr w0, [reg_base, #REG_PC]             // load new PC
+  tbz reg_save0, #CPU_ALERT_HALT_B, lookup_pc   // Resume execution if running
+
+  // explicit fallthrough to alert_loop, while CPU is halted
 
 alert_loop:
   mov w0, reg_cycles                      // load remaining cycles
@@ -707,25 +723,6 @@ alert_loop:
   ldr w0, [reg_base, #REG_PC]             // load new PC
   b lookup_pc                             // Resume execution at that PC
 
-
-smc_write:
-  bl flush_translation_cache_ram
-  ldr w0, [reg_base, #REG_PC]             // load "current new" PC
-
-// Resume execution at PC (at w0)
-lookup_pc:
-  ldr w1, [reg_base, #REG_CPSR]           // w1 = flags
-  extract_flags_reg(w1)
-  tbnz w1, #5, 2f                         // see if Thumb bit is set
-
-  // Lookup and jump to the right mode block
-  bl block_lookup_address_arm
-  load_registers()
-  br x0
-2:
-  bl block_lookup_address_thumb
-  load_registers()
-  br x0
 
 .data
 .align 4

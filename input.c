@@ -47,12 +47,18 @@ static void trigger_key(u32 key)
     if(p1_cnt >> 15)
     {
       if(key_intersection == (p1_cnt & 0x3FF))
-        raise_interrupt(IRQ_KEYPAD);
+      {
+        flag_interrupt(IRQ_KEYPAD);
+        check_and_raise_interrupts();
+      }
     }
     else
     {
       if(key_intersection)
-        raise_interrupt(IRQ_KEYPAD);
+      {
+        flag_interrupt(IRQ_KEYPAD);
+        check_and_raise_interrupts();
+      }
     }
   }
 }

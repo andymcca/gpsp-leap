@@ -1342,7 +1342,7 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
     // REG_IE
     case 0x200:
       write_ioreg(REG_IE, value);
-      return check_interrupts();
+      return check_interrupt();
 
     // Interrupt flag
     case 0x202:
@@ -1357,7 +1357,7 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
     // REG_IME
     case 0x208:
       write_ioreg(REG_IME, value);
-      return check_interrupts();
+      return check_interrupt();
 
     // Halt
     case 0x300:
@@ -1417,16 +1417,9 @@ cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
 
     default:
     {
-      cpu_alert_type alert_low =
-        write_io_register16(address, value & 0xFFFF);
-
-      cpu_alert_type alert_high =
-        write_io_register16(address + 2, value >> 16);
-
-      if(alert_high)
-        return alert_high;
-
-      return alert_low;
+      cpu_alert_type allow = write_io_register16(address, value & 0xFFFF);
+      cpu_alert_type alhigh = write_io_register16(address + 2, value >> 16);
+      return allow | alhigh;
     }
   }
 
@@ -2739,8 +2732,8 @@ cpu_alert_type dma_transfer(unsigned dma_chan, int *usedcycles)
         dst_ptr & 0xFFFFFF : 0x1000000 - (dst_ptr & 0xFFFFFF);
     u32 src1 = src_ptr + blen0 * dma_stride[dmach->source_direction];
     u32 dst1 = dst_ptr + blen0 * dma_stride[dmach->dest_direction];
-    ret = dma_transfer_copy(dmach, src_ptr, dst_ptr, blen0 >> tfsizes);
-    ret = dma_transfer_copy(dmach, src1, dst1, (byte_length - blen0) >> tfsizes);
+    ret  = dma_transfer_copy(dmach, src_ptr, dst_ptr, blen0 >> tfsizes);
+    ret |= dma_transfer_copy(dmach, src1, dst1, (byte_length - blen0) >> tfsizes);
   }
   else if (dst_reg0 == dst_reg1) {
     // Dest stays within the region, source crosses over
@@ -2748,8 +2741,8 @@ cpu_alert_type dma_transfer(unsigned dma_chan, int *usedcycles)
         src_ptr & 0xFFFFFF : 0x1000000 - (src_ptr & 0xFFFFFF);
     u32 src1 = src_ptr + blen0 * dma_stride[dmach->source_direction];
     u32 dst1 = dst_ptr + blen0 * dma_stride[dmach->dest_direction];
-    ret = dma_transfer_copy(dmach, src_ptr, dst_ptr, blen0 >> tfsizes);
-    ret = dma_transfer_copy(dmach, src1, dst1, (byte_length - blen0) >> tfsizes);
+    ret  = dma_transfer_copy(dmach, src_ptr, dst_ptr, blen0 >> tfsizes);
+    ret |= dma_transfer_copy(dmach, src1, dst1, (byte_length - blen0) >> tfsizes);
   }
   // TODO: We do not cover the three-region case, seems no game uses that?
   // Lucky Luke does cross dest region due to some off-by-one error.
@@ -2762,11 +2755,9 @@ cpu_alert_type dma_transfer(unsigned dma_chan, int *usedcycles)
     dmach->start_type = DMA_INACTIVE;
   }
 
-  if(dmach->irq)
-  {
-    raise_interrupt(IRQ_DMA0 << dma_chan);
-    ret = CPU_ALERT_IRQ;
-  }
+  // Trigger an IRQ if configured to do so.
+  if (dmach->irq)
+    ret |= flag_interrupt(IRQ_DMA0 << dma_chan);
 
   // This is an approximation for the most common case (no region cross)
   if (usedcycles)
