@@ -440,10 +440,10 @@ ext_load_io##rtype:                                                          ;\
   ret                                                                        ;\
                                                                              ;\
 ext_load_rom##rtype:                                                         ;\
-  mov %eax, %edx                                 /* edx = address */         ;\
-  shr $15, %edx                                  /* edx = address >> 15 */   ;\
+  mov %eax, %esi                                 /* esi = address */         ;\
+  shr $15, %esi                                  /* esi = address >> 15 */   ;\
                                                  /* Read rdmap pointer */    ;\
-  mov RDMAP_OFF(REG_BASE, FULLREG(dx), ADDR_SIZE_BYTES), FULLREG(cx)         ;\
+  mov RDMAP_OFF(REG_BASE, FULLREG(si), ADDR_SIZE_BYTES), FULLREG(cx)         ;\
   JUMP_CX_ZERO ext_load_slow##rtype              /* page not loaded, slow */ ;\
   mov %eax, %edx                                 /* edx = address */         ;\
   and $0x7FFF, %edx                              /* edx = address LSB */     ;\
