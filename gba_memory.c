@@ -2421,7 +2421,8 @@ const dma_region_type dma_region_map[17] =
 #define dma_write_iwram(type, tfsize)                                         \
   address##tfsize(iwram + 0x8000, type##_ptr & 0x7FFF) =                      \
                                           eswap##tfsize(read_value);          \
-  smc_trigger |= address##tfsize(iwram, type##_ptr & 0x7FFF)                  \
+  if (address##tfsize(iwram, type##_ptr & 0x7FFF))                            \
+    alerts |= CPU_ALERT_SMC;                                                  \
 
 #define dma_write_vram(type, tfsize) {                                        \
   u32 wraddr = type##_ptr & 0x1FFFF;                                          \
@@ -2430,7 +2431,7 @@ const dma_region_type dma_region_map[17] =
 }
 
 #define dma_write_io(type, tfsize)                                            \
-  write_io_register##tfsize(type##_ptr & 0x3FF, read_value)                   \
+  alerts |= write_io_register##tfsize(type##_ptr & 0x3FF, read_value)         \
 
 #define dma_write_oam_ram(type, tfsize)                                       \
   address##tfsize(oam_ram, type##_ptr & 0x3FF) = eswap##tfsize(read_value)    \
@@ -2443,7 +2444,8 @@ const dma_region_type dma_region_map[17] =
 
 #define dma_write_ewram(type, tfsize)                                         \
   address##tfsize(ewram, type##_ptr & 0x3FFFF) = eswap##tfsize(read_value);   \
-  smc_trigger |= address##tfsize(ewram, (type##_ptr & 0x3FFFF) + 0x40000)     \
+  if (address##tfsize(ewram, (type##_ptr & 0x3FFFF) + 0x40000))               \
+    alerts |= CPU_ALERT_SMC;                                                  \
 
 #define print_line()                                                          \
   dma_print(src_op, dest_op, tfsize);                                         \
@@ -2471,7 +2473,7 @@ cpu_alert_type dma_tf_loop##tfsize(                                           \
 {                                                                             \
   u32 i;                                                                      \
   u32 read_value;                                                             \
-  u32 smc_trigger = 0;                                                        \
+  cpu_alert_type alerts = CPU_ALERT_NONE;                                     \
   u32 src_region = MIN(src_ptr >> 24, 16);                                    \
   u32 dest_region = MIN(dest_ptr >> 24, 16);                                  \
   dma_region_type src_region_type = dma_region_map[src_region];               \
@@ -2677,7 +2679,7 @@ cpu_alert_type dma_tf_loop##tfsize(                                           \
   if (wb)   /* Update destination pointer if requested */                     \
     dma->dest_address = dest_ptr;                                             \
                                                                               \
-  return smc_trigger ? CPU_ALERT_SMC : CPU_ALERT_NONE;                        \
+  return alerts;                                                              \
 }                                                                             \
 
 dma_tf_loop_builder(16);
