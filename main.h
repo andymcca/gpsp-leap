@@ -93,6 +93,13 @@ extern boot_mode selected_boot_mode;
 void print_regs(void);
 #endif
 
+#ifdef TRACE_EVENTS
+  #define trace_update_gba(remcyc)   \
+    printf("update_gba: %d remaining cycles\n", (remcyc));
+#else  /* TRACE_EVENTS */
+  #define trace_update_gba(x)
+#endif
+
 #endif
 
 

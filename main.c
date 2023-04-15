@@ -111,6 +111,8 @@ u32 function_cc update_gba(int remaining_cycles)
 {
   irq_type irq_raised = IRQ_NONE;
   int dma_cycles;
+  trace_update_gba(remaining_cycles);
+
   remaining_cycles = MAX(remaining_cycles, -64);
 
   do

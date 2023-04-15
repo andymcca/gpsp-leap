@@ -499,6 +499,7 @@ ifeq ($(MMAP_JIT_CACHE), 1)
 CFLAGS += -DMMAP_JIT_CACHE
 endif
 
+# Add -DTRACE_EVENTS to trace relevant events (IRQs, SMC, etc)
 # Add -DTRACE_INSTRUCTIONS to trace instruction execution
 # Can add -DTRACE_REGISTERS to additionally print register values
 ifeq ($(DEBUG), 1)
