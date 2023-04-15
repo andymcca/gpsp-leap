@@ -868,7 +868,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   }                                                                           \
   if(((_address >> 24) == 0) && (pc >= 0x4000))                               \
   {                                                                           \
-    ror(dest, reg[REG_BUS_VALUE], (_address & 0x03) << 3);                    \
+    dest = (type)(reg[REG_BUS_VALUE] >> ((_address & 0x03) << 3));            \
   }                                                                           \
   else                                                                        \
                                                                               \
@@ -950,7 +950,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   fast_read_memory(8, u8, address, dest)                                      \
 
 #define load_memory_u16(address, dest)                                        \
-  fast_read_memory(16, u32, address, dest)                                    \
+  fast_read_memory(16, u16, address, dest)                                    \
 
 #define load_memory_u32(address, dest)                                        \
   fast_read_memory(32, u32, address, dest)                                    \

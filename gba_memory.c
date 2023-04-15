@@ -569,10 +569,14 @@ u32 function_cc read_eeprom(void)
   {                                                                           \
     case 0x00:                                                                \
       /* BIOS */                                                              \
-      if(reg[REG_PC] >= 0x4000)                                               \
-        ror(value, reg[REG_BUS_VALUE], (address & 0x03) << 3);                \
-      else                                                                    \
-        value = readaddress##type(bios_rom, address & 0x3FFF);                \
+      if (address < 0x4000) {                                                 \
+        if(reg[REG_PC] >= 0x4000)                                             \
+          value = (u##type)(reg[REG_BUS_VALUE] >> ((address & 0x03) << 3));   \
+        else                                                                  \
+          value = readaddress##type(bios_rom, address & 0x3FFF);              \
+      } else {                                                                \
+        read_open##type();                                                    \
+      }                                                                       \
       break;                                                                  \
                                                                               \
     case 0x02:                                                                \
