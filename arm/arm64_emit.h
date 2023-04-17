@@ -1145,7 +1145,14 @@ u32 execute_spsr_restore_body(u32 address)
   generate_op_##name##_imm(arm_to_a64_reg[rd], arm_to_a64_reg[rn])            \
 
 #define arm_generate_op_imm_flags(name, load_op)                              \
-  arm_generate_op_imm(name, load_op)                                          \
+  arm_decode_data_proc_imm(opcode);                                           \
+  ror(imm, imm, imm_ror);                                                     \
+  if(check_generate_c_flag && (imm_ror != 0))                                 \
+  {  /* Generate carry flag from integer rotation */                          \
+     aa64_emit_movlo(reg_c_cache, ((imm) >> 31));                             \
+  }                                                                           \
+  arm_op_check_##load_op();                                                   \
+  generate_op_##name##_imm(arm_to_a64_reg[rd], arm_to_a64_reg[rn])            \
 
 #define arm_data_proc(name, type, flags_op)                                   \
 {                                                                             \
