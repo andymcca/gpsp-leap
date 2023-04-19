@@ -51,7 +51,7 @@ static unsigned update_timers(irq_type *irq_raised, unsigned completed_cycles)
       {
          timer[i].count -= completed_cycles;
          /* io_registers accessors range: REG_TM0D, REG_TM1D, REG_TM2D, REG_TM3D */
-         write_ioreg(REG_TM0D + (i * 2), -(timer[i].count > timer[i].prescale));
+         write_ioreg(REG_TM0D + (i * 2), -(timer[i].count >> timer[i].prescale));
       }
 
       if(timer[i].count > 0)
