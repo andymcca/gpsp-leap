@@ -56,11 +56,12 @@
   }                                                                           \
                                                                               \
   gbc_sound_update = 1;                                                       \
-  write_ioreg(regn, value);                                                   \
+  write_ioreg(regn, value & 0x47FF);                                          \
 }                                                                             \
 
 #define gbc_sound_tone_control_sweep()                                        \
 {                                                                             \
+  value &= 0x007F;                                                            \
   u32 sweep_ticks = ((value >> 4) & 0x07) * 2;                                \
   gbc_sound_channel[0].sweep_shift = value & 0x07;                            \
   gbc_sound_channel[0].sweep_direction = (value >> 3) & 0x01;                 \
@@ -80,7 +81,7 @@
     gbc_sound_channel[2].master_enable = 1;                                   \
                                                                               \
   gbc_sound_update = 1;                                                       \
-  write_ioreg(REG_SOUND3CNT_L, value);                                        \
+  write_ioreg(REG_SOUND3CNT_L, value & 0x00E0);                               \
 }                                                                             \
 
 static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
@@ -141,7 +142,7 @@ static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
      gbc_sound_channel[3].envelope_initial_volume;                            \
   }                                                                           \
   gbc_sound_update = 1;                                                       \
-  write_ioreg(REG_SOUND4CNT_H, value);                                        \
+  write_ioreg(REG_SOUND4CNT_H, value & 0x40FF);                               \
 }                                                                             \
 
 static void gbc_trigger_sound(u32 value)
@@ -156,7 +157,7 @@ static void gbc_trigger_sound(u32 value)
       gbc_sound_channel[channel].status =
         (((value >> (channel + 8)) & 0x1) | ((value >> (channel + 11)) & 0x3));
    }
-   write_ioreg(REG_SOUNDCNT_L, value);
+   write_ioreg(REG_SOUNDCNT_L, value & 0xFF77);
 }
 
 #define trigger_sound()                                                       \
@@ -175,7 +176,7 @@ static void gbc_trigger_sound(u32 value)
     sound_reset_fifo(0);                                                      \
   if((value >> 15) & 0x01)                                                    \
     sound_reset_fifo(1);                                                      \
-  write_ioreg(REG_SOUNDCNT_H, value);                                         \
+  write_ioreg(REG_SOUNDCNT_H, value & 0x770F);                                \
 }                                                                             \
 
 static void sound_control_x(u32 value)
@@ -875,12 +876,6 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
 
     // Sound 1 control sweep
     case 0x60:
-      access_register8_low(0x60);
-      gbc_sound_tone_control_sweep();
-      break;
-
-    case 0x61:
-      access_register8_low(0x60);
       gbc_sound_tone_control_sweep();
       break;
 

@@ -2345,14 +2345,10 @@ static inline s32 signext28(u32 value)
 void video_reload_counters()
 {
   /* This happens every Vblank */
-  affine_reference_x[0] = signext28(read_ioreg(REG_BG2X_L) |
-                                   (read_ioreg(REG_BG2X_H) << 16));
-  affine_reference_y[0] = signext28(read_ioreg(REG_BG2Y_L) |
-                                   (read_ioreg(REG_BG2Y_H) << 16));
-  affine_reference_x[1] = signext28(read_ioreg(REG_BG3X_L) |
-                                   (read_ioreg(REG_BG3X_H) << 16));
-  affine_reference_y[1] = signext28(read_ioreg(REG_BG3Y_L) |
-                                   (read_ioreg(REG_BG3Y_H) << 16));
+  affine_reference_x[0] = signext28(read_ioreg32(REG_BG2X_L));
+  affine_reference_y[0] = signext28(read_ioreg32(REG_BG2Y_L));
+  affine_reference_x[1] = signext28(read_ioreg32(REG_BG3X_L));
+  affine_reference_y[1] = signext28(read_ioreg32(REG_BG3Y_L));
 }
 
 #define affine_render_bg_pixel_normal()                                       \

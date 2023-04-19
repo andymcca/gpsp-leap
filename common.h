@@ -145,6 +145,7 @@ typedef u32 fixed8_24;
 
 #define read_ioreg(regnum) (eswap16(io_registers[(regnum)]))
 #define write_ioreg(regnum, val) io_registers[(regnum)] = eswap16(val)
+#define read_ioreg32(regnum) (read_ioreg(regnum) | (read_ioreg((regnum)+1) << 16))
 
 #define read_dmareg(regnum, dmachan) (eswap16(io_registers[(regnum) + (dmachan) * 6]))
 #define write_dmareg(regnum, dmachan, val) io_registers[(regnum) + (dmachan) * 6] = eswap16(val)
