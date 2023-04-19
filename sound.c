@@ -31,46 +31,23 @@ static u32 sound_buffer_base;
 
 static fixed16_16 gbc_sound_tick_step;
 
-/* Queue 1 sample to the top of the DS FIFO, wrap around circularly */
-
-void sound_timer_queue8(u32 channel, u8 value)
-{
-  direct_sound_struct *ds = direct_sound_channel + channel;
-
-  *((s8 *)(ds->fifo + ds->fifo_top)) = value;
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
-}
-
-/* Queue 2 samples to the top of the DS FIFO, wrap around circularly */
-
-void sound_timer_queue16(u32 channel, u16 value)
-{
-  direct_sound_struct *ds = direct_sound_channel + channel;
-
-  *((s8 *)(ds->fifo + ds->fifo_top)) = value & 0xFF;
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
-
-  *((s8 *)(ds->fifo + ds->fifo_top)) = value >> 8;
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
-}
-
 /* Queue 4 samples to the top of the DS FIFO, wrap around circularly */
 
 void sound_timer_queue32(u32 channel, u32 value)
 {
-  direct_sound_struct *ds = direct_sound_channel + channel;
+  direct_sound_struct *ds = &direct_sound_channel[channel];
 
-  *((s8 *)(ds->fifo + ds->fifo_top)) = value & 0xFF;
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
+  ds->fifo[ds->fifo_top++] = value & 0xFF;
+  ds->fifo_top &= 31;
 
-  *((s8 *)(ds->fifo + ds->fifo_top)) = (value >> 8) & 0xFF;
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
+  ds->fifo[ds->fifo_top++] = (value >> 8) & 0xFF;
+  ds->fifo_top &= 31;
 
-  *((s8 *)(ds->fifo + ds->fifo_top)) = (value >> 16) & 0xFF;
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
+  ds->fifo[ds->fifo_top++] = (value >> 16) & 0xFF;
+  ds->fifo_top &= 31;
 
-  *((s8 *)(ds->fifo + ds->fifo_top)) = (value >> 24);
-  ds->fifo_top = (ds->fifo_top + 1) % 32;
+  ds->fifo[ds->fifo_top++] = (value >> 24);
+  ds->fifo_top &= 31;
 }
 
 

@@ -1011,16 +1011,6 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
       address8(io_registers, address) = value;
       break;
 
-    // Sound FIFO A
-    case 0xA0:
-      sound_timer_queue8(0, value);
-      break;
-
-    // Sound FIFO B
-    case 0xA4:
-      sound_timer_queue8(1, value);
-      break;
-
     // DMA control (trigger byte)
     case 0xBB:
       access_register8_low(0xBA);
@@ -1274,16 +1264,6 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
       address16(io_registers, address) = eswap16(value);
       break;
 
-    // Sound FIFO A
-    case 0xA0:
-      sound_timer_queue16(0, value);
-      break;
-
-    // Sound FIFO B
-    case 0xA4:
-      sound_timer_queue16(1, value);
-      break;
-
     // DMA control
     case 0xBA:
       return trigger_dma(0, value);
@@ -1375,54 +1355,23 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
   return CPU_ALERT_NONE;
 }
 
-
 cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
 {
-  switch(address)
-  {
-    // BG2 reference X
-    case 0x28:
-      affine_reference_x[0] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x28) = eswap32(value);
-      break;
-
-    // BG2 reference Y
-    case 0x2C:
-      affine_reference_y[0] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x2C) = eswap32(value);
-      break;
-
-    // BG3 reference X
-    case 0x38:
-      affine_reference_x[1] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x38) = eswap32(value);
-      break;
-
-    // BG3 reference Y
-    case 0x3C:
-      affine_reference_y[1] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x3C) = eswap32(value);
-      break;
-
-    // Sound FIFO A
-    case 0xA0:
-      sound_timer_queue32(0, value);
-      break;
-
-    // Sound FIFO B
-    case 0xA4:
-      sound_timer_queue32(1, value);
-      break;
-
-    default:
-    {
-      cpu_alert_type allow = write_io_register16(address, value & 0xFFFF);
-      cpu_alert_type alhigh = write_io_register16(address + 2, value >> 16);
-      return allow | alhigh;
-    }
+  // Handle sound FIFO data write
+  if (address == 0xA0) {
+    sound_timer_queue32(0, value);
+    return CPU_ALERT_NONE;
+  }
+  else if (address == 0xA4) {
+    sound_timer_queue32(1, value);
+    return CPU_ALERT_NONE;
   }
 
-  return CPU_ALERT_NONE;
+  // Perform two 16 bit writes. Low part goes first apparently.
+  // Some Count+Control DMA writes use 32 bit, so control must be last.
+  cpu_alert_type allow = write_io_register16(address, value & 0xFFFF);
+  cpu_alert_type alhigh = write_io_register16(address + 2, value >> 16);
+  return allow | alhigh;
 }
 
 #define write_palette8(address, value)                                        \
