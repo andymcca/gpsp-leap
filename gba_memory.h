@@ -49,6 +49,10 @@ extern int use_libretro_save_method;
 #define DMA_DIRECT_SOUND_B            1
 #define DMA_NO_DIRECT_SOUND           2
 
+// Access to timer registers
+#define REG_TMXD(n)   (REG_TM0D   + (2 * (n)))
+#define REG_TMXCNT(n) (REG_TM0CNT + (2 * (n)))
+
 typedef struct
 {
   u32 source_address;

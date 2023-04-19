@@ -51,7 +51,7 @@ static unsigned update_timers(irq_type *irq_raised, unsigned completed_cycles)
       {
          timer[i].count -= completed_cycles;
          /* io_registers accessors range: REG_TM0D, REG_TM1D, REG_TM2D, REG_TM3D */
-         write_ioreg(REG_TM0D + (i * 2), -(timer[i].count > timer[i].prescale));
+         write_ioreg(REG_TMXD(i), -(timer[i].count >> timer[i].prescale));
       }
 
       if(timer[i].count > 0)
@@ -59,12 +59,12 @@ static unsigned update_timers(irq_type *irq_raised, unsigned completed_cycles)
 
       /* irq_raised value range: IRQ_TIMER0, IRQ_TIMER1, IRQ_TIMER2, IRQ_TIMER3 */
       if(timer[i].irq)
-         *irq_raised |= (8 << i);
+         *irq_raised |= (IRQ_TIMER0 << i);
 
       if((i != 3) && (timer[i + 1].status == TIMER_CASCADE))
       {
          timer[i + 1].count--;
-         write_ioreg(REG_TM0D + (i + 1) * 2, -timer[i+1].count);
+         write_ioreg(REG_TMXD(i + 1), -timer[i+1].count);
       }
 
       if(i < 2)
@@ -253,10 +253,8 @@ u32 function_cc update_gba(int remaining_cycles)
 
     for (i = 0; i < 4; i++)
     {
-       if(timer[i].status != TIMER_PRESCALE)
-          continue;
-
-       if(timer[i].count < execute_cycles)
+       if (timer[i].status == TIMER_PRESCALE &&
+           timer[i].count < execute_cycles)
           execute_cycles = timer[i].count;
     }
   } while(reg[CPU_HALT_STATE] != CPU_ACTIVE && !reg[COMPLETED_FRAME]);

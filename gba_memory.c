@@ -238,7 +238,7 @@ static void trigger_timer(u32 timer_number, u32 value)
          timer[timer_number].prescale = prescale;
          timer[timer_number].irq = ((value >> 6) & 0x1);
 
-         write_ioreg(REG_TM0D + (timer_number * 2), (u32)(-timer_reload));
+         write_ioreg(REG_TMXD(timer_number), (u32)(-timer_reload));
 
          timer_reload <<= prescale;
          timer[timer_number].count = timer_reload;
@@ -265,7 +265,7 @@ static void trigger_timer(u32 timer_number, u32 value)
          timer[timer_number].status = TIMER_INACTIVE;
       }
    }
-   write_ioreg(REG_TM0CNT + (timer_number * 2), value);
+   write_ioreg(REG_TMXCNT(timer_number), value);
 }
 
 // This table is configured for sequential access on system defaults
