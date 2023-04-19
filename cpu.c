@@ -1475,7 +1475,7 @@ void set_cpu_mode(cpu_mode_type new_mode)
 
 #define cpu_has_interrupt()                                 \
   (!(reg[REG_CPSR] & 0x80) && read_ioreg(REG_IME) &&        \
-    (read_ioreg(REG_IE) & io_registers[REG_IF]))
+    (read_ioreg(REG_IE) & read_ioreg(REG_IF)))
 
 // Returns whether the CPU has a pending interrupt.
 cpu_alert_type check_interrupt() {
