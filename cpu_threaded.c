@@ -2697,7 +2697,7 @@ u8 function_cc *block_lookup_address_thumb(u32 pc)
   ((opcode & 0x12FFF10) == 0x12FFF10) ||                                      \
   ((opcode & 0x8108000) == 0x8108000) ||                                      \
   ((opcode >= 0xA000000) && (opcode < 0xF000000)) ||                          \
-  ((opcode > 0xF000000) && (!is_div_swi((opcode >> 16) & 0xFF))))             \
+  ((opcode >= 0xF000000) && (!is_div_swi((opcode >> 16) & 0xFF))))            \
 
 #define arm_opcode_branch                                                     \
   ((opcode & 0xE000000) == 0xA000000)                                         \
