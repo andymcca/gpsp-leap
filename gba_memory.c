@@ -718,238 +718,158 @@ static cpu_alert_type trigger_dma(u32 dma_number, u32 value)
   return CPU_ALERT_NONE;
 }
 
-
-#define access_register16_high(address)                                       \
-  value = (value << 16) | (readaddress16(io_registers, address))              \
-
-#define access_register16_low(address)                                        \
-  value = ((readaddress16(io_registers, address + 2)) << 16) | value          \
-
+static inline s32 signext28(u32 value)
+{
+  s32 ret = (s32)(value << 4);
+  return ret >> 4;
+}
 
 cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
 {
+  uint16_t ioreg = (address & 0x3FE) >> 1;
   value &= 0xffff;
-  switch(address)
+  switch(ioreg)
   {
-    case 0x00:
-    {
-      u32 dispcnt = read_ioreg(REG_DISPCNT);
-      if((value & 0x07) != (dispcnt & 0x07))
-        reg[OAM_UPDATED] = 1;
-
+    case REG_DISPCNT:
+      // Changing the lowest 3 bits might require object re-sorting
+      reg[OAM_UPDATED] |= ((value & 0x07) != (read_ioreg(REG_DISPCNT) & 0x07));
       write_ioreg(REG_DISPCNT, value);
       break;
-    }
 
-    // DISPSTAT
-    case 0x04:
+    // DISPSTAT has 3 read only bits, controlled by the LCD controller
+    case REG_DISPSTAT:
       write_ioreg(REG_DISPSTAT, (read_ioreg(REG_DISPSTAT) & 0x07) | (value & ~0x07));
       break;
 
-    // VCOUNT
-    case 0x06:
-      break;
-
     // BG2 reference X
-    case 0x28:
-      access_register16_low(0x28);
-      affine_reference_x[0] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x28) = eswap32(value);
-      break;
-
-    case 0x2A:
-      access_register16_high(0x28);
-      affine_reference_x[0] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x28) = eswap32(value);
+    case REG_BG2X_L:
+    case REG_BG2X_H:
+      write_ioreg(ioreg, value);
+      affine_reference_x[0] = signext28(read_ioreg32(REG_BG2X_L));
       break;
 
     // BG2 reference Y
-    case 0x2C:
-      access_register16_low(0x2C);
-      affine_reference_y[0] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x2C) = eswap32(value);
-      break;
-
-    case 0x2E:
-      access_register16_high(0x2C);
-      affine_reference_y[0] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x2C) = eswap32(value);
+    case REG_BG2Y_L:
+    case REG_BG2Y_H:
+      write_ioreg(ioreg, value);
+      affine_reference_y[0] = signext28(read_ioreg32(REG_BG2Y_L));
       break;
 
     // BG3 reference X
-
-    case 0x38:
-      access_register16_low(0x38);
-      affine_reference_x[1] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x38) = eswap32(value);
-      break;
-
-    case 0x3A:
-      access_register16_high(0x38);
-      affine_reference_x[1] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x38) = eswap32(value);
+    case REG_BG3X_L:
+    case REG_BG3X_H:
+      write_ioreg(ioreg, value);
+      affine_reference_x[1] = signext28(read_ioreg32(REG_BG3X_L));
       break;
 
     // BG3 reference Y
-    case 0x3C:
-      access_register16_low(0x3C);
-      affine_reference_y[1] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x3C) = eswap32(value);
+    case REG_BG3Y_L:
+    case REG_BG3Y_H:
+      write_ioreg(ioreg, value);
+      affine_reference_y[1] = signext28(read_ioreg32(REG_BG3Y_L));
       break;
 
-    case 0x3E:
-      access_register16_high(0x3C);
-      affine_reference_y[1] = (s32)(value << 4) >> 4;
-      address32(io_registers, 0x3C) = eswap32(value);
-      break;
-
-    // Sound 1 control sweep
-    case 0x60:
+    // Sound 1 registers
+    case REG_SOUND1CNT_L:    // control sweep
       gbc_sound_tone_control_sweep();
       break;
 
-    // Sound 1 control duty/length/envelope
-    case 0x62:
+    case REG_SOUND1CNT_H:    // control duty/length/envelope
       gbc_sound_tone_control_low(0, REG_SOUND1CNT_H);
       break;
 
-    // Sound 1 control frequency
-    case 0x64:
+    case REG_SOUND1CNT_X:    // control frequency
       gbc_sound_tone_control_high(0, REG_SOUND1CNT_X);
       break;
 
-    // Sound 2 control duty/length/envelope
-    case 0x68:
+    // Sound 2 registers
+    case REG_SOUND2CNT_L:    // control duty/length/envelope
       gbc_sound_tone_control_low(1, REG_SOUND2CNT_L);
       break;
 
-    // Sound 2 control frequency
-    case 0x6C:
+    case REG_SOUND2CNT_H:    // control frequency
       gbc_sound_tone_control_high(1, REG_SOUND2CNT_H);
       break;
 
-    // Sound 3 control wave
-    case 0x70:
+    // Sound 3 registers
+    case REG_SOUND3CNT_L:    // control wave
       gbc_sound_wave_control();
       break;
 
-    // Sound 3 control length/volume
-    case 0x72:
+    case REG_SOUND3CNT_H:    // control length/volume
       gbc_sound_tone_control_low_wave();
       break;
 
-    // Sound 3 control frequency
-    case 0x74:
+    case REG_SOUND3CNT_X:    // control frequency
       gbc_sound_tone_control_high_wave();
       break;
 
-    // Sound 4 control length/envelope
-    case 0x78:
+    // Sound 4 registers
+    case REG_SOUND4CNT_L:    // length/envelope
       gbc_sound_tone_control_low(3, REG_SOUND4CNT_L);
       break;
 
-    // Sound 4 control frequency
-    case 0x7C:
+    case REG_SOUND4CNT_H:    // control frequency
       gbc_sound_noise_control();
       break;
 
-    // Sound control L
-    case 0x80:
+    // Sound control registers
+    case REG_SOUNDCNT_L:
       gbc_trigger_sound(value);
       break;
 
-    // Sound control H
-    case 0x82:
+    case REG_SOUNDCNT_H:
       trigger_sound();
       break;
 
-    // Sound control X
-    case 0x84:
+    case REG_SOUNDCNT_X:
       sound_control_x(value);
       break;
 
-    // Sound wave RAM
-    case 0x90 ... 0x9E:
+    // Sound wave RAM, flag wave table update
+    case REG_SOUNDWAVE_0 ... REG_SOUNDWAVE_7:
       gbc_sound_wave_update = 1;
-      address16(io_registers, address) = eswap16(value);
+      write_ioreg(ioreg, value);
       break;
 
-    // DMA control
-    case 0xBA:
-      return trigger_dma(0, value);
+    // DMA control register: can cause an IRQ
+    case REG_DMA0CNT_H: return trigger_dma(0, value);
+    case REG_DMA1CNT_H: return trigger_dma(1, value);
+    case REG_DMA2CNT_H: return trigger_dma(2, value);
+    case REG_DMA3CNT_H: return trigger_dma(3, value);
 
-    case 0xC6:
-      return trigger_dma(1, value);
+    // Timer counter reload
+    case REG_TM0D: count_timer(0); break;
+    case REG_TM1D: count_timer(1); break;
+    case REG_TM2D: count_timer(2); break;
+    case REG_TM3D: count_timer(3); break;
 
-    case 0xD2:
-      return trigger_dma(2, value);
+    /* Timer control register (0..3)*/
+    case REG_TM0CNT: trigger_timer(0, value); break;
+    case REG_TM1CNT: trigger_timer(1, value); break;
+    case REG_TM2CNT: trigger_timer(2, value); break;
+    case REG_TM3CNT: trigger_timer(3, value); break;
 
-    case 0xDE:
-      return trigger_dma(3, value);
-
-    // Timer counts
-    case 0x100:
-      count_timer(0);
-      break;
-
-    case 0x104:
-      count_timer(1);
-      break;
-
-    case 0x108:
-      count_timer(2);
-      break;
-
-    case 0x10C:
-      count_timer(3);
-      break;
-
-    /* Timer control 0 */
-    case 0x102:
-      trigger_timer(0, value);
-      break;
-
-    /* Timer control 1 */
-    case 0x106:
-      trigger_timer(1, value);
-      break;
-
-    /* Timer control 2 */
-    case 0x10A:
-      trigger_timer(2, value);
-      break;
-
-    /* Timer control 3 */
-    case 0x10E:
-      trigger_timer(3, value);
-      break;
-
-    // P1
-    case 0x130:
-      break;
-
-    // REG_IE
-    case 0x200:
-      write_ioreg(REG_IE, value);
-      return check_interrupt();
-
-    // Interrupt flag
-    case 0x202:
+    // Interrupt flag, clears the bits it tries to write
+    case REG_IF:
       write_ioreg(REG_IF, read_ioreg(REG_IF) & (~value));
       break;
 
-    // WAITCNT
-    case 0x204:
-      write_ioreg(REG_WAITCNT, value);
-      break;
-
-    // REG_IME
-    case 0x208:
-      write_ioreg(REG_IME, value);
+    // Register writes with side-effects, can raise an IRQ
+    case REG_IE:
+    case REG_IME:
+      write_ioreg(ioreg, value);
       return check_interrupt();
 
+    // Read-only registers
+    case REG_P1:
+    case REG_VCOUNT:
+      break;  // Do nothing
+
+    // Registers without side effects
+    case REG_WAITCNT:
     default:
-      address16(io_registers, address) = eswap16(value);
+      write_ioreg(ioreg, value);
       break;
   }
 
@@ -968,9 +888,9 @@ cpu_alert_type function_cc write_io_register8(u32 address, u32 value)
 
   // Partial 16 bit write, treat like a regular merge-write
   if (address & 1)
-    value = (value << 8) | (read_ioreg((address >> 1) & 0x1FF) & 0x00ff);
+    value = (value << 8) | (read_ioreg(address >> 1) & 0x00ff);
   else
-    value = (value & 0xff) | (read_ioreg((address >> 1) & 0x1FF) & 0xff00);
+    value = (value & 0xff) | (read_ioreg(address >> 1) & 0xff00);
   return write_io_register16(address & 0x3FE, value);
 }
 
