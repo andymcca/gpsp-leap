@@ -57,14 +57,9 @@ _##symbol:
 #define REG_Z_FLAG        (21 * 4)
 #define REG_C_FLAG        (22 * 4)
 #define REG_V_FLAG        (23 * 4)
-#define CHANGED_PC_STATUS (24 * 4)
-#define COMPLETED_FRAME   (25 * 4)
-#define OAM_UPDATED       (26 * 4)
-#define REG_SAVE          (27 * 4)
-#define REG_SAVE2         (28 * 4)
-#define REG_SAVE3         (29 * 4)
-#define REG_SAVE4         (30 * 4)
-#define REG_SAVE5         (31 * 4)
+#define COMPLETED_FRAME   (24 * 4)
+#define OAM_UPDATED       (25 * 4)
+#define REG_SAVE          (26 * 4)
 
 #define CPU_ALERT_HALT_B        0
 #define CPU_ALERT_SMC_B         1
@@ -162,11 +157,10 @@ defsymbl(a64_update_gba)
   cbnz w1, return_to_main
 
   // Resume execution (perhaps from a new PC)
-  mov reg_cycles, w0                      // load new cycle count
+  and reg_cycles, w0, 0x7fff              // load new cycle count
   extract_flags(w2)                       // reload flag cache bits
 
-  ldr w0, [reg_base, #CHANGED_PC_STATUS]  // see if PC has change
-  cbnz w0, 1f                             // go start from new PC
+  tbnz w0, #31, 1f                        // check if PC changed
 
   ldr lr, [reg_base, #REG_SAVE]           // Restore return point
   load_registers()                        // reload registers
@@ -712,7 +706,7 @@ write_epilogue:
 alert_loop:
   mov w0, reg_cycles                      // load remaining cycles
   bl update_gba                           // update GBA until CPU isn't halted
-  mov reg_cycles, w0                      // load new cycle count
+  and reg_cycles, w0, 0x7fff              // load new cycle count
 
   ldr w1, [reg_base, #COMPLETED_FRAME]    // Check whether a frame was completed
   cbnz w1, return_to_main                 // and return to caller function.

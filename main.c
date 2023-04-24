@@ -109,6 +109,7 @@ void init_main(void)
 
 u32 function_cc update_gba(int remaining_cycles)
 {
+  u32 changed_pc = 0;
   irq_type irq_raised = IRQ_NONE;
   int dma_cycles;
   trace_update_gba(remaining_cycles);
@@ -124,7 +125,6 @@ u32 function_cc update_gba(int remaining_cycles)
     cpu_ticks += completed_cycles;
 
     remaining_cycles = 0;
-    reg[CHANGED_PC_STATUS] = 0;
     reg[COMPLETED_FRAME] = 0;
 
     if(gbc_sound_update)
@@ -247,7 +247,8 @@ u32 function_cc update_gba(int remaining_cycles)
       flag_interrupt(irq_raised);
 
     // Raise any pending interrupts. This changes the CPU mode.
-    check_and_raise_interrupts();
+    if (check_and_raise_interrupts())
+      changed_pc = 0x80000000;
 
     execute_cycles = MAX(video_count, 0);
 
@@ -263,7 +264,7 @@ u32 function_cc update_gba(int remaining_cycles)
   dma_cycles = MIN(64, dma_cycles);
   dma_cycles = MIN(execute_cycles, dma_cycles);
 
-  return execute_cycles - dma_cycles;
+  return (execute_cycles - dma_cycles) | changed_pc;
 }
 
 void reset_gba(void)

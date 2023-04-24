@@ -95,14 +95,9 @@ _##symbol:
 .equ REG_Z_FLAG,        (21 * 4)
 .equ REG_C_FLAG,        (22 * 4)
 .equ REG_V_FLAG,        (23 * 4)
-.equ CHANGED_PC_STATUS, (24 * 4)
-.equ COMPLETED_FRAME,   (25 * 4)
-.equ OAM_UPDATED,       (26 * 4)
-.equ REG_SAVE,          (27 * 4)
-.equ REG_SAVE2,         (28 * 4)
-.equ REG_SAVE3,         (29 * 4)
-.equ REG_SAVE4,         (30 * 4)
-.equ REG_SAVE5,         (31 * 4)
+.equ COMPLETED_FRAME,   (24 * 4)
+.equ OAM_UPDATED,       (25 * 4)
+.equ REG_SAVE,          (26 * 4)
 
 .equ load_u8_tbl,           -(9 * 16 * ADDR_SIZE_BYTES)
 .equ load_s8_tbl,           -(8 * 16 * ADDR_SIZE_BYTES)
@@ -176,15 +171,16 @@ defsymbl(x86_update_gba)
   mov REG_CYCLES, CARG1_REG           # Load remaining cycles as arg0
   CALL_FUNC(update_gba)               # process the next event
   mov %eax, REG_CYCLES                # new cycle count
+  and $0x7fff, REG_CYCLES             # in the lowest bits
 
   # did we just complete a frame? go back to main then
   cmpl $0, COMPLETED_FRAME(REG_BASE)
   jne return_to_main
 
   # did the PC change?
-  cmpl $1, CHANGED_PC_STATUS(REG_BASE)
-  je lookup_pc
-  ret                         # if not, go back to caller
+  test %eax, %eax                     # Bit 31 set, means need to re-fetch
+  js lookup_pc
+  ret                                 # otherwise, go back to caller
 
 # Perform this on an indirect branch that will definitely go to
 # ARM code, IE anything that changes the PC in ARM mode except
@@ -269,7 +265,8 @@ alert_loop:
   mov REG_CYCLES, CARG1_REG   # Load remaining cycles as arg0
   CALL_FUNC(update_gba)       # process the next event
   mov %eax, REG_CYCLES        # load new cycle count
-  
+  and $0x7fff, REG_CYCLES     # (only lowest bits)
+
   # did we just complete a frame? go back to main then
   cmpl $0, COMPLETED_FRAME(REG_BASE)
   jne return_to_main
@@ -502,7 +499,6 @@ defsymbl(execute_store_cpsr)
 smc_write:
   CALL_FUNC(flush_translation_cache_ram)
 lookup_pc:
-  movl $0, CHANGED_PC_STATUS(REG_BASE)   # Lookup new block and jump to it
   mov REG_PC(REG_BASE), CARG1_REG        # Load PC as argument0
   testl $0x20, REG_CPSR(REG_BASE)
   jz 1f

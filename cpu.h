@@ -91,14 +91,14 @@ typedef enum
   REG_Z_FLAG        = 21,
   REG_C_FLAG        = 22,
   REG_V_FLAG        = 23,
-  CHANGED_PC_STATUS = 24,
-  COMPLETED_FRAME   = 25,
-  OAM_UPDATED       = 26,
-  REG_SAVE          = 27,
-  REG_SAVE2         = 28,
-  REG_SAVE3         = 29,
-  REG_SAVE4         = 30,
-  REG_SAVE5         = 31,
+  COMPLETED_FRAME   = 24,
+  OAM_UPDATED       = 25,
+  REG_SAVE          = 26,
+  REG_SAVE2         = 27,
+  REG_SAVE3         = 28,
+  REG_SAVE4         = 29,
+  REG_SAVE5         = 30,
+  REG_SAVE6         = 31,
 
   /* Machine defined storage */
   REG_USERDEF       = 32,
@@ -109,7 +109,7 @@ typedef enum
 extern u32 instruction_count;
 
 void execute_arm(u32 cycles);
-void check_and_raise_interrupts(void);
+u32 check_and_raise_interrupts(void);
 cpu_alert_type check_interrupt(void);
 cpu_alert_type flag_interrupt(irq_type irq_raised);
 void set_cpu_mode(cpu_mode_type new_mode);

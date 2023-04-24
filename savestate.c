@@ -107,7 +107,6 @@ bool gba_load_state(const void* src)
 #endif
 
   instruction_count = 0;
-  reg[CHANGED_PC_STATUS] = 1;
   reg[COMPLETED_FRAME] = 0;
   reg[OAM_UPDATED] = 1;
   gbc_sound_update = 1;

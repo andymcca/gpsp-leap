@@ -39,14 +39,8 @@ _##symbol:
 #define REG_Z_FLAG        (21 * 4)
 #define REG_C_FLAG        (22 * 4)
 #define REG_V_FLAG        (23 * 4)
-#define CHANGED_PC_STATUS (24 * 4)
-#define COMPLETED_FRAME   (25 * 4)
-#define OAM_UPDATED       (26 * 4)
-#define REG_SAVE          (27 * 4)
-#define REG_SAVE2         (28 * 4)
-#define REG_SAVE3         (29 * 4)
-#define REG_SAVE4         (30 * 4)
-#define REG_SAVE5         (31 * 4)
+#define COMPLETED_FRAME   (24 * 4)
+#define OAM_UPDATED       (25 * 4)
 
 #define CPU_ALERT_HALT    (1 << 0)
 #define CPU_ALERT_SMC     (1 << 1)
@@ -205,10 +199,10 @@ defsymbl(arm_update_gba_##name)                                              ;\
   cmp r1, #0                                                                 ;\
   bne return_to_main                                                         ;\
                                                                              ;\
-  mvn reg_cycles, r0                      /* load new cycle count          */;\
+  bic reg_cycles, r0, #0x80000000         /* clear MSB, not part of count  */;\
+  mvn reg_cycles, reg_cycles              /* we count negative to zero     */;\
                                                                              ;\
-  ldr r0, [reg_base, #CHANGED_PC_STATUS]  /* load PC changed status        */;\
-  cmp r0, #0                              /* see if PC has changed         */;\
+  tst r0, #0x80000000                     /* set if PC changed             */;\
   bne 1f                                  /* go jump/translate             */;\
                                                                              ;\
   load_registers_##mode()                 /* reload registers              */;\
@@ -698,6 +692,7 @@ write_epilogue:
 
 alert_loop:
   call_c_function(update_gba)             @ update GBA until CPU isn't halted
+  bic r0, r0, #0x80000000                 @ clear MSB, not part of count
 
   ldr r1, [reg_base, #COMPLETED_FRAME]    @ Check whether a frame was completed
   cmp r1, #0

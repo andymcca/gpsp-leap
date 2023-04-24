@@ -104,12 +104,12 @@ symbol:
 .equ REG_Z_FLAG,          (21 * 4)
 .equ REG_C_FLAG,          (22 * 4)
 .equ REG_V_FLAG,          (23 * 4)
-.equ CHANGED_PC_STATUS,   (24 * 4)
-.equ COMPLETED_FRAME,     (25 * 4)
-.equ OAM_UPDATED,         (26 * 4)
-.equ REG_SAVE,            (27 * 4)
-.equ REG_SAVE2,           (28 * 4)
-.equ REG_SAVE3,           (29 * 4)
+.equ COMPLETED_FRAME,     (24 * 4)
+.equ OAM_UPDATED,         (25 * 4)
+.equ REG_SAVE,            (26 * 4)
+.equ REG_SAVE2,           (27 * 4)
+.equ REG_SAVE3,           (28 * 4)
+.equ REG_SAVE4,           (29 * 4)
 .equ GP_SAVE,             (30 * 4)
 .equ GP_SAVE_HI,          (31 * 4)
 
@@ -247,20 +247,16 @@ defsymbl(mips_update_gba)
   sw $ra, REG_SAVE2($16)          # save return addr
   collapse_flags                  # update cpsr
   save_registers                  # save registers
-  sw $0, CHANGED_PC_STATUS($16)
   move $4, reg_cycles             # Remaining cycles as asg0
   cfncall update_gba, 0           # process the next event
 
   lw $1, COMPLETED_FRAME($16)     # Check whether we completed a frame
   bne $1, $0, return_to_main      # Return to main thread now
 
-  move reg_cycles, $2             # update new cycle count (ret value)
+  and reg_cycles, $2, 0x7FFF      # update new cycle count (ret value)
 
+  bltz $2, lookup_pc
   lw $ra, REG_SAVE2($16)          # restore return address
-
-  lw $1, CHANGED_PC_STATUS($16)
-  bne $1, $0, lookup_pc
-  nop
 
   restore_registers
 
@@ -347,7 +343,7 @@ defsymbl(write_io_epilogue)
 alert_loop:
   move $4, reg_cycles             # Remaining cycles as asg0
   cfncall update_gba, 0           # process the next event
-  move reg_cycles, $2             # update new cycle count (ret value)
+  and reg_cycles, $2, 0x7FFF      # update new cycle count (ret value)
 
   lw $1, COMPLETED_FRAME($16)     # Check whether we completed a frame
   bne $1, $0, return_to_main      # Return to main thread now

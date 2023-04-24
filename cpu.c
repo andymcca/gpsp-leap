@@ -1484,7 +1484,7 @@ cpu_alert_type check_interrupt() {
 
 // Checks for pending IRQs and raises them. This changes the CPU mode
 // which means that it must be called with a valid CPU state.
-void check_and_raise_interrupts()
+u32 check_and_raise_interrupts()
 {
   // Check any IRQ flag pending, IME and CPSR-IRQ enabled
   if (cpu_has_interrupt())
@@ -1500,8 +1500,9 @@ void check_and_raise_interrupts()
 
     set_cpu_mode(MODE_IRQ);
     reg[CPU_HALT_STATE] = CPU_ACTIVE;
-    reg[CHANGED_PC_STATUS] = 1;
+    return 1;
   }
+  return 0;
 }
 
 // This function marks a pending interrupt but does not raise it.
@@ -1560,7 +1561,7 @@ void execute_arm(u32 cycles)
   {
     /* Do not execute until CPU is active */
     while(reg[CPU_HALT_STATE] != CPU_ACTIVE) {
-       cycles_remaining = update_gba(cycles_remaining);
+       cycles_remaining = update_gba_cycles(cycles_remaining);
 
        if (reg[COMPLETED_FRAME])
           return;
@@ -3154,7 +3155,7 @@ skip_instruction:
     } while(cycles_remaining > 0);
 
     collapse_flags();
-    cycles_remaining = update_gba(cycles_remaining);
+    cycles_remaining = update_gba_cycles(cycles_remaining);
     if (reg[COMPLETED_FRAME])
        return;
     continue;
@@ -3671,7 +3672,7 @@ thumb_loop:
     } while(cycles_remaining > 0);
 
     collapse_flags();
-    cycles_remaining = update_gba(cycles_remaining);
+    cycles_remaining = update_gba_cycles(cycles_remaining);
     if (reg[COMPLETED_FRAME])
       return;
     continue;
@@ -3692,7 +3693,6 @@ void init_cpu(void)
     spsr[i] = 0x00000010;
 
   reg[CPU_HALT_STATE] = CPU_ACTIVE;
-  reg[CHANGED_PC_STATUS] = 0;
 
   if (selected_boot_mode == boot_game) {
     reg[REG_SP] = 0x03007F00;

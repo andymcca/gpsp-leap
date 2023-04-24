@@ -1972,7 +1972,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 address)
 #define ReOff_SaveR2   (REG_SAVE2 * 4)
 #define ReOff_SaveR3   (REG_SAVE3 * 4)
 #define ReOff_OamUpd   (OAM_UPDATED*4) // OAM_UPDATED
-#define ReOff_GP_Save  (REG_SAVE4 * 4) // GP_SAVE
+#define ReOff_GP_Save  (REG_SAVE5 * 4) // GP_SAVE
 
 // Saves all regs to their right slot and loads gp
 #define emit_save_regs(save_a2) {                                             \
