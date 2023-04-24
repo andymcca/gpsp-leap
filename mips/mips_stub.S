@@ -191,8 +191,6 @@ symbol:
   sw $18, REG_R10($16)
   sw $28, REG_R13($16)
   sw $30, REG_R14($16)
-
-  REG_L $28, GP_SAVE($16)
 .endm
 
 .macro restore_registers
@@ -220,12 +218,12 @@ symbol:
 .macro cfncall target, targetid
   lw $t9, (FNPTRS_BASE + \targetid * 4)($16)
   jalr $t9
-  nop
+  REG_L $28, GP_SAVE($16)
 .endm
 #else
 .macro cfncall target, targetid
   jal \target
-  nop
+  REG_L $28, GP_SAVE($16)
 .endm
 #endif
 
