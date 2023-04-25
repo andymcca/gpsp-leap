@@ -511,6 +511,11 @@ execute_load_builder(u32,   ldr, 3, 4, read_memory32)
 #define store_align_16()           and w1, w1, #0xffff; bic w0, w0, #1
 #define store_align_32()           bic w0, w0, #3
 
+// For byte-accesses on 16 bit buses
+#define dup8(reg)  bfi reg, reg, #8, #24    // Duplicates byte to u16
+#define dup16(reg)
+#define dup32(reg)
+
 // Write out to memory.
 
 // Input:
@@ -560,6 +565,7 @@ ext_store_ewram_u##store_type:                                               ;\
                                                                              ;\
 ext_store_vram_u##store_type:                                                ;\
 ext_store_vram_u##store_type##_safe:                                         ;\
+  dup##store_type(w1)                     /* Duplicate byte if necessary   */;\
   and w0, w0, #(0x1ffff & ~stmask16)      /* Mask to mirror memory (+align)*/;\
   sub w3, w0, #0x8000                     /* Mirrored addr for last bank   */;\
   cmp w0, #0x18000                        /* Check if exceeds 96KB         */;\
@@ -570,6 +576,7 @@ ext_store_vram_u##store_type##_safe:                                         ;\
                                                                              ;\
 ext_store_oam_ram_u##store_type:                                             ;\
 ext_store_oam_ram_u##store_type##_safe:                                      ;\
+  dup##store_type(w1)                     /* Duplicate byte if necessary   */;\
   and w0, w0, #(0x3ff & ~stmask16)        /* Mask to mirror memory (+align)*/;\
   add x3, reg_base, #OAM_RAM_OFF          /* x3 = oam ram base             */;\
   str_op16 w1, [x0, x3]                   /* store data                    */;\

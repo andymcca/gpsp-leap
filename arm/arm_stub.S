@@ -472,6 +472,10 @@ return_to_main:
 #define mask_addr_bus16_16(nbits) mask_addr_16(nbits)
 #define mask_addr_bus16_8(nbits)  mask_addr_16(nbits)
 
+#define dup8(reg)  bic r1, r1, #0xff00; orr r1, r1, lsl #8;
+#define dup16(reg)
+#define dup32(reg)
+
 @ Write out to memory.
 
 @ Input:
@@ -532,6 +536,7 @@ ext_store_ewram_u##store_type:                                               ;\
 ext_store_vram_u##store_type:                                                ;\
   save_flags()                                                               ;\
   mask_addr_bus16_##store_type(17)        /* Mask to mirror memory (+align)*/;\
+  dup##store_type(r1)                     /* Duplicate byte if necessary   */;\
   cmp r0, #0x18000                        /* Check if exceeds 96KB         */;\
   subcs r0, r0, #0x8000                   /* Mirror to the last bank       */;\
   add r2, reg_base, #VRAM_OFF             /* r2 = vram base                */;\
@@ -541,6 +546,7 @@ ext_store_vram_u##store_type:                                                ;\
                                                                              ;\
 ext_store_oam_ram_u##store_type:                                             ;\
   mask_addr_bus16_##store_type(10)        /* Mask to mirror memory (+align)*/;\
+  dup##store_type(r1)                     /* Duplicate byte if necessary   */;\
   add r2, reg_base, #OAM_RAM_OFF          /* r2 = oam ram base             */;\
   str_op16 r1, [r0, r2]                   /* store data                    */;\
   str r2, [reg_base, #OAM_UPDATED]        /* write non zero to signal      */;\
