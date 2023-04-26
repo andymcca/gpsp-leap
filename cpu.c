@@ -856,60 +856,41 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
 #define aligned_address_mask16 0xF0000001
 #define aligned_address_mask32 0xF0000003
 
-#define fast_read_memory(size, type, addr, dest)                              \
+#define fast_read_memory(size, type, addr, dest, readfn)                      \
 {                                                                             \
   u8 *map;                                                                    \
   u32 _address = addr;                                                        \
                                                                               \
   if(_address < 0x10000000)                                                   \
   {                                                                           \
-    memory_region_access_read_##type[_address >> 24]++;                       \
+    /* Account for cycles and other stats */                                  \
+    u8 region = _address >> 24;                                               \
+    memory_region_access_read_##type[region]++;                               \
     memory_reads_##type++;                                                    \
   }                                                                           \
-  if(((_address >> 24) == 0) && (pc >= 0x4000))                               \
+                                                                              \
+  if (                                                                        \
+     (((_address >> 24) == 0) && (pc >= 0x4000)) ||  /* BIOS reading */       \
+     (_address & aligned_address_mask##size) ||      /* Unaligned access */   \
+     !(map = memory_map_read[_address >> 15])        /* Unmapped memory */    \
+  )                                                                           \
   {                                                                           \
-    dest = (type)(reg[REG_BUS_VALUE] >> ((_address & 0x03) << 3));            \
+    dest = (type)(readfn)(_address);                                          \
   }                                                                           \
   else                                                                        \
-                                                                              \
-  if(((_address & aligned_address_mask##size) == 0) &&                        \
-   (map = memory_map_read[_address >> 15]))                                   \
   {                                                                           \
+    /* Aligned and mapped read */                                             \
     dest = (type)readaddress##size(map, (_address & 0x7FFF));                 \
   }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    dest = (type)read_memory##size(_address);                                 \
-  }                                                                           \
 }                                                                             \
-
-#define fast_read_memory_s16(address, dest)                                   \
-{                                                                             \
-  u8 *map;                                                                    \
-  u32 _address = address;                                                     \
-  if(_address < 0x10000000)                                                   \
-  {                                                                           \
-    memory_region_access_read_s16[_address >> 24]++;                          \
-    memory_reads_s16++;                                                       \
-  }                                                                           \
-  if(((_address & aligned_address_mask16) == 0) &&                            \
-   (map = memory_map_read[_address >> 15]))                                   \
-  {                                                                           \
-    dest = (s16)readaddress16(map, (_address & 0x7FFF));                      \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    dest = (s16)read_memory16_signed(_address);                               \
-  }                                                                           \
-}                                                                             \
-
 
 #define fast_write_memory(size, type, address, value)                         \
 {                                                                             \
   u32 _address = (address) & ~(aligned_address_mask##size & 0x03);            \
   if(_address < 0x10000000)                                                   \
   {                                                                           \
-    memory_region_access_write_##type[_address >> 24]++;                      \
+    u8 region = _address >> 24;                                               \
+    memory_region_access_write_##type[region]++;                              \
     memory_writes_##type++;                                                   \
   }                                                                           \
                                                                               \
@@ -922,7 +903,9 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   u8 *map = memory_map_read[_address >> 15];                                  \
   if(_address < 0x10000000)                                                   \
   {                                                                           \
-    memory_region_access_read_u32[_address >> 24]++;                          \
+    /* Account for cycles and other stats */                                  \
+    u8 region = _address >> 24;                                               \
+    memory_region_access_read_u32[region]++;                                  \
     memory_reads_u32++;                                                       \
   }                                                                           \
   if(_address < 0x10000000 && map)                                            \
@@ -940,26 +923,28 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   u32 _address = address;                                                     \
   if(_address < 0x10000000)                                                   \
   {                                                                           \
-    memory_region_access_write_u32[_address >> 24]++;                         \
+    /* Account for cycles and other stats */                                  \
+    u8 region = _address >> 24;                                               \
+    memory_region_access_write_u32[region]++;                                 \
     memory_writes_u32++;                                                      \
   }                                                                           \
   cpu_alert = write_memory32(_address, value);                                \
 }                                                                             \
 
 #define load_memory_u8(address, dest)                                         \
-  fast_read_memory(8, u8, address, dest)                                      \
+  fast_read_memory(8, u8, address, dest, read_memory8)                        \
 
 #define load_memory_u16(address, dest)                                        \
-  fast_read_memory(16, u16, address, dest)                                    \
+  fast_read_memory(16, u16, address, dest, read_memory16)                     \
 
 #define load_memory_u32(address, dest)                                        \
-  fast_read_memory(32, u32, address, dest)                                    \
+  fast_read_memory(32, u32, address, dest, read_memory32)                     \
 
 #define load_memory_s8(address, dest)                                         \
-  fast_read_memory(8, s8, address, dest)                                      \
+  fast_read_memory(8, s8, address, dest, read_memory8)                        \
 
 #define load_memory_s16(address, dest)                                        \
-  fast_read_memory_s16(address, dest)                                         \
+  fast_read_memory(16, s16, address, dest, read_memory16_signed)              \
 
 #define store_memory_u8(address, value)                                       \
   fast_write_memory(8, u8, address, value)                                    \
