@@ -26,6 +26,7 @@ gbc_sound_struct gbc_sound_channel[4];
 const u32 sound_frequency = GBA_SOUND_FREQUENCY;
 
 u32 sound_on;
+u32 noise_index = 0;
 static s16 sound_buffer[BUFFER_SIZE];
 static u32 sound_buffer_base;
 
@@ -340,17 +341,13 @@ u32 gbc_sound_master_volume;
 
 #define gbc_noise_wrap_full 32767
 
-#define gbc_noise_wrap_half 126
+#define gbc_noise_wrap_half 127
 
 #define get_noise_sample_full()                                               \
-  current_sample =                                                            \
-   ((s32)(noise_table15[fp16_16_to_u32(sample_index) >> 5] <<                 \
-   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) & 0x0F                       \
+  current_sample = ((s32)(noise_table15[noise_index >> 5] << (noise_index & 0x1F)) >> 31) ^ 0x07 \
 
 #define get_noise_sample_half()                                               \
-  current_sample =                                                            \
-   ((s32)(noise_table7[fp16_16_to_u32(sample_index) >> 5] <<                  \
-   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) & 0x0F                       \
+    current_sample = ((s32)(noise_table7[noise_index >> 5]  << (noise_index & 0x1F)) >> 31) ^ 0x07 \
 
 #define gbc_sound_render_noise(type, noise_type, envelope_op, sweep_op)       \
   for(i = 0; i < buffer_ticks; i++)                                           \
@@ -359,9 +356,11 @@ u32 gbc_sound_master_volume;
     gbc_sound_render_sample_##type();                                         \
                                                                               \
     sample_index += frequency_step;                                           \
-                                                                              \
-    if(sample_index >= u32_to_fp16_16(gbc_noise_wrap_##noise_type))           \
-      sample_index -= u32_to_fp16_16(gbc_noise_wrap_##noise_type);            \
+    if (sample_index > 0x00FFFFFF)                                            \
+    {                                                                         \
+      noise_index = (noise_index + 1) % gbc_noise_wrap_##noise_type;          \
+      sample_index = fp8_24_fractional_part(sample_index);                    \
+    }                                                                         \
                                                                               \
     buffer_index = (buffer_index + 2) % BUFFER_SIZE;                          \
     update_tone_counters(envelope_op, sweep_op);                              \
@@ -537,7 +536,7 @@ void reset_sound(void)
   direct_sound_struct *ds = direct_sound_channel;
   gbc_sound_struct *gs = gbc_sound_channel;
   u32 i;
-
+  noise_index = 0;
   sound_on = 0;
   sound_buffer_base = 0;
   memset(sound_buffer, 0, sizeof(sound_buffer));
