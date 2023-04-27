@@ -345,12 +345,12 @@ u32 gbc_sound_master_volume;
 #define get_noise_sample_full()                                               \
   current_sample =                                                            \
    ((s32)(noise_table15[fp16_16_to_u32(sample_index) >> 5] <<                 \
-   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) & 0x0F                       \
+   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) ^ 0x07                       \
 
 #define get_noise_sample_half()                                               \
   current_sample =                                                            \
    ((s32)(noise_table7[fp16_16_to_u32(sample_index) >> 5] <<                  \
-   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) & 0x0F                       \
+   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) ^ 0x07                       \
 
 #define gbc_sound_render_noise(type, noise_type, envelope_op, sweep_op)       \
   for(i = 0; i < buffer_ticks; i++)                                           \
