@@ -31,6 +31,13 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
  u32 enable_flags, u32 dispcnt, u32 bldcnt, const bitmap_layer_render_struct
  *layer_renderers);
 
+#define tile_expand_base_normal_p0(index)                                     \
+  if(current_pixel != 0)							                                               \
+  {									                                                                  \
+    current_pixel = palette[current_pixel];                                   \
+    dest_ptr[index] = current_pixel;                                          \
+  }									                                                                  \
+
 #define tile_expand_base_normal(index)                                        \
   current_pixel = palette[current_pixel];                                     \
   dest_ptr[index] = current_pixel                                             \
@@ -2584,7 +2591,7 @@ render_scanline_affine_builder(transparent, alpha);
   *dest_ptr = current_pixel                                                   \
 
 #define bitmap_render_pixel_mode4(alpha_op)                                   \
-  tile_expand_base_##alpha_op(0)                                              \
+  tile_expand_base_##alpha_op_p0(0)                                           \
 
 #define bitmap_render_pixel_mode5(alpha_op)                                   \
   bitmap_render_pixel_mode3(alpha_op)                                         \
