@@ -32,8 +32,11 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
  *layer_renderers);
 
 #define tile_expand_base_normal(index)                                        \
-  current_pixel = palette[current_pixel];                                     \
-  dest_ptr[index] = current_pixel                                             \
+  if (current_pixel != 0)                                                     \
+  {                                                                           \
+    tile_lookup_palette(palette, current_pixel);                              \
+    dest_ptr[index] = current_pixel;                                          \
+  }                                                                           \
 
 #define tile_expand_transparent_normal(index)                                 \
   tile_expand_base_normal(index)                                              \
