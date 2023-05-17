@@ -3988,19 +3988,23 @@ static void render_scanline_bitmap(u16 *scanline, u32 dispcnt)
 
   fill_line_bg(normal, scanline, 0, 240);
 
+  // Render OBJ layers first
   for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
   {
     current_layer = layer_order[layer_order_pos];
     if(current_layer & 0x04)
-    {
       render_obj_layer(normal, scanline, 0, 240);
-    }
-    else
-    {
+  }
+
+  // Render Backgrounds
+  for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
+  {
+    current_layer = layer_order[layer_order_pos];
+    if((current_layer & 0x04) == 0)
       layer_renderers->normal_render(0, 240, scanline);
-    }
   }
 }
+
 
 // Render layers from start to end based on if they're allowed in the
 // enable flags.
@@ -4126,23 +4130,29 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 
   fill_line_bg(normal, scanline, start, end);
 
+  // Render OBJ layers first
   for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
   {
     current_layer = layer_order[layer_order_pos];
     if(current_layer & 0x04)
     {
       if(enable_flags & 0x10)
-      {
         render_obj_layer(normal, scanline, start, end);
-      }
     }
-    else
+  }
+
+  // Render Backgrounds
+  for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
+  {
+    current_layer = layer_order[layer_order_pos];
+    if((current_layer & 0x04) == 0)
     {
       if(enable_flags & 0x04)
         layer_renderers->normal_render(start, end, scanline);
     }
   }
 }
+
 
 
 #define window_x_coords(window_number)                                        \
