@@ -2910,27 +2910,28 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
     }                                                                         \
   }                                                                           \
   else                                                                        \
-                                                                              \
-  if((obj_x + obj_width) >= end)                                              \
-  {                                                                           \
-    pixel_run = end - obj_x;                                                  \
-    if((s32)pixel_run > 0)                                                    \
+  {                                                                           \                                                                            \
+    if((obj_x + obj_width) >= end)                                            \
     {                                                                         \
-      dest_ptr = scanline + obj_x;                                            \
-      tile_run = pixel_run / 8;                                               \
-      multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);          \
-      partial_tile_run = pixel_run % 8;                                       \
-      if(partial_tile_run)                                                    \
+      pixel_run = end - obj_x;                                                \
+      if((s32)pixel_run > 0)                                                  \
       {                                                                       \
-        partial_tile_left_obj(combine_op, color_depth, alpha_op, flip_op);    \
+        dest_ptr = scanline + obj_x;                                          \
+        tile_run = pixel_run / 8;                                             \
+        multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);        \
+        partial_tile_run = pixel_run % 8;                                     \
+        if(partial_tile_run)                                                  \
+        {                                                                     \
+          partial_tile_left_obj(combine_op, color_depth, alpha_op, flip_op);  \
+        }                                                                     \
       }                                                                       \
     }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    dest_ptr = scanline + obj_x;                                              \
-    tile_run = obj_width / 8;                                                 \
-    multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);            \
+    else                                                                      \
+    {                                                                         \
+      dest_ptr = scanline + obj_x;                                            \
+      tile_run = obj_width / 8;                                               \
+      multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);          \
+    }                                                                         \
   }                                                                           \
 }                                                                             \
 
