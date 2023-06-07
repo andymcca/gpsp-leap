@@ -269,41 +269,70 @@ static void trigger_timer(u32 timer_number, u32 value)
    write_ioreg(REG_TMXCNT(timer_number), value);
 }
 
-// This table is configured for sequential access on system defaults
+/* Memory timings */
+const u8 ws012_nonseq[] = {4, 3, 2, 8};
+const u8 ws0_seq[] = {2, 1};
+const u8 ws1_seq[] = {4, 1};
+const u8 ws2_seq[] = {8, 1};
 
-const u32 waitstate_cycles_sequential[16][3] =
+/* Divided by region and bus width (16/32) */
+u8 ws_cyc_seq[16][2] =
 {
-  { 1, 1, 1 }, // BIOS
-  { 1, 1, 1 }, // Invalid
-  { 3, 3, 6 }, // EWRAM (default settings)
-  { 1, 1, 1 }, // IWRAM
-  { 1, 1, 1 }, // IO Registers
-  { 1, 1, 2 }, // Palette RAM
-  { 1, 1, 2 }, // VRAM
-  { 1, 1, 2 }, // OAM
-  { 3, 3, 6 }, // Gamepak (wait 0)
-  { 3, 3, 6 }, // Gamepak (wait 0)
-  { 5, 5, 9 }, // Gamepak (wait 1)
-  { 5, 5, 9 }, // Gamepak (wait 1)
-  { 9, 9, 17 }, // Gamepak (wait 2)
-  { 9, 9, 17 }, // Gamepak (wait 2)
+  { 1, 1 }, // BIOS
+  { 1, 1 }, // Invalid
+  { 3, 6 }, // EWRAM (default settings)
+  { 1, 1 }, // IWRAM
+  { 1, 1 }, // IO Registers
+  { 1, 2 }, // Palette RAM
+  { 1, 2 }, // VRAM
+  { 1, 2 }, // OAM
+  { 0, 0 }, // Gamepak (wait 0)
+  { 0, 0 }, // Gamepak (wait 0)
+  { 0, 0 }, // Gamepak (wait 1)
+  { 0, 0 }, // Gamepak (wait 1)
+  { 0, 0 }, // Gamepak (wait 2)
+  { 0, 0 }, // Gamepak (wait 2)
+  { 1, 1 }, // Invalid
+  { 1, 1 }, // Invalid
+};
+u8 ws_cyc_nseq[16][2] =
+{
+  { 1, 1 }, // BIOS
+  { 1, 1 }, // Invalid
+  { 3, 6 }, // EWRAM (default settings)
+  { 1, 1 }, // IWRAM
+  { 1, 1 }, // IO Registers
+  { 1, 2 }, // Palette RAM
+  { 1, 2 }, // VRAM
+  { 1, 2 }, // OAM
+  { 0, 0 }, // Gamepak (wait 0)
+  { 0, 0 }, // Gamepak (wait 0)
+  { 0, 0 }, // Gamepak (wait 1)
+  { 0, 0 }, // Gamepak (wait 1)
+  { 0, 0 }, // Gamepak (wait 2)
+  { 0, 0 }, // Gamepak (wait 2)
+  { 1, 1 }, // Invalid
+  { 1, 1 }, // Invalid
 };
 
-// Different settings for gamepak ws0-2 sequential (2nd) access
-
-const u32 gamepak_waitstate_sequential[2][3][3] =
+const u32 def_seq_cycles[16][2] =
 {
-  {
-    { 3, 3, 6 },
-    { 5, 5, 9 },
-    { 9, 9, 17 }
-  },
-  {
-    { 2, 2, 3 },
-    { 2, 2, 3 },
-    { 2, 2, 3 }
-  }
+  { 1, 1 }, // BIOS
+  { 1, 1 }, // Invalid
+  { 3, 6 }, // EWRAM (default settings)
+  { 1, 1 }, // IWRAM
+  { 1, 1 }, // IO Registers
+  { 1, 2 }, // Palette RAM
+  { 1, 2 }, // VRAM
+  { 1, 2 }, // OAM
+  { 3, 6 }, // Gamepak (wait 0)
+  { 3, 6 }, // Gamepak (wait 0)
+  { 5, 9 }, // Gamepak (wait 1)
+  { 5, 9 }, // Gamepak (wait 1)
+  { 9, 17 }, // Gamepak (wait 2)
+  { 9, 17 }, // Gamepak (wait 2)
 };
+
 
 u8 bios_rom[1024 * 16];
 
@@ -363,6 +392,34 @@ u32 flash_bank_num;  // 0 or 1
 u32 flash_bank_cnt;
 
 u32 flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
+
+void reload_timing_info()
+{
+  int i;
+  uint16_t waitcnt = read_ioreg(REG_WAITCNT);
+
+  /* Sequential 16 and 32 bit accesses to ROM */
+  ws_cyc_seq[0x8][0] = ws_cyc_seq[0x9][0] = 1 + ws0_seq[(waitcnt >>  4) & 1];
+  ws_cyc_seq[0xA][0] = ws_cyc_seq[0xB][0] = 1 + ws1_seq[(waitcnt >>  7) & 1];
+  ws_cyc_seq[0xC][0] = ws_cyc_seq[0xD][0] = 1 + ws2_seq[(waitcnt >> 10) & 1];
+
+  for (i = 0x8; i <= 0xD; i++)
+  {
+    /* 32 bit accesses just cost double due to 16 bit bus */
+    ws_cyc_seq[i][1] = ws_cyc_seq[i][0] * 2;
+  }
+
+  /* Sequential 16 and 32 bit accesses to ROM */
+  ws_cyc_nseq[0x8][0] = ws_cyc_nseq[0x9][0] = 1 + ws012_nonseq[(waitcnt >> 2) & 3];
+  ws_cyc_nseq[0xA][0] = ws_cyc_nseq[0xB][0] = 1 + ws012_nonseq[(waitcnt >> 5) & 3];
+  ws_cyc_nseq[0xC][0] = ws_cyc_nseq[0xD][0] = 1 + ws012_nonseq[(waitcnt >> 8) & 3];
+
+  for (i = 0x8; i <= 0xD; i++)
+  {
+    /* 32 bit accesses are a non-seq (16) + seq access (16) */
+    ws_cyc_nseq[i][1] = 1 + ws_cyc_nseq[i][0] + ws_cyc_seq[i][0];
+  }
+}
 
 u8 read_backup(u32 address)
 {
@@ -866,8 +923,12 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
     case REG_VCOUNT:
       break;  // Do nothing
 
-    // Registers without side effects
     case REG_WAITCNT:
+      write_ioreg(REG_WAITCNT, value);
+      reload_timing_info();
+      break;
+
+    // Registers without side effects
     default:
       write_ioreg(ioreg, value);
       break;
@@ -2251,8 +2312,8 @@ cpu_alert_type dma_transfer(unsigned dma_chan, int *usedcycles)
   // This is an approximation for the most common case (no region cross)
   if (usedcycles)
     *usedcycles += dmach->length * (
-       waitstate_cycles_sequential[src_ptr >> 24][tfsizes] +
-       waitstate_cycles_sequential[dst_ptr >> 24][tfsizes]);
+       def_seq_cycles[src_ptr >> 24][tfsizes - 1] +
+       def_seq_cycles[dst_ptr >> 24][tfsizes - 1]);
 
   return ret;
 }
@@ -2414,6 +2475,8 @@ void init_memory(void)
   write_ioreg(REG_BG3PA, 0x100);
   write_ioreg(REG_BG3PD, 0x100);
   write_ioreg(REG_RCNT, 0x8000);
+
+  reload_timing_info();
 
   backup_type = BACKUP_NONE;
 

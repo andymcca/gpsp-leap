@@ -2774,7 +2774,7 @@ u8 function_cc *block_lookup_address_thumb(u32 pc)
 #define arm_instruction_width 4
 
 #define arm_base_cycles()                                                     \
-  cycle_count += waitstate_cycles_sequential[pc >> 24][2]                     \
+  cycle_count += def_seq_cycles[pc >> 24][1]                                  \
 
 // For now this just sets a variable that says flags should always be
 // computed.
@@ -2843,7 +2843,7 @@ u8 function_cc *block_lookup_address_thumb(u32 pc)
 #define thumb_instruction_width 2
 
 #define thumb_base_cycles()                                                   \
-  cycle_count += waitstate_cycles_sequential[pc >> 24][1]                     \
+  cycle_count += def_seq_cycles[pc >> 24][0]                                  \
 
 // Here's how this works: each instruction has three different sets of flag
 // attributes, each consisiting of a 4bit mask describing how that instruction

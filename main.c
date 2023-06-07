@@ -22,8 +22,6 @@
 
 timer_type timer[4];
 
-const u32 global_cycles_per_instruction = 1;
-
 u32 cpu_ticks = 0;
 
 u32 execute_cycles = 960;

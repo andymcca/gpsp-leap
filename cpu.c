@@ -865,6 +865,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   {                                                                           \
     /* Account for cycles and other stats */                                  \
     u8 region = _address >> 24;                                               \
+    cycles_remaining -= ws_cyc_nseq[region][(size - 8) / 16];                 \
     memory_region_access_read_##type[region]++;                               \
     memory_reads_##type++;                                                    \
   }                                                                           \
@@ -890,6 +891,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   if(_address < 0x10000000)                                                   \
   {                                                                           \
     u8 region = _address >> 24;                                               \
+    cycles_remaining -= ws_cyc_nseq[region][(size - 8) / 16];                 \
     memory_region_access_write_##type[region]++;                              \
     memory_writes_##type++;                                                   \
   }                                                                           \
@@ -905,6 +907,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   {                                                                           \
     /* Account for cycles and other stats */                                  \
     u8 region = _address >> 24;                                               \
+    cycles_remaining -= ws_cyc_seq[region][1];                                \
     memory_region_access_read_u32[region]++;                                  \
     memory_reads_u32++;                                                       \
   }                                                                           \
@@ -925,6 +928,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   {                                                                           \
     /* Account for cycles and other stats */                                  \
     u8 region = _address >> 24;                                               \
+    cycles_remaining -= ws_cyc_seq[region][1];                                \
     memory_region_access_write_u32[region]++;                                 \
     memory_writes_u32++;                                                      \
   }                                                                           \
@@ -1404,6 +1408,7 @@ const u32 spsr_masks[4] = { 0x00000000, 0x000000EF, 0xF0000000, 0xF00000EF };
   {                                                                           \
     thumb_pc_offset(2);                                                       \
   }                                                                           \
+  cycles_remaining -= ws_cyc_nseq[pc >> 24][0];                               \
 }                                                                             \
 
 // When a mode change occurs from non-FIQ to non-FIQ retire the current
@@ -1530,7 +1535,6 @@ void execute_arm(u32 cycles)
   u8 *pc_address_block = memory_map_read[pc_region];
   u32 new_pc_region;
   s32 cycles_remaining;
-  u32 cycles_per_instruction = global_cycles_per_instruction;
   cpu_alert_type cpu_alert;
 
   u32 old_pc;
@@ -1564,7 +1568,6 @@ void execute_arm(u32 cycles)
 arm_loop:
 
        collapse_flags();
-       cycles_per_instruction = global_cycles_per_instruction;
 
        /* Process cheats if we are about to execute the cheat hook */
        if (pc == cheat_master_hook)
@@ -2156,6 +2159,7 @@ arm_loop:
                    {
                       arm_pc_offset_update_direct(src);
                    }
+                   cycles_remaining -= ws_cyc_nseq[pc >> 24][1];
                 }
                 else
                 {
@@ -3084,6 +3088,7 @@ arm_loop:
                 /* B offset */
                 arm_decode_branch();
                 arm_pc_offset_update(offset + 8);
+                cycles_remaining -= ws_cyc_nseq[pc >> 24][1];
                 break;
              }
 
@@ -3093,6 +3098,7 @@ arm_loop:
                 arm_decode_branch();
                 reg[REG_LR] = pc + 4;
                 arm_pc_offset_update(offset + 8);
+                cycles_remaining -= ws_cyc_nseq[pc >> 24][1];
                 break;
              }
 
@@ -3130,7 +3136,7 @@ arm_loop:
 skip_instruction:
 
        /* End of Execute ARM instruction */
-       cycles_remaining -= cycles_per_instruction;
+       cycles_remaining -= ws_cyc_seq[(pc >> 24) & 0xF][1];
 
        if (pc == idle_loop_target_pc && cycles_remaining > 0) cycles_remaining = 0;
 
@@ -3622,6 +3628,7 @@ thumb_loop:
                 /* B label */
                 thumb_decode_branch();
                 thumb_pc_offset_update(((s32)(offset << 21) >> 20) + 4);
+                cycles_remaining -= ws_cyc_nseq[pc >> 24][0];
                 break;
              }
 
@@ -3642,12 +3649,13 @@ thumb_loop:
                 pc = reg[REG_LR] + (offset * 2);
                 reg[REG_LR] = lr;
                 reg[REG_PC] = pc;
+                cycles_remaining -= ws_cyc_nseq[pc >> 24][0];
                 break;
              }
        }
 
        /* End of Execute THUMB instruction */
-       cycles_remaining -= cycles_per_instruction;
+       cycles_remaining -= ws_cyc_seq[(pc >> 24) & 0xF][0];
 
        if (pc == idle_loop_target_pc && cycles_remaining > 0) cycles_remaining = 0;
 

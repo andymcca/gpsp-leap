@@ -68,7 +68,6 @@ typedef enum
 
 extern u32 cpu_ticks;
 extern u32 execute_cycles;
-extern const u32 global_cycles_per_instruction;
 extern u32 skip_next_frame;
 
 extern u32 flush_ram_count;
