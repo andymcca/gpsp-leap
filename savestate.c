@@ -103,7 +103,7 @@ bool gba_load_state(const void* src)
   // Reset most of the frame state and dynarec state
 #ifdef HAVE_DYNAREC
   if (dynarec_enable)
-    init_caches();
+    flush_dynarec_caches();
 #endif
 
   instruction_count = 0;

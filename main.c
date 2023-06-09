@@ -100,8 +100,8 @@ void init_main(void)
   video_count = 960;
 
 #ifdef HAVE_DYNAREC
+  init_dynarec_caches();
   init_emitter(gamepak_must_swap());
-  init_caches();
 #endif
 }
 

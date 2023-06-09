@@ -164,7 +164,8 @@ extern u32 rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 void flush_translation_cache_rom(void);
 void flush_translation_cache_ram(void);
 void dump_translation_cache(void);
-void init_caches(void);
+void init_dynarec_caches(void);
+void flush_dynarec_caches(void);
 void init_emitter(bool);
 void init_bios_hooks(void);
 

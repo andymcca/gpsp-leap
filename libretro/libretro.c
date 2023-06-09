@@ -803,8 +803,9 @@ static void check_variables(int started_from_load)
       else if (strcmp(var.value, "enabled") == 0)
          dynarec_enable = 1;
 
+      /* Flush dynarec cache to ensure we do not execute old code */
       if (dynarec_enable != prevvalue)
-         init_caches();
+         flush_dynarec_caches();
    }
    else
       dynarec_enable = 1;

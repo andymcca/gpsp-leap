@@ -3343,6 +3343,7 @@ void init_bios_hooks(void)
 
 void flush_translation_cache_ram(void)
 {
+  /* Flushes RAM caches avoiding doing too much work (ie. wiping unused memory) */
   flush_ram_count++;
   /*printf("ram flush %d (pc %x), %x to %x, %x to %x\n",
    flush_ram_count, reg[REG_PC], iwram_code_min, iwram_code_max,
@@ -3380,15 +3381,32 @@ void flush_translation_cache_ram(void)
 
 void flush_translation_cache_rom(void)
 {
+  /* We flush the generated code except for everything below the watermark. */
   last_rom_translation_ptr = &rom_translation_cache[rom_cache_watermark];
   rom_translation_ptr      = &rom_translation_cache[rom_cache_watermark];
 
   memset(rom_branch_hash, 0, sizeof(rom_branch_hash));
 }
 
-void init_caches(void)
+void init_dynarec_caches(void)
 {
-  /* Ensure we wipe everything including the SMC mirrors */
+  /* Initialize caches so that we can start initalizing the emitter. */
+  rom_translation_ptr = last_rom_translation_ptr = &rom_translation_cache[0];
+  memset(rom_branch_hash, 0, sizeof(rom_branch_hash));
+
+  ram_translation_ptr = last_ram_translation_ptr = &ram_translation_cache[0];
+  memset(iwram, 0, 0x8000);
+  memset(&ewram[0x40000], 0, 0x40000);
+
+  ewram_code_min = 0;
+  ewram_code_max = 0x40000;
+  iwram_code_min = 0;
+  iwram_code_max = 0x8000;
+}
+
+void flush_dynarec_caches(void)
+{
+  /* Flush ROM and RAM caches. */
   flush_translation_cache_rom();
   ewram_code_min = 0;
   ewram_code_max = 0x40000;

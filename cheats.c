@@ -60,7 +60,7 @@ static void update_hook_codebreaker(cheat_type *cheat)
         u32 pcaddr = 0x08000000 | (address & 0x1ffffff);
         #ifdef HAVE_DYNAREC
         if (cheat_master_hook != pcaddr)
-           init_caches();   /* Flush caches to install hook */
+           flush_dynarec_caches();   /* Flush caches to install hook */
         #endif
         cheat_master_hook = pcaddr;
         return;   /* Only support for one hook */
