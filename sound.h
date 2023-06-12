@@ -66,7 +66,6 @@ typedef struct
    u32 envelope_volume;
    u32 envelope_direction;
    u32 envelope_status;
-   u32 envelope_step;
    u32 envelope_ticks;
    u32 envelope_initial_ticks;
    u32 sweep_status;
@@ -102,7 +101,7 @@ void sound_timer_queue32(u32 channel, u32 value);
 unsigned sound_timer(fixed8_24 frequency_step, u32 channel);
 void sound_reset_fifo(u32 channel);
 void update_gbc_sound(u32 cpu_ticks);
-void init_sound(int need_reset);
+void init_sound();
 unsigned sound_write_savestate(u8 *dst);
 bool sound_read_savestate(const u8 *src);
 

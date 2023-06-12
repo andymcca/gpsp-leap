@@ -82,13 +82,14 @@ static unsigned update_timers(irq_type *irq_raised, unsigned completed_cycles)
 void init_main(void)
 {
   u32 i;
-
   for(i = 0; i < 4; i++)
   {
-    dma[i].start_type = DMA_INACTIVE;
-    dma[i].direct_sound_channel = DMA_NO_DIRECT_SOUND;
     timer[i].status = TIMER_INACTIVE;
-    timer[i].reload = 0x10000;
+    timer[i].prescale = 0;
+    timer[i].irq = 0;
+    timer[i].reload = timer[i].count = 0x10000;
+    timer[i].direct_sound_channels = TIMER_DS_CHANNEL_NONE;
+    timer[i].frequency_step = 0;
   }
 
   timer[0].direct_sound_channels = TIMER_DS_CHANNEL_BOTH;

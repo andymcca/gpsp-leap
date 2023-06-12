@@ -549,6 +549,7 @@ void reset_sound(void)
     ds->fifo_top = 0;
     ds->fifo_base = 0;
     ds->fifo_fractional = 0;
+    ds->volume_halve = 1;
     memset(ds->fifo, 0, 32);
   }
 
@@ -561,6 +562,7 @@ void reset_sound(void)
   gbc_sound_master_volume = 0;
   memset(wave_samples, 0, 64);
 
+  memset(&gbc_sound_channel[0], 0, sizeof(gbc_sound_channel));
   for(i = 0; i < 4; i++, gs++)
   {
     gs->status = GBC_SOUND_INACTIVE;
@@ -569,7 +571,7 @@ void reset_sound(void)
   }
 }
 
-void init_sound(int need_reset)
+void init_sound()
 {
   gbc_sound_tick_step =
    float_to_fp16_16(256.0f / sound_frequency);
@@ -577,8 +579,7 @@ void init_sound(int need_reset)
   init_noise_table(noise_table15, 32767, 14);
   init_noise_table(noise_table7, 127, 6);
 
-  if (need_reset)
-    reset_sound();
+  reset_sound();
 }
 
 bool sound_read_savestate(const u8 *src)
@@ -633,7 +634,6 @@ bool sound_read_savestate(const u8 *src)
       bson_read_int32(sndchan, "env-vol", &gs->envelope_volume) &&
       bson_read_int32(sndchan, "env-dir", &gs->envelope_direction) &&
       bson_read_int32(sndchan, "env-status", &gs->envelope_status) &&
-      bson_read_int32(sndchan, "env-step", &gs->envelope_step) &&
       bson_read_int32(sndchan, "env-ticks0", &gs->envelope_initial_ticks) &&
       bson_read_int32(sndchan, "env-ticks", &gs->envelope_ticks) &&
       bson_read_int32(sndchan, "sweep-status", &gs->sweep_status) &&
@@ -705,7 +705,6 @@ unsigned sound_write_savestate(u8 *dst)
     bson_write_int32(dst, "env-vol", gs->envelope_volume);
     bson_write_int32(dst, "env-dir", gs->envelope_direction);
     bson_write_int32(dst, "env-status", gs->envelope_status);
-    bson_write_int32(dst, "env-step", gs->envelope_step);
     bson_write_int32(dst, "env-ticks0", gs->envelope_initial_ticks);
     bson_write_int32(dst, "env-ticks", gs->envelope_ticks);
     bson_write_int32(dst, "sweep-status", gs->sweep_status);
@@ -721,6 +720,9 @@ unsigned sound_write_savestate(u8 *dst)
     bson_write_int32(dst, "len-ticks", gs->length_ticks);
     bson_write_int32(dst, "noise-type", gs->noise_type);
     bson_write_int32(dst, "sample-tbl", gs->sample_table_idx);
+
+    // No longer used fields, keep for backwards compatibility.
+    bson_write_int32(dst, "env-step", 0);
     bson_finish_document(dst, wbptr2);
   }
 

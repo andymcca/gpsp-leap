@@ -566,7 +566,7 @@ void retro_init(void)
 #endif
 
    init_gamepak_buffer();
-   init_sound(1);
+   init_sound();
 
    if(!gba_screen_pixels)
 #ifdef _3DS

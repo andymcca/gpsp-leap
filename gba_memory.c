@@ -2447,7 +2447,19 @@ bool gamepak_must_swap(void)
 
 void init_memory(void)
 {
-  u32 map_offset = 0;
+  u32 map_offset = 0, i;
+
+  for (i = 0; i < DMA_CHAN_CNT; i++)
+  {
+    dma[i].start_type = DMA_INACTIVE;
+    dma[i].irq = DMA_NO_IRQ;
+    dma[i].source_address = dma[i].dest_address = 0;
+    dma[i].source_direction = dma[i].dest_direction = 0;
+    dma[i].length = 0;
+    dma[i].length_type = DMA_16BIT;
+    dma[i].repeat_type = DMA_NO_REPEAT;
+    dma[i].direct_sound_channel = DMA_NO_DIRECT_SOUND;
+  }
 
   // Fill memory map regions, areas marked as NULL must be checked directly
   map_region(read, 0x0000000, 0x1000000, 1, bios_rom);
