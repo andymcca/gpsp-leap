@@ -23,9 +23,8 @@
 timer_type timer[4];
 
 u32 cpu_ticks = 0;
-
-u32 execute_cycles = 960;
-s32 video_count = 960;
+u32 execute_cycles = 0;
+s32 video_count = 0;
 
 u32 last_frame = 0;
 u32 flush_ram_count = 0;
@@ -96,7 +95,6 @@ void init_main(void)
   timer[1].direct_sound_channels = TIMER_DS_CHANNEL_NONE;
 
   cpu_ticks = 0;
-
   execute_cycles = 960;
   video_count = 960;
 
@@ -126,81 +124,84 @@ u32 function_cc update_gba(int remaining_cycles)
     remaining_cycles = 0;
     reg[COMPLETED_FRAME] = 0;
 
-    if(gbc_sound_update)
-    {
-      gbc_update_count++;
-      update_gbc_sound(cpu_ticks);
-      gbc_sound_update = 0;
-    }
-
     // Timers can trigger DMA (usually sound) and consume cycles
     dma_cycles = update_timers(&irq_raised, completed_cycles);
 
+    // Video count tracks the video cycles remaining until the next event
     video_count -= completed_cycles;
 
+    // Ran out of cycles, move to the next video area
     if(video_count <= 0)
     {
       u32 vcount = read_ioreg(REG_VCOUNT);
       u32 dispstat = read_ioreg(REG_DISPSTAT);
 
-      if((dispstat & 0x02) == 0)
+      // Check if we are in hrefresh (0) or hblank (1)
+      if ((dispstat & 0x02) == 0)
       {
         // Transition from hrefresh to hblank
-        video_count += (272);
         dispstat |= 0x02;
+        video_count += (272);    // hblank duration, 272 cycles
 
-        if((dispstat & 0x01) == 0)
+        // Check if we are drawing (0) or we are in vblank (1)
+        if ((dispstat & 0x01) == 0)
         {
           u32 i;
+
+          // Render the scan line
           if(reg[OAM_UPDATED])
             oam_update_count++;
 
           update_scanline();
 
-          // If in visible area also fire HDMA
-          for(i = 0; i < 4; i++)
+          // Trigger the HBlank DMAs if enabled
+          for (i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_HBLANK)
               dma_transfer(i, &dma_cycles);
           }
         }
 
-        if(dispstat & 0x10)
+        // Trigger the hblank interrupt, if enabled in DISPSTAT
+        if (dispstat & 0x10)
           irq_raised |= IRQ_HBLANK;
       }
       else
       {
-        // Transition from hblank to next line
+        // Transition from hblank to the next scan line (vdraw or vblank)
         video_count += 960;
         dispstat &= ~0x02;
-
         vcount++;
 
         if(vcount == 160)
         {
           // Transition from vrefresh to vblank
           u32 i;
-
           dispstat |= 0x01;
-          if(dispstat & 0x8)
-          {
-            irq_raised |= IRQ_VBLANK;
-          }
 
+          // Reinit affine transformation counters for the next frame
           video_reload_counters();
 
-          for(i = 0; i < 4; i++)
+          // Trigger VBlank interrupt if enabled
+          if (dispstat & 0x8)
+            irq_raised |= IRQ_VBLANK;
+
+          // Trigger the VBlank DMAs if enabled
+          for (i = 0; i < 4; i++)
           {
             if(dma[i].start_type == DMA_START_VBLANK)
               dma_transfer(i, &dma_cycles);
           }
         }
-        else
-
-        if(vcount == 228)
+        else if (vcount == 228)
         {
           // Transition from vblank to next screen
+          vcount = 0;
           dispstat &= ~0x01;
+
+          /* If there's no cheat hook, run on vblank! */
+          if (cheat_master_hook == ~0U)
+             process_cheats();
 
 /*        printf("frame update (%x), %d instructions total, %d RAM flushes\n",
            reg[REG_PC], instruction_count - last_frame, flush_ram_count);
@@ -212,26 +213,19 @@ u32 function_cc update_gba(int remaining_cycles)
           oam_update_count = 0;
           flush_ram_count = 0;
 
-          update_gbc_sound(cpu_ticks);
-          gbc_sound_update = 0;
+          // Force audio generation. Need to flush samples for this frame.
+          render_gbc_sound();
 
-          /* If there's no cheat hook, run on vblank! */
-          if (cheat_master_hook == ~0U)
-             process_cheats();
-
-          vcount = 0;
           // We completed a frame, tell the dynarec to exit to the main thread
           reg[COMPLETED_FRAME] = 1;
         }
 
+        // Vcount trigger (flag) and IRQ if enabled
         if(vcount == (dispstat >> 8))
         {
-          // vcount trigger
           dispstat |= 0x04;
           if(dispstat & 0x20)
-          {
             irq_raised |= IRQ_VCOUNT;
-          }
         }
         else
           dispstat &= ~0x04;
@@ -241,7 +235,7 @@ u32 function_cc update_gba(int remaining_cycles)
       write_ioreg(REG_DISPSTAT, dispstat);
     }
 
-    // Flag any V/H blank interrupts.
+    // Flag any V/H blank interrupts, DMA IRQs, Vcount, etc.
     if (irq_raised)
       flag_interrupt(irq_raised);
 
@@ -249,6 +243,8 @@ u32 function_cc update_gba(int remaining_cycles)
     if (check_and_raise_interrupts())
       changed_pc = 0x80000000;
 
+    // Figure out when we need to stop CPU execution. The next event is
+    // a video event or a timer event, whatever happens first.
     execute_cycles = MAX(video_count, 0);
 
     for (i = 0; i < 4; i++)

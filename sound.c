@@ -345,12 +345,12 @@ u32 gbc_sound_master_volume;
 #define get_noise_sample_full()                                               \
   current_sample =                                                            \
    ((s32)(noise_table15[fp16_16_to_u32(sample_index) >> 5] <<                 \
-   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) & 0x0F                       \
+   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) ^ 0x07                       \
 
 #define get_noise_sample_half()                                               \
   current_sample =                                                            \
    ((s32)(noise_table7[fp16_16_to_u32(sample_index) >> 5] <<                  \
-   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) & 0x0F                       \
+   (fp16_16_to_u32(sample_index) & 0x1F)) >> 31) ^ 0x07                       \
 
 #define gbc_sound_render_noise(type, noise_type, envelope_op, sweep_op)       \
   for(i = 0; i < buffer_ticks; i++)                                           \
@@ -396,10 +396,8 @@ u32 gbc_sound_master_volume;
   gs->sample_index = sample_index;                                            \
   gs->tick_counter = tick_counter;                                            \
 
-void update_gbc_sound(u32 cpu_ticks)
+void render_gbc_sound()
 {
-  fixed16_16 buffer_ticks = float_to_fp16_16((float)(cpu_ticks -
-   gbc_sound_last_cpu_ticks) * sound_frequency / GBC_BASE_RATE);
   u32 i, i2;
   gbc_sound_struct *gs = gbc_sound_channel;
   fixed16_16 sample_index, frequency_step;
@@ -410,9 +408,13 @@ void update_gbc_sound(u32 cpu_ticks)
   s32 current_sample;
   u16 sound_status = read_ioreg(REG_SOUNDCNT_X) & 0xFFF0;
   const s8 *sample_data;
-  s8 *wave_bank;
-  u8 *wave_ram = ((u8 *)io_registers) + 0x90;
+  u32 tick_delta = cpu_ticks - gbc_sound_last_cpu_ticks;
+  fixed16_16 buffer_ticks = float_to_fp16_16((float)(tick_delta) *
+                                             sound_frequency / GBC_BASE_RATE);
+  if (!tick_delta)
+    return;
 
+  gbc_update_count++;
   gbc_sound_partial_ticks += fp16_16_fractional_part(buffer_ticks);
   buffer_ticks = fp16_16_to_u32(buffer_ticks);
 
@@ -424,6 +426,7 @@ void update_gbc_sound(u32 cpu_ticks)
 
   if(sound_on == 1)
   {
+    s8 *wave_bank;
     gs = gbc_sound_channel + 0;
     if(gs->active_flag)
     {
@@ -446,6 +449,7 @@ void update_gbc_sound(u32 cpu_ticks)
     if(gbc_sound_wave_update)
     {
        unsigned bank = (gs->wave_bank == 1) ? 1 : 0;
+       u8 *wave_ram = ((u8 *)io_registers) + 0x90;
 
        wave_bank = wave_samples + (bank * 32);
        for(i = 0, i2 = 0; i < 16; i++, i2 += 2)

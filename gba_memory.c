@@ -23,6 +23,7 @@
 /* Sound */
 #define gbc_sound_tone_control_low(channel, regn)                             \
 {                                                                             \
+  render_gbc_sound();                                                         \
   u32 initial_volume = (value >> 12) & 0x0F;                                  \
   u32 envelope_ticks = ((value >> 8) & 0x07) * 4;                             \
   gbc_sound_channel[channel].length_ticks = 64 - (value & 0x3F);              \
@@ -34,12 +35,12 @@
   gbc_sound_channel[channel].envelope_ticks = envelope_ticks;                 \
   gbc_sound_channel[channel].envelope_status = (envelope_ticks != 0);         \
   gbc_sound_channel[channel].envelope_volume = initial_volume;                \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(regn, value);                                                   \
 }                                                                             \
 
 #define gbc_sound_tone_control_high(channel, regn)                            \
 {                                                                             \
+  render_gbc_sound();                                                         \
   u32 rate = value & 0x7FF;                                                   \
   gbc_sound_channel[channel].rate = rate;                                     \
   gbc_sound_channel[channel].frequency_step =                                 \
@@ -55,12 +56,12 @@
      gbc_sound_channel[channel].envelope_initial_volume;                      \
   }                                                                           \
                                                                               \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(regn, value & 0x47FF);                                          \
 }                                                                             \
 
 #define gbc_sound_tone_control_sweep()                                        \
 {                                                                             \
+  render_gbc_sound();                                                         \
   value &= 0x007F;                                                            \
   u32 sweep_ticks = ((value >> 4) & 0x07) * 2;                                \
   gbc_sound_channel[0].sweep_shift = value & 0x07;                            \
@@ -68,19 +69,18 @@
   gbc_sound_channel[0].sweep_status = (value != 8);                           \
   gbc_sound_channel[0].sweep_ticks = sweep_ticks;                             \
   gbc_sound_channel[0].sweep_initial_ticks = sweep_ticks;                     \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(REG_SOUND1CNT_L, value);                                        \
 }                                                                             \
 
 #define gbc_sound_wave_control()                                              \
 {                                                                             \
+  render_gbc_sound();                                                         \
   gbc_sound_channel[2].wave_type = (value >> 5) & 0x01;                       \
   gbc_sound_channel[2].wave_bank = (value >> 6) & 0x01;                       \
   gbc_sound_channel[2].master_enable = 0;                                     \
   if(value & 0x80)                                                            \
     gbc_sound_channel[2].master_enable = 1;                                   \
                                                                               \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(REG_SOUND3CNT_L, value & 0x00E0);                               \
 }                                                                             \
 
@@ -88,18 +88,19 @@ static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
 
 #define gbc_sound_tone_control_low_wave()                                     \
 {                                                                             \
+  render_gbc_sound();                                                         \
   gbc_sound_channel[2].length_ticks = 256 - (value & 0xFF);                   \
   if((value >> 15) & 0x01)                                                    \
     gbc_sound_channel[2].wave_volume = 12288;                                 \
   else                                                                        \
     gbc_sound_channel[2].wave_volume =                                        \
      gbc_sound_wave_volume[(value >> 13) & 0x03];                             \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(REG_SOUND3CNT_H, value);                                        \
 }                                                                             \
 
 #define gbc_sound_tone_control_high_wave()                                    \
 {                                                                             \
+  render_gbc_sound();                                                         \
   u32 rate = value & 0x7FF;                                                   \
   gbc_sound_channel[2].rate = rate;                                           \
   gbc_sound_channel[2].frequency_step =                                       \
@@ -110,7 +111,6 @@ static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
     gbc_sound_channel[2].sample_index = 0;                                    \
     gbc_sound_channel[2].active_flag = 1;                                     \
   }                                                                           \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(REG_SOUND3CNT_X, value);                                        \
 }                                                                             \
 
@@ -118,6 +118,7 @@ static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
 {                                                                             \
   u32 dividing_ratio = value & 0x07;                                          \
   u32 frequency_shift = (value >> 4) & 0x0F;                                  \
+  render_gbc_sound();                                                         \
   if(dividing_ratio == 0)                                                     \
   {                                                                           \
     gbc_sound_channel[3].frequency_step =                                     \
@@ -141,13 +142,13 @@ static const u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
     gbc_sound_channel[3].envelope_volume =                                    \
      gbc_sound_channel[3].envelope_initial_volume;                            \
   }                                                                           \
-  gbc_sound_update = 1;                                                       \
   write_ioreg(REG_SOUND4CNT_H, value & 0x40FF);                               \
 }                                                                             \
 
 static void gbc_trigger_sound(u32 value)
 {
    u32 channel;
+   render_gbc_sound();
 
    /* Trigger all 4 GBC sound channels */
    for (channel = 0; channel < 4; channel++)
@@ -162,6 +163,7 @@ static void gbc_trigger_sound(u32 value)
 
 #define trigger_sound()                                                       \
 {                                                                             \
+  render_gbc_sound();                                                         \
   timer[0].direct_sound_channels =                                            \
       ((((value >> 10) & 0x01) == 0) | ((((value >> 14) & 0x01) == 0) << 1)); \
   timer[1].direct_sound_channels =                                            \
@@ -181,6 +183,7 @@ static void gbc_trigger_sound(u32 value)
 
 static void sound_control_x(u32 value)
 {
+   render_gbc_sound();
    if (value & 0x80)
    {
       if (sound_on != 1)
@@ -374,9 +377,6 @@ RFILE *gamepak_file_large = NULL;
 
 // Writes to these respective locations should trigger an update
 // so the related subsystem may react to it.
-
-// If GBC audio is written to:
-u32 gbc_sound_update = 0;
 
 // If the GBC audio waveform is modified:
 u32 gbc_sound_wave_update = 0;
@@ -885,6 +885,7 @@ cpu_alert_type function_cc write_io_register16(u32 address, u32 value)
 
     // Sound wave RAM, flag wave table update
     case REG_SOUNDWAVE_0 ... REG_SOUNDWAVE_7:
+      render_gbc_sound();
       gbc_sound_wave_update = 1;
       write_ioreg(ioreg, value);
       break;

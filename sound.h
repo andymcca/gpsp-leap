@@ -100,7 +100,7 @@ extern u32 sound_on;
 void sound_timer_queue32(u32 channel, u32 value);
 unsigned sound_timer(fixed8_24 frequency_step, u32 channel);
 void sound_reset_fifo(u32 channel);
-void update_gbc_sound(u32 cpu_ticks);
+void render_gbc_sound();
 void init_sound();
 unsigned sound_write_savestate(u8 *dst);
 bool sound_read_savestate(const u8 *src);

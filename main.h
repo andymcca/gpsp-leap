@@ -66,6 +66,8 @@ typedef enum
   boot_bios
 } boot_mode;
 
+extern u32 gbc_update_count;
+
 extern u32 cpu_ticks;
 extern u32 execute_cycles;
 extern u32 skip_next_frame;
