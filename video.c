@@ -2812,9 +2812,10 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
 // Adjust a flipped obj's starting position
 
 #define obj_tile_offset_noflip(color_depth)                                   \
+  0                                                                           \
 
 #define obj_tile_offset_flip(color_depth)                                     \
-  + (tile_size_##color_depth * ((obj_width - 8) / 8))                         \
+  (tile_size_##color_depth * ((obj_width - 8) / 8))                           \
 
 
 // Adjust the obj's starting point if it goes too far off the left edge of
@@ -2832,7 +2833,7 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
   tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
    + ((vertical_offset / 8) * (obj_width / 8) * tile_size_##color_depth)      \
    + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-   obj_tile_offset_##flip_op(color_depth)                                     \
+   + obj_tile_offset_##flip_op(color_depth)                                     \
 
 // Get the current row offset into an obj in 2D map space
 
@@ -2840,7 +2841,7 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
   tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
    + ((vertical_offset / 8) * 1024)                                           \
    + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-   obj_tile_offset_##flip_op(color_depth)                                     \
+   + obj_tile_offset_##flip_op(color_depth)                                     \
 
 
 // Get the palette for 4bpp obj.
