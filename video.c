@@ -3142,8 +3142,8 @@ static const u32 obj_height_table[] =
   { 8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64 };
 
 static u8 obj_priority_list[5][160][128];
-static u32 obj_priority_count[5][160];
-static u32 obj_alpha_count[160];
+static u8 obj_priority_count[5][160];
+static u8 obj_alpha_count[160];
 
 
 // Build obj rendering functions
@@ -3348,23 +3348,16 @@ render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
 
 static void order_obj(u32 video_mode)
 {
-  s32 obj_num, priority, row;
+  s32 obj_num, row;
   s32 obj_x, obj_y;
   u32 obj_size, obj_mode;
   s32 obj_width, obj_height;
   u32 obj_priority;
   u32 obj_attribute_0, obj_attribute_1, obj_attribute_2;
-  u32 current_count;
   u16 *oam_ptr = oam_ram + 508;
 
-  for(priority = 0; priority < 5; priority++)
-  {
-    for(row = 0; row < 160; row++)
-      obj_priority_count[priority][row] = 0;
-  }
-
-  for(row = 0; row < 160; row++)
-    obj_alpha_count[row] = 0;
+  memset(obj_priority_count, 0, sizeof(obj_priority_count));
+  memset(obj_alpha_count, 0, sizeof(obj_alpha_count));
 
   for(obj_num = 127; obj_num >= 0; obj_num--, oam_ptr -= 4)
   {
@@ -3412,10 +3405,10 @@ static void order_obj(u32 video_mode)
           {
             for(row = obj_y; row < obj_y + obj_height; row++)
             {
-              current_count = obj_priority_count[obj_priority][row];
-              obj_priority_list[obj_priority][row][current_count] = obj_num;
-              obj_priority_count[obj_priority][row] = current_count + 1;
-              obj_alpha_count[row]++;
+              u32 cur_cnt = obj_priority_count[obj_priority][row];
+              obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+              obj_priority_count[obj_priority][row] = cur_cnt + 1;
+              obj_alpha_count[row] = 1;
             }
           }
           else
@@ -3425,9 +3418,9 @@ static void order_obj(u32 video_mode)
 
             for(row = obj_y; row < obj_y + obj_height; row++)
             {
-              current_count = obj_priority_count[obj_priority][row];
-              obj_priority_list[obj_priority][row][current_count] = obj_num;
-              obj_priority_count[obj_priority][row] = current_count + 1;
+              u32 cur_cnt = obj_priority_count[obj_priority][row];
+              obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+              obj_priority_count[obj_priority][row] = cur_cnt + 1;
             }
           }
         }
@@ -3835,7 +3828,7 @@ static void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_
 {                                                                             \
   if(layer_condition)                                                         \
   {                                                                           \
-    if(obj_alpha_count[read_ioreg(REG_VCOUNT)] > 0)                           \
+    if(obj_alpha_count[read_ioreg(REG_VCOUNT)])                               \
     {                                                                         \
       /* Render based on special effects mode. */                             \
       u32 screen_buffer[240];                                                 \
