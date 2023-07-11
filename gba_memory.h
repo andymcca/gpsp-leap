@@ -171,6 +171,8 @@ typedef enum
   REG_HALTCNT = 0x180
 } hardware_register;
 
+#define REG_BGxCNT(n) (REG_BG0CNT + (n))
+
 #define FLASH_DEVICE_UNDEFINED       0x00
 #define FLASH_DEVICE_MACRONIX_64KB   0x1C
 #define FLASH_DEVICE_AMTEL_64KB      0x3D

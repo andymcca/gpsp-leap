@@ -24,6 +24,10 @@ u16* gba_screen_pixels = NULL;
 #define get_screen_pixels()   gba_screen_pixels
 #define get_screen_pitch()    GBA_SCREEN_PITCH
 
+typedef struct {
+  u16 attr0, attr1, attr2, attr3;
+} t_oam;
+
 static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
  u32 enable_flags, u32 dispcnt, u32 bldcnt, const tile_layer_render_struct
  *layer_renderers);
@@ -863,7 +867,7 @@ static void render_scanline_text_base_normal(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_base_normal(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -1050,7 +1054,7 @@ static void render_scanline_text_transparent_normal(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_transparent_normal(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -1236,7 +1240,7 @@ static void render_scanline_text_base_color16(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_base_color16(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -1421,7 +1425,7 @@ static void render_scanline_text_transparent_color16(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_transparent_color16(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -1606,7 +1610,7 @@ static void render_scanline_text_base_color32(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_base_color32(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -1791,7 +1795,7 @@ static void render_scanline_text_transparent_color32(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_transparent_color32(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -1978,7 +1982,7 @@ static void render_scanline_text_base_alpha(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_base_alpha(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -2161,7 +2165,7 @@ static void render_scanline_text_transparent_alpha(u32 layer,
  u32 start, u32 end, void *scanline)
 {
   render_scanline_extra_variables_transparent_alpha(text);
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
   u32 horizontal_offset =
@@ -2532,7 +2536,7 @@ void render_scanline_affine_##combine_op##_##alpha_op(u32 layer,              \
  u32 start, u32 end, void *scanline)                                          \
 {                                                                             \
   render_scanline_extra_variables_##combine_op##_##alpha_op(affine);          \
-  u32 bg_control = read_ioreg(REG_BG0CNT + layer);                            \
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));                             \
   u32 current_pixel;                                                          \
   s32 source_x, source_y;                                                     \
   u32 pixel_x, pixel_y;                                                       \
@@ -3141,6 +3145,12 @@ static const u32 obj_width_table[] =
 static const u32 obj_height_table[] =
   { 8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64 };
 
+static const u8 obj_dim_table[3][4][2] = {
+  { {8, 8}, {16, 16}, {32, 32}, {64, 64} },
+  { {16, 8}, {32, 8}, {32, 16}, {64, 32} },
+  { {8, 16}, {8, 32}, {16, 32}, {32, 64} }
+};
+
 static u8 obj_priority_list[5][160][128];
 static u8 obj_priority_count[5][160];
 static u8 obj_alpha_count[160];
@@ -3344,83 +3354,92 @@ render_scanline_obj_builder(copy, copy_tile, 2D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
 
+#define OBJ_MOD_NORMAL     0
+#define OBJ_MOD_SEMITRAN   1
+#define OBJ_MOD_WINDOW     2
+#define OBJ_MOD_INVALID    3
 
-
+// Goes through the object list in the OAM (from #127 to #0) and adds objects
+// into a sorted list by priority for the current row.
+// Invisible objects are discarded.
 static void order_obj(u32 video_mode)
 {
-  s32 obj_num, row;
-  s32 obj_x, obj_y;
-  u32 obj_size, obj_mode;
-  s32 obj_width, obj_height;
-  u32 obj_priority;
-  u32 obj_attribute_0, obj_attribute_1, obj_attribute_2;
-  u16 *oam_ptr = oam_ram + 508;
+  s32 obj_num;
+  u32 row;
+  t_oam *oam_base = (t_oam*)oam_ram;
 
   memset(obj_priority_count, 0, sizeof(obj_priority_count));
   memset(obj_alpha_count, 0, sizeof(obj_alpha_count));
 
-  for(obj_num = 127; obj_num >= 0; obj_num--, oam_ptr -= 4)
+  for(obj_num = 127; obj_num >= 0; obj_num--)
   {
-    obj_attribute_0 = eswap16(oam_ptr[0]);
-    obj_attribute_2 = eswap16(oam_ptr[2]);
-    obj_size = obj_attribute_0 & 0xC000;
-    obj_priority = (obj_attribute_2 >> 10) & 0x03;
-    obj_mode = (obj_attribute_0 >> 10) & 0x03;
+    t_oam *oam_ptr = &oam_base[obj_num];
+    u16 obj_attr0 = eswap16(oam_ptr->attr0);
+    // Bit 9 disables regular sprites. Used as double bit for affine ones.
+    bool visible = (obj_attr0 & 0x0300) != 0x0200;
+    if (visible) {
+      u16 obj_shape = obj_attr0 >> 14;
+      u32 obj_mode = (obj_attr0 >> 10) & 0x03;
 
-    if(((obj_attribute_0 & 0x0300) != 0x0200) && (obj_size != 0xC000) &&
-     (obj_mode != 3) && ((video_mode < 3) ||
-     ((obj_attribute_2 & 0x3FF) >= 512)))
-    {
-      obj_y = obj_attribute_0 & 0xFF;
-      if(obj_y > 160)
-        obj_y -= 256;
+      // Prohibited shape and mode
+      bool invalid = (obj_shape == 0x3) || (obj_mode == OBJ_MOD_INVALID);
+      if (!invalid) {
+        u16 obj_attr1 = eswap16(oam_ptr->attr1);
+        u16 obj_attr2 = eswap16(oam_ptr->attr2);
+        u32 obj_priority = (obj_attr2 >> 10) & 0x03;
 
-      obj_attribute_1 = eswap16(oam_ptr[1]);
-      obj_size = ((obj_size >> 12) & 0x0C) | (obj_attribute_1 >> 14);
-      obj_height = obj_height_table[obj_size];
-      obj_width = obj_width_table[obj_size];
-
-      if(obj_attribute_0 & 0x200)
-      {
-        obj_height *= 2;
-        obj_width *= 2;
-      }
-
-      if(((obj_y + obj_height) > 0) && (obj_y < 160))
-      {
-        obj_x = (s32)(obj_attribute_1 << 23) >> 23;
-
-        if(((obj_x + obj_width) > 0) && (obj_x < 240))
+        if (((video_mode < 3) || ((obj_attr2 & 0x3FF) >= 512)))
         {
-          if(obj_y < 0)
+          // Calculate object size (from size and shape attr bits)
+          u16 obj_size = (obj_attr1 >> 14);
+          s32 obj_height = obj_dim_table[obj_shape][obj_size][1];
+          s32 obj_width  = obj_dim_table[obj_shape][obj_size][0];
+          s32 obj_y = obj_attr0 & 0xFF;
+
+          if(obj_y > 160)
+            obj_y -= 256;
+
+          // Double size for affine sprites with double bit set
+          if(obj_attr0 & 0x200)
           {
-            obj_height += obj_y;
-            obj_y = 0;
+            obj_height *= 2;
+            obj_width *= 2;
           }
 
-          if((obj_y + obj_height) >= 160)
-            obj_height = 160 - obj_y;
-
-          if(obj_mode == 1)
+          if(((obj_y + obj_height) > 0) && (obj_y < 160))
           {
-            for(row = obj_y; row < obj_y + obj_height; row++)
-            {
-              u32 cur_cnt = obj_priority_count[obj_priority][row];
-              obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
-              obj_priority_count[obj_priority][row] = cur_cnt + 1;
-              obj_alpha_count[row] = 1;
-            }
-          }
-          else
-          {
-            if(obj_mode == 2)
-              obj_priority = 4;
+            s32 obj_x = (s32)(obj_attr1 << 23) >> 23;
 
-            for(row = obj_y; row < obj_y + obj_height; row++)
+            if(((obj_x + obj_width) > 0) && (obj_x < 240))
             {
-              u32 cur_cnt = obj_priority_count[obj_priority][row];
-              obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
-              obj_priority_count[obj_priority][row] = cur_cnt + 1;
+              // Clip Y coord and height to the 0..159 interval
+              u32 starty = MAX(obj_y, 0);
+              u32 endy   = MIN(obj_y + obj_height, 160);
+
+              switch (obj_mode) {
+              case OBJ_MOD_SEMITRAN:
+                for(row = starty; row < endy; row++)
+                {
+                  u32 cur_cnt = obj_priority_count[obj_priority][row];
+                  obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+                  obj_priority_count[obj_priority][row] = cur_cnt + 1;
+                  // Mark the row as having semi-transparent objects
+                  obj_alpha_count[row] = 1;
+                }
+                break;
+              case OBJ_MOD_WINDOW:
+                obj_priority = 4;
+                /* fallthrough */
+              case OBJ_MOD_NORMAL:
+                // Add the object to the list.
+                for(row = starty; row < endy; row++)
+                {
+                  u32 cur_cnt = obj_priority_count[obj_priority][row];
+                  obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+                  obj_priority_count[obj_priority][row] = cur_cnt + 1;
+                }
+                break;
+              };
             }
           }
         }
@@ -3432,29 +3451,31 @@ static void order_obj(u32 video_mode)
 u32 layer_order[16];
 u32 layer_count;
 
-static void order_layers(u32 layer_flags)
+// Sorts active BG/OBJ layers and generates an ordered list of layers.
+// Things are drawn back to front, so lowest priority goes first.
+static void order_layers(u32 layer_flags, u32 vcnt)
 {
-  s32 priority, layer_number;
+  bool obj_enabled = (layer_flags & 0x10);
+  s32 priority;
+
   layer_count = 0;
 
   for(priority = 3; priority >= 0; priority--)
   {
-    for(layer_number = 3; layer_number >= 0; layer_number--)
+    bool anyobj = obj_priority_count[priority][vcnt] > 0;
+    s32 lnum;
+
+    for(lnum = 3; lnum >= 0; lnum--)
     {
-      if(((layer_flags >> layer_number) & 1) &&
-       ((read_ioreg(REG_BG0CNT + layer_number) & 0x03) == priority))
+      if(((layer_flags >> lnum) & 1) &&
+         ((read_ioreg(REG_BGxCNT(lnum)) & 0x03) == priority))
       {
-        layer_order[layer_count] = layer_number;
-        layer_count++;
+        layer_order[layer_count++] = lnum;
       }
     }
 
-    if((obj_priority_count[priority][read_ioreg(REG_VCOUNT)] > 0)
-     && (layer_flags & 0x10))
-    {
-      layer_order[layer_count] = priority | 0x04;
-      layer_count++;
-    }
+    if(obj_enabled && anyobj)
+      layer_order[layer_count++] = priority | 0x04;
   }
 }
 
@@ -4448,7 +4469,16 @@ static void render_scanline_window_##type(u16 *scanline, u32 dispcnt)         \
 render_scanline_window_builder(tile);
 render_scanline_window_builder(bitmap);
 
-static const u32 active_layers[6] = { 0x1F, 0x17, 0x1C, 0x14, 0x14, 0x14 };
+static const u8 active_layers[] = {
+  0x1F,   // Mode 0, Tile BG0-3 and OBJ
+  0x17,   // Mode 1, Tile BG0-2 and OBJ
+  0x1C,   // Mode 2, Tile BG2-3 and OBJ
+  0x14,   // Mode 3, BMP  BG2 and OBJ
+  0x14,   // Mode 4, BMP  BG2 and OBJ
+  0x14,   // Mode 5, BMP  BG2 and OBJ
+  0,      // Unused
+  0,
+};
 
 void update_scanline(void)
 {
@@ -4466,7 +4496,7 @@ void update_scanline(void)
     reg[OAM_UPDATED] = 0;
   }
 
-  order_layers((dispcnt >> 8) & active_layers[video_mode]);
+  order_layers((dispcnt >> 8) & active_layers[video_mode], vcount);
 
   if(skip_next_frame)
     return;
