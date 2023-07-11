@@ -92,11 +92,8 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 // OBJ should only shift if the top isn't already OBJ
 #define tile_expand_transparent_alpha_obj(index)                              \
   dest = dest_ptr[index];                                                     \
-  if(dest & 0x00000100)                                                       \
-    dest_ptr[index] = (dest & 0xFFFF0000) | current_pixel | pixel_combine;    \
-  else                                                                        \
-    dest_ptr[index] = (dest << 16) | current_pixel | pixel_combine;           \
-
+ u32 obj_shift = current_pixel | pixel_combine;				\
+  dest_ptr[index] = (dest & 0x0000FFFF) | (obj_shift << 16);    \
 
 // For color effects that don't need to preserve the previous layer.
 // The color32 version should be used with 32bit wide dest_ptr so as to be
@@ -3158,11 +3155,7 @@ static u32 obj_alpha_count[160];
 #define render_scanline_obj_extra_variables_alpha_obj(map_space)              \
   render_scanline_obj_extra_variables_color();                                \
   u32 dest;                                                                   \
-  if((pixel_combine & 0x00000200) == 0)                                       \
-  {                                                                           \
-    render_scanline_obj_color32_##map_space(priority, start, end, scanline);  \
-    return;                                                                   \
-  }                                                                           \
+  u32 base_pixel_combine = pixel_combine;                                     \
 
 #define render_scanline_obj_extra_variables_color16(map_space)                \
   render_scanline_obj_extra_variables_color()                                 \
@@ -3335,8 +3328,8 @@ render_scanline_obj_builder(transparent, color16, 1D, no_partial_alpha);
 render_scanline_obj_builder(transparent, color16, 2D, no_partial_alpha);
 render_scanline_obj_builder(transparent, color32, 1D, no_partial_alpha);
 render_scanline_obj_builder(transparent, color32, 2D, no_partial_alpha);
-render_scanline_obj_builder(transparent, alpha_obj, 1D, no_partial_alpha);
-render_scanline_obj_builder(transparent, alpha_obj, 2D, no_partial_alpha);
+render_scanline_obj_builder(transparent, alpha_obj, 1D, partial_alpha);
+render_scanline_obj_builder(transparent, alpha_obj, 2D, partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 1D, partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 2D, partial_alpha);
 render_scanline_obj_builder(copy, copy_tile, 1D, no_partial_alpha);
@@ -4510,5 +4503,3 @@ void update_scanline(void)
   affine_reference_x[1] += (s16)read_ioreg(REG_BG3PB);
   affine_reference_y[1] += (s16)read_ioreg(REG_BG3PD);
 }
-
-
