@@ -171,7 +171,10 @@ typedef enum
   REG_HALTCNT = 0x180
 } hardware_register;
 
+// Some useful macros to avoid reg math
 #define REG_BGxCNT(n) (REG_BG0CNT + (n))
+#define REG_WINxH(n)  (REG_WIN0H  + (n))
+#define REG_WINxV(n)  (REG_WIN0V  + (n))
 
 #define FLASH_DEVICE_UNDEFINED       0x00
 #define FLASH_DEVICE_MACRONIX_64KB   0x1C

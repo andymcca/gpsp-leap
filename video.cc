@@ -3341,6 +3341,7 @@ static void render_scanline_obj_##alpha_op##_##map_space(u32 priority,        \
   }                                                                           \
 }                                                                             \
 
+// There are actually used to render sprites to the scanline
 render_scanline_obj_builder(transparent, normal, 1D, no_partial_alpha);
 render_scanline_obj_builder(transparent, normal, 2D, no_partial_alpha);
 render_scanline_obj_builder(transparent, color16, 1D, no_partial_alpha);
@@ -3351,6 +3352,8 @@ render_scanline_obj_builder(transparent, alpha_obj, 1D, no_partial_alpha);
 render_scanline_obj_builder(transparent, alpha_obj, 2D, no_partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 1D, partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 2D, partial_alpha);
+
+// These are used for winobj rendering
 render_scanline_obj_builder(copy, copy_tile, 1D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_tile, 2D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
@@ -3991,39 +3994,37 @@ static void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_
 
 
 // Renders an entire scanline from 0 to 240, based on current color mode.
-
-static void render_scanline_tile(u16 *scanline, u32 dispcnt)
+template<bool tiled>
+static void render_scanline(u16 *scanline, u32 dispcnt)
 {
   u32 current_layer;
   u32 layer_order_pos;
-  u32 bldcnt = read_ioreg(REG_BLDCNT);
-  render_scanline_layer_functions_tile();
 
-  render_layers_color_effect(render_layers, layer_count,
-   render_condition_alpha, render_condition_fade, 0, 240);
-}
+  if (tiled) {
+    u32 bldcnt = read_ioreg(REG_BLDCNT);
+    render_scanline_layer_functions_tile();
 
-static void render_scanline_bitmap(u16 *scanline, u32 dispcnt)
-{
-  render_scanline_layer_functions_bitmap();
-  u32 current_layer;
-  u32 layer_order_pos;
+    render_layers_color_effect(render_layers, layer_count,
+      render_condition_alpha, render_condition_fade, 0, 240);
+  } else {
+    render_scanline_layer_functions_bitmap();
+    fill_line_bg(normal, scanline, 0, 240);
 
-  fill_line_bg(normal, scanline, 0, 240);
-
-  for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
-  {
-    current_layer = layer_order[layer_order_pos];
-    if(current_layer & 0x04)
+    for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
     {
-      render_obj_layer(normal, scanline, 0, 240);
-    }
-    else
-    {
-      layer_renderers->normal_render(0, 240, scanline);
+      current_layer = layer_order[layer_order_pos];
+      if(current_layer & 0x04)
+      {
+        render_obj_layer(normal, scanline, 0, 240);
+      }
+      else
+      {
+        layer_renderers->normal_render(0, 240, scanline);
+      }
     }
   }
 }
+
 
 // Render layers from start to end based on if they're allowed in the
 // enable flags.
@@ -4168,308 +4169,208 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 }
 
 
-#define window_x_coords(window_number)                                        \
-  window_##window_number##_x1 =                                               \
-   read_ioreg(REG_WIN##window_number##H) >> 8;                                \
-  window_##window_number##_x2 =                                               \
-   read_ioreg(REG_WIN##window_number##H) & 0xFF;                              \
-  window_##window_number##_enable =                                           \
-   (winin >> (window_number * 8)) & 0x3F;                                     \
-                                                                              \
-  if(window_##window_number##_x1 > 240)                                       \
-    window_##window_number##_x1 = 240;                                        \
-                                                                              \
-  if(window_##window_number##_x2 > 240)                                       \
-    window_##window_number##_x2 = 240                                         \
+// If the window Y coordinates are out of the window range we can skip
+// rendering the inside of the window.
+inline bool in_window_y(u32 vcount, u32 top, u32 bottom) {
+  // TODO: check if these are reversed when top-bottom are also reversed.
+  if (top > 227)     // This causes the window to be invisible
+    return false;
+  if (bottom > 227)  // This makes it all visible
+    return true;
 
-#define window_coords(window_number)                                          \
-  u32 window_##window_number##_x1, window_##window_number##_x2;               \
-  u32 window_##window_number##_y1, window_##window_number##_y2;               \
-  u32 window_##window_number##_enable = 0;                                    \
-  window_##window_number##_y1 =                                               \
-   read_ioreg(REG_WIN##window_number##V) >> 8;                                \
-  window_##window_number##_y2 =                                               \
-   read_ioreg(REG_WIN##window_number##V) & 0xFF;                              \
-                                                                              \
-  if(window_##window_number##_y1 > window_##window_number##_y2)               \
-  {                                                                           \
-    if((((vcount <= window_##window_number##_y2) ||                           \
-     (vcount > window_##window_number##_y1)) ||                               \
-     (window_##window_number##_y2 > 227)) &&                                  \
-     (window_##window_number##_y1 <= 227))                                    \
-    {                                                                         \
-      window_x_coords(window_number);                                         \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      window_##window_number##_x1 = 240;                                      \
-      window_##window_number##_x2 = 240;                                      \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    if((((vcount >= window_##window_number##_y1) &&                           \
-     (vcount < window_##window_number##_y2)) ||                               \
-     (window_##window_number##_y2 > 227)) &&                                  \
-     (window_##window_number##_y1 <= 227))                                    \
-    {                                                                         \
-      window_x_coords(window_number);                                         \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      window_##window_number##_x1 = 240;                                      \
-      window_##window_number##_x2 = 240;                                      \
-    }                                                                         \
-  }                                                                           \
+  if (top > bottom)  /* Reversed: if not in the "band" */
+    return vcount > top || vcount <= bottom;
 
-#define render_window_segment(type, start, end, window_type)                  \
-  if(start != end)                                                            \
-  {                                                                           \
-    render_scanline_conditional_##type(start, end, scanline,                  \
-     window_##window_type##_enable, dispcnt, bldcnt, layer_renderers);        \
-  }                                                                           \
+  return vcount >= top && vcount < bottom;
+}
 
-#define render_window_segment_unequal(type, start, end, window_type)          \
-  render_scanline_conditional_##type(start, end, scanline,                    \
-   window_##window_type##_enable, dispcnt, bldcnt, layer_renderers)           \
+// Temporary wrap functions, to be removed once all the plain calls do not exist
 
-#define render_window_segment_clip(type, clip_start, clip_end, start, end,    \
- window_type)                                                                 \
-{                                                                             \
-  if(start != end)                                                            \
-  {                                                                           \
-    if(start < clip_start)                                                    \
-    {                                                                         \
-      if(end > clip_start)                                                    \
-      {                                                                       \
-        if(end > clip_end)                                                    \
-        {                                                                     \
-          render_window_segment_unequal(type, clip_start, clip_end,           \
-           window_type);                                                      \
-        }                                                                     \
-        else                                                                  \
-        {                                                                     \
-          render_window_segment_unequal(type, clip_start, end, window_type);  \
-        }                                                                     \
-      }                                                                       \
-    }                                                                         \
-    else                                                                      \
-                                                                              \
-    if(end > clip_end)                                                        \
-    {                                                                         \
-      if(start < clip_end)                                                    \
-        render_window_segment_unequal(type, start, clip_end, window_type);    \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      render_window_segment_unequal(type, start, end, window_type);           \
-    }                                                                         \
-  }                                                                           \
-}                                                                             \
+template <bool tiled>
+static inline void render_scanline_conditional(u32 start, u32 end,
+  u16 *scanline, u32 enable_flags, u32 dispcnt, u32 bldcnt)
+{
+  if (tiled) {
+    const tile_layer_render_struct *layer_renderers = tile_mode_renderers[dispcnt & 0x07];
+    render_scanline_conditional_tile(start, end, scanline, enable_flags, dispcnt, bldcnt, layer_renderers);
+  }
+  else {
+    const bitmap_layer_render_struct *layer_renderers = &bitmap_mode_renderers[(dispcnt & 0x07) - 3];
+    render_scanline_conditional_bitmap(start, end, scanline, enable_flags, dispcnt, bldcnt, layer_renderers);
+  }
+}
 
-#define render_window_clip_1(type, start, end)                                \
-  if(window_1_x1 != 240)                                                      \
-  {                                                                           \
-    if(window_1_x1 > window_1_x2)                                             \
-    {                                                                         \
-      render_window_segment_clip(type, start, end, 0, window_1_x2, 1);        \
-      render_window_segment_clip(type, start, end, window_1_x2, window_1_x1,  \
-       out);                                                                  \
-      render_window_segment_clip(type, start, end, window_1_x1, 240, 1);      \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      render_window_segment_clip(type, start, end, 0, window_1_x1, out);      \
-      render_window_segment_clip(type, start, end, window_1_x1, window_1_x2,  \
-       1);                                                                    \
-      render_window_segment_clip(type, start, end, window_1_x2, 240, out);    \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    render_window_segment(type, start, end, out);                             \
-  }                                                                           \
+// Renders window1 (low priority window) and outside/obj areas for a given range.
+template <bool tiled>
+static void render_windowobj_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
+{
+  u32 bldcnt = read_ioreg(REG_BLDCNT);
+  u32 winout = read_ioreg(REG_WINOUT);
+  u32 wndout_enable = winout & 0x3F;
+  render_scanline_conditional<tiled>(start, end, scanline,
+    wndout_enable, dispcnt, bldcnt);
 
-#define render_window_clip_obj(type, start, end);                             \
-  render_window_segment(type, start, end, out);                               \
-  if(dispcnt & 0x40)                                                          \
-    render_scanline_obj_copy_##type##_1D(4, start, end, scanline);            \
-  else                                                                        \
-    render_scanline_obj_copy_##type##_2D(4, start, end, scanline)             \
+  if (dispcnt >> 15) {
+    // Perform the actual object rendering in copy mode
+    if (tiled) {
+      if (dispcnt & 0x40)
+        render_scanline_obj_copy_tile_1D(4, start, end, scanline);
+      else
+        render_scanline_obj_copy_tile_2D(4, start, end, scanline);
+    } else {
+      if (dispcnt & 0x40)
+        render_scanline_obj_copy_bitmap_1D(4, start, end, scanline);
+      else
+        render_scanline_obj_copy_bitmap_2D(4, start, end, scanline);
+    }
+  }
+}
 
+// Renders window1 (low priority window) and outside/obj areas for a given range.
+template <bool tiled>
+static void render_window1_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
+{
+  u32 bldcnt = read_ioreg(REG_BLDCNT);
+  u32 winout = read_ioreg(REG_WINOUT);
+  u32 wndout_enable = winout & 0x3F;
 
-#define render_window_segment_clip_obj(type, clip_start, clip_end, start,     \
- end)                                                                         \
-{                                                                             \
-  if(start != end)                                                            \
-  {                                                                           \
-    if(start < clip_start)                                                    \
-    {                                                                         \
-      if(end > clip_start)                                                    \
-      {                                                                       \
-        if(end > clip_end)                                                    \
-        {                                                                     \
-          render_window_clip_obj(type, clip_start, clip_end);                 \
-        }                                                                     \
-        else                                                                  \
-        {                                                                     \
-          render_window_clip_obj(type, clip_start, end);                      \
-        }                                                                     \
-      }                                                                       \
-    }                                                                         \
-    else                                                                      \
-                                                                              \
-    if(end > clip_end)                                                        \
-    {                                                                         \
-      if(start < clip_end)                                                    \
-      {                                                                       \
-        render_window_clip_obj(type, start, clip_end);                        \
-      }                                                                       \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      render_window_clip_obj(type, start, end);                               \
-    }                                                                         \
-  }                                                                           \
-}                                                                             \
+  switch (dispcnt >> 14) {
+  case 0x0:    // No Win1 nor WinObj
+    render_scanline_conditional<tiled>(
+      start, end, scanline, wndout_enable, dispcnt, bldcnt);
+    break;
+  case 0x2:    // Only winobj enabled, render it.
+    render_windowobj_pass<tiled>(scanline, dispcnt, start, end);
+    break;
+  case 0x1: case 0x3:   // Win1 is enabled (and perhaps WinObj too)
+    {
+      // Attempt to render window 1
+      u32 vcount = read_ioreg(REG_VCOUNT);
+      // Check the Y coordinates to check if they fall in the right row
+      u32 win_top = read_ioreg(REG_WINxV(1)) >> 8;
+      u32 win_bot = read_ioreg(REG_WINxV(1)) & 0xFF;
+      // Check the X coordinates and generate up to three segments
+      // Clip the coordinates to the [start, end) range.
+      u32 win_l = MAX(start, MIN(end, read_ioreg(REG_WINxH(1)) >> 8));
+      u32 win_r = MAX(start, MIN(end, read_ioreg(REG_WINxH(1)) & 0xFF));
 
+      if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
+        // Window1 is completely out, just render all out.
+        render_windowobj_pass<tiled>(
+          scanline, dispcnt, start, end);
+      else {
+        // Render win1 withtin the clipped range
+        // Enable bits for stuff inside the window (and outside)
+        u32 winin  = read_ioreg(REG_WININ);
+        u32 wnd1_enable = (winin >> 8) & 0x3F;
 
-#define render_window_clip_1_obj(type, start, end)                            \
-  if(window_1_x1 != 240)                                                      \
-  {                                                                           \
-    if(window_1_x1 > window_1_x2)                                             \
-    {                                                                         \
-      render_window_segment_clip(type, start, end, 0, window_1_x2, 1);        \
-      render_window_segment_clip_obj(type, start, end, window_1_x2,           \
-       window_1_x1);                                                          \
-      render_window_segment_clip(type, start, end, window_1_x1, 240, 1);      \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      render_window_segment_clip_obj(type, start, end, 0, window_1_x1);       \
-      render_window_segment_clip(type, start, end, window_1_x1, window_1_x2,  \
-       1);                                                                    \
-      render_window_segment_clip_obj(type, start, end, window_1_x2, 240);     \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    render_window_clip_obj(type, start, end);                                 \
-  }                                                                           \
+        // If the window is defined upside down, the areas are inverted.
+        if (win_l < win_r) {
+          // Render [start, win_l) range (which is outside the window)
+          if (win_l != start)
+            render_windowobj_pass<tiled>(scanline, dispcnt, start, win_l);
+          // Render the actual window0 pixels
+          render_scanline_conditional<tiled>(
+            win_l, win_r, scanline, wnd1_enable, dispcnt, bldcnt);
+          // Render the [win_l, end] range (outside)
+          if (win_r != end)
+            render_windowobj_pass<tiled>(scanline, dispcnt, win_r, end);
+        } else {
+          // Render [0, win_r) range (which is "inside" window0)
+          if (win_r != start)
+            render_scanline_conditional<tiled>(
+              start, win_r, scanline, wnd1_enable, dispcnt, bldcnt);
+          // The actual window is now outside, render recursively
+          render_windowobj_pass<tiled>(scanline, dispcnt, win_r, win_l);
+          // Render the [win_l, 240] range ("inside")
+          if (win_l != end)
+            render_scanline_conditional<tiled>(
+              win_l, end, scanline, wnd1_enable, dispcnt, bldcnt);
+        }
+      }
+    }
+    break;
+  };
+}
+
+// Renders window0 (high priority window) and renders window1 or out
+// on the area that falls outside. It will call the above function for
+// outside areas to "recursively" render segments.
+template <bool tiled>
+static void render_window0_pass(u16 *scanline, u16 dispcnt)
+{
+  u32 bldcnt = read_ioreg(REG_BLDCNT);
+  u32 vcount = read_ioreg(REG_VCOUNT);
+  // Check the Y coordinates to check if they fall in the right row
+  u32 win_top = read_ioreg(REG_WINxV(0)) >> 8;
+  u32 win_bot = read_ioreg(REG_WINxV(0)) & 0xFF;
+  // Check the X coordinates and generate up to three segments
+  u32 win_l = MIN(240, read_ioreg(REG_WINxH(0)) >> 8);
+  u32 win_r = MIN(240, read_ioreg(REG_WINxH(0)) & 0xFF);
+
+  if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
+    // No windowing, everything is "outside", just render win1.
+    render_window1_pass<tiled>(scanline, dispcnt, 0, 240);
+  else {
+    u32 winin  = read_ioreg(REG_WININ);
+    // Enable bits for stuff inside the window
+    u32 wnd0_enable = (winin) & 0x3F;
+
+    // If the window is defined upside down, the areas are inverted.
+    if (win_l < win_r) {
+      // Render [0, win_l) range (which is outside the window)
+      if (win_l)
+        render_window1_pass<tiled>(scanline, dispcnt, 0, win_l);
+      // Render the actual window0 pixels
+      render_scanline_conditional<tiled>(
+        win_l, win_r, scanline, wnd0_enable, dispcnt, bldcnt);
+      // Render the [win_l, 240] range (outside)
+      if (win_r != 240)
+        render_window1_pass<tiled>(scanline, dispcnt, win_r, 240);
+    } else {
+      // Render [0, win_r) range (which is "inside" window0)
+      if (win_r)
+        render_scanline_conditional<tiled>(
+          0, win_r, scanline, wnd0_enable, dispcnt, bldcnt);
+      // The actual window is now outside, render recursively
+      render_window1_pass<tiled>(scanline, dispcnt, win_r, win_l);
+      // Render the [win_l, 240] range ("inside")
+      if (win_l != 240)
+        render_scanline_conditional<tiled>(
+          win_l, 240, scanline, wnd0_enable, dispcnt, bldcnt);
+    }
+  }
+}
 
 
+// Renders a full scaleline, taking into consideration windowing effects.
+// Breaks the rendering step into N steps, for each windowed region.
+template <bool tiled>
+static void render_scanline_window(u16 *scanline, u16 dispcnt)
+{
+  u32 win_ctrl = (dispcnt >> 13);
 
-#define render_window_single(type, window_number)                             \
-  u32 winin = read_ioreg(REG_WININ);                                          \
-  window_coords(window_number);                                               \
-  if(window_##window_number##_x1 > window_##window_number##_x2)               \
-  {                                                                           \
-    render_window_segment(type, 0, window_##window_number##_x2,               \
-     window_number);                                                          \
-    render_window_segment(type, window_##window_number##_x2,                  \
-     window_##window_number##_x1, out);                                       \
-    render_window_segment(type, window_##window_number##_x1, 240,             \
-     window_number);                                                          \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    render_window_segment(type, 0, window_##window_number##_x1, out);         \
-    render_window_segment(type, window_##window_number##_x1,                  \
-     window_##window_number##_x2, window_number);                             \
-    render_window_segment(type, window_##window_number##_x2, 240, out);       \
-  }                                                                           \
-
-#define render_window_multi(type, front, back)                                \
-  if(window_##front##_x1 > window_##front##_x2)                               \
-  {                                                                           \
-    render_window_segment(type, 0, window_##front##_x2, front);               \
-    render_window_clip_##back(type, window_##front##_x2,                      \
-     window_##front##_x1);                                                    \
-    render_window_segment(type, window_##front##_x1, 240, front);             \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    render_window_clip_##back(type, 0, window_##front##_x1);                  \
-    render_window_segment(type, window_##front##_x1, window_##front##_x2,     \
-     front);                                                                  \
-    render_window_clip_##back(type, window_##front##_x2, 240);                \
-  }                                                                           \
-
-#define render_scanline_window_builder(type)                                  \
-static void render_scanline_window_##type(u16 *scanline, u32 dispcnt)         \
-{                                                                             \
-  u32 vcount = read_ioreg(REG_VCOUNT);                                        \
-  u32 winout = read_ioreg(REG_WINOUT);                                        \
-  u32 bldcnt = read_ioreg(REG_BLDCNT);                                        \
-  u32 window_out_enable = winout & 0x3F;                                      \
-                                                                              \
-  render_scanline_layer_functions_##type();                                   \
-                                                                              \
-  switch(dispcnt >> 13)                                                       \
-  {                                                                           \
-    /* Just window 0 */                                                       \
-    case 0x01:                                                                \
-    {                                                                         \
-      render_window_single(type, 0);                                          \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    /* Just window 1 */                                                       \
-    case 0x02:                                                                \
-    {                                                                         \
-      render_window_single(type, 1);                                          \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    /* Windows 1 and 2 */                                                     \
-    case 0x03:                                                                \
-    {                                                                         \
-      u32 winin = read_ioreg(REG_WININ);                                      \
-      window_coords(0);                                                       \
-      window_coords(1);                                                       \
-      render_window_multi(type, 0, 1);                                        \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    /* Just OBJ windows */                                                    \
-    case 0x04:                                                                \
-    {                                                                         \
-      render_window_clip_obj(type, 0, 240);                                   \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    /* Window 0 and OBJ window */                                             \
-    case 0x05:                                                                \
-    {                                                                         \
-      u32 winin = read_ioreg(REG_WININ);                                      \
-      window_coords(0);                                                       \
-      render_window_multi(type, 0, obj);                                      \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    /* Window 1 and OBJ window */                                             \
-    case 0x06:                                                                \
-    {                                                                         \
-      u32 winin = read_ioreg(REG_WININ);                                      \
-      window_coords(1);                                                       \
-      render_window_multi(type, 1, obj);                                      \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    /* Window 0, 1, and OBJ window */                                         \
-    case 0x07:                                                                \
-    {                                                                         \
-      u32 winin = read_ioreg(REG_WININ);                                      \
-      window_coords(0);                                                       \
-      window_coords(1);                                                       \
-      render_window_multi(type, 0, 1_obj);                                    \
-      break;                                                                  \
-    }                                                                         \
-  }                                                                           \
-}                                                                             \
-
-render_scanline_window_builder(tile);
-render_scanline_window_builder(bitmap);
+  // Priority decoding for windows
+  switch (win_ctrl) {
+  case 0x1: case 0x3: case 0x5: case 0x7:
+    // Window 0 is enabled, call the win0 render function. It does recursively
+    // check for window 1 and Obj, so no worries.
+    render_window0_pass<tiled>(scanline, dispcnt);
+    break;
+  case 0x2: case 0x6:
+    // Window 1 is active, call the window1 renderer.
+    render_window1_pass<tiled>(scanline, dispcnt, 0, 240);
+    break;
+  case 0x4:
+    // Only winobj seems active
+    render_windowobj_pass<tiled>(scanline, dispcnt, 0, 240);
+    break;
+  case 0x0:
+    // No windows are active?
+    render_scanline<tiled>(scanline, dispcnt);
+    break;
+  }
+}
 
 static const u8 active_layers[] = {
   0x1F,   // Mode 0, Tile BG0-3 and OBJ
@@ -4485,7 +4386,7 @@ static const u8 active_layers[] = {
 void update_scanline(void)
 {
   u32 pitch = get_screen_pitch();
-  u32 dispcnt = read_ioreg(REG_DISPCNT);
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 vcount = read_ioreg(REG_VCOUNT);
   u16 *screen_offset = get_screen_pixels() + (vcount * pitch);
   u32 video_mode = dispcnt & 0x07;
@@ -4510,24 +4411,11 @@ void update_scanline(void)
   }
   else
   {
+    // Modes 0..2 are tiled modes, 3..5 are bitmap-based modes.
     if(video_mode < 3)
-    {
-      if(dispcnt >> 13)
-      {
-        render_scanline_window_tile(screen_offset, dispcnt);
-      }
-      else
-      {
-        render_scanline_tile(screen_offset, dispcnt);
-      }
-    }
+      render_scanline_window<true>(screen_offset, dispcnt);
     else
-    {
-      if(dispcnt >> 13)
-        render_scanline_window_bitmap(screen_offset, dispcnt);
-      else
-        render_scanline_bitmap(screen_offset, dispcnt);
-    }
+      render_scanline_window<false>(screen_offset, dispcnt);
   }
 
   affine_reference_x[0] += (s16)read_ioreg(REG_BG2PB);
