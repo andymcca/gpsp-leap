@@ -3235,9 +3235,9 @@ static u32 obj_alpha_count[160];
   render_scanline_obj_main(combine_op, alpha_op, map_space)                   \
 
 #define render_scanline_obj_partial_alpha(combine_op, alpha_op, map_space)    \
-  if((obj_attribute_0 >> 10) & 0x03)                                          \
+  if((obj_attribute_0 >> 10) & 0x01)                                          \
   {                                                                           \
-    pixel_combine = 0x00000300;                                               \
+    pixel_combine = 0x00001300;                                               \
     render_scanline_obj_main(combine_op, alpha_obj, map_space);               \
   }                                                                           \
   else                                                                        \
@@ -3566,7 +3566,7 @@ fill_line_builder(color32);
   pixel_top = (pixel_top >> 16) | pixel_top                                   \
 
 #define expand_pixel(expand_type, pixel_source)                               \
-  pixel_top = palette_ram_converted[pixel_source & 0x1FF];                    \
+  pixel_top = palette_ram_converted[pixel_source & 0x11FF];                    \
   expand_pixel_no_dest(expand_type, pixel_source);                            \
   *screen_dest_ptr = pixel_top                                                \
 
@@ -3579,7 +3579,7 @@ fill_line_builder(color32);
   for(i = 0; i < end; i++)                                                    \
   {                                                                           \
     pixel_source = *screen_src_ptr;                                           \
-    if(effect_condition)                                                      \
+    if(effect_condition || pixel_source & 0x00001000)                                                      \
     {                                                                         \
       expand_pixel(expand_type, pixel_source);                                \
     }                                                                         \
