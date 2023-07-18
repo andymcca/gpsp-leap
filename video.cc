@@ -791,8 +791,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 
 // Extra variables specific for 8bpp/4bpp tile renderers.
 
-#define tile_extra_variables_8bpp()                                           \
-
 #define tile_extra_variables_4bpp()                                           \
   u32 current_palette                                                         \
 
@@ -865,378 +863,212 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 
 static const u32 map_widths[] = { 256, 512, 256, 512 };
 
-static void render_scanline_text_base_normal(u32 layer,
+// Renders non-affine tiled background layer.
+// Will process a full or partial tile (start and end within 0..8) and draw
+// it in either 8 or 4 bpp mode. Honors vertical and horizontal flip.
+
+template<typename dsttype, bool transparent, bool hflip>
+static inline void render_tile_Nbpp(
+  dsttype *dest_ptr, bool is8bpp, u32 start, u32 end, u16 tile,
+  const u8 *tile_base, int vertical_pixel_flip
+) {
+  // tile contains the tile info (contains tile index, flip bits, pal info)
+  // hflip causes the tile pixels lookup to be reversed (from MSB to LSB
+  // If transparent is set, color 0 is honoured (no write). Otherwise we assume
+  // that we are drawing the base layer, so palette[0] is used (backdrop).
+
+  // Seek to the specified tile, using the tile number and size.
+  // tile_base already points to the right tile-line vertical offset
+  const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
+
+  // On vertical flip, apply the mirror offset
+  if (tile & 0x800)
+    tile_ptr += vertical_pixel_flip;
+
+  if (is8bpp) {
+    // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
+    u64 tilepix = eswap64(*(u64*)tile_ptr);
+    for (u32 i = start; i < end; i++, dest_ptr++) {
+      u32 sel = hflip ? (7-i) : i;
+      u8 pval = (tilepix >> (sel*8)) & 0xFF;
+      if (!transparent || pval)
+        *dest_ptr = palette_ram_converted[pval];
+    }
+  } else {
+    // In 4bpp mode, the tile[15..12] bits contain the sub-palette number.
+    u16 tilepal = (tile >> 12) << 4;
+    // Only 32 bits (8 pixels * 4 bits)
+    u32 tilepix = eswap32(*(u32*)tile_ptr);
+    for (u32 i = start; i < end; i++, dest_ptr++) {
+      u32 sel = hflip ? (7-i) : i;
+      u8 pval = (tilepix >> (sel*4)) & 0xF;
+      if (transparent) {
+        if (pval)
+          *dest_ptr = palette_ram_converted[pval | tilepal];
+      } else {
+        u8 colidx = pval ? (pval | tilepal) : 0;
+        *dest_ptr = palette_ram_converted[colidx];
+      }
+    }
+  }
+}
+
+template<bool transparent>
+static void render_scanline_text_normal(u32 layer,
  u32 start, u32 end, void *scanline)
 {
-  render_scanline_extra_variables_base_normal(text);
   u32 bg_control = read_ioreg(REG_BGxCNT(layer));
+  u16 vcount = read_ioreg(REG_VCOUNT);
   u32 map_size = (bg_control >> 14) & 0x03;
   u32 map_width = map_widths[map_size];
-  u32 horizontal_offset =
-   (read_ioreg(REG_BG0HOFS + (layer * 2)) + start) % 512;
-  u32 vertical_offset = (read_ioreg(REG_VCOUNT) +
-   read_ioreg(REG_BG0VOFS + (layer * 2))) % 512;
-  u32 current_pixel;
-  u32 current_pixels;
-  u32 partial_tile_run = 0;
-  u32 partial_tile_offset;
-  u32 tile_run;
+  u32 hoffset = (start + read_ioreg(REG_BGxHOFS(layer))) % 512;
+  u32 voffset = (vcount + read_ioreg(REG_BGxVOFS(layer))) % 512;
   u32 i;
   render_scanline_dest_normal *dest_ptr =
    ((render_scanline_dest_normal *)scanline) + start;
 
-  u16 *map_base = (u16 *)(vram + ((bg_control >> 8) & 0x1F) * (1024 * 2));
+  // Background map data is in vram, at an offset specified in 2K blocks.
+  // (each map data block is 32x32 tiles, at 16bpp, so 2KB)
+  u32 base_block = (bg_control >> 8) & 0x1F;
+  u16 *map_base = (u16 *)&vram[base_block * 2048];
+
   u16 *map_ptr, *second_ptr;
-  u8 *tile_ptr;
 
   end -= start;
 
-  if((map_size & 0x02) && (vertical_offset >= 256))
-  {
-    map_base += ((map_width / 8) * 32) +
-     (((vertical_offset - 256) / 8) * 32);
-  }
-  else
-  {
-    map_base += (((vertical_offset % 256) / 8) * 32);
-  }
+  // Skip the top one/two block(s) if using the bottom half
+  if ((map_size & 0x02) && (voffset >= 256))
+    map_base += ((map_width / 8) * 32);
 
-  if(map_size & 0x01)
+  // Skip the top tiles within the block
+  map_base += (((voffset % 256) / 8) * 32);
+
+  // we might need to render from two charblocks, store a second pointer.
+  second_ptr = map_ptr = map_base;
+
+  if(map_size & 0x01)    // If background is 512 pixels wide
   {
-    if(horizontal_offset >= 256)
+    if(hoffset >= 256)
     {
-      horizontal_offset -= 256;
-      map_ptr = map_base + (32 * 32) + (horizontal_offset / 8);
-      second_ptr = map_base;
+      // If we are rendering the right block, skip a whole charblock
+      hoffset -= 256;
+      map_ptr += (32 * 32);
     }
     else
     {
-      map_ptr = map_base + (horizontal_offset / 8);
-      second_ptr = map_base + (32 * 32);
+      // If we are rendering the left block, we might overrun into the right
+      second_ptr += (32 * 32);
     }
   }
   else
   {
-    horizontal_offset %= 256;
-    map_ptr = map_base + (horizontal_offset / 8);
-    second_ptr = map_base;
+    hoffset %= 256;     // Background is 256 pixels wide
   }
 
-  if(bg_control & 0x80)
+  // Skip the left blocks within the block
+  map_ptr += hoffset / 8;
+
   {
-     /* color depth: 8bpp 
-      * combine: base
-      * alpha : normal
-      */
+    bool mode8bpp = (bg_control & 0x80);   // Color depth 8bpp when set
 
-     /* Render a single scanline of text tiles */
-     u32 vertical_pixel_offset = (vertical_offset % 8) *
-        tile_width_8bpp;
-     s32 vertical_pixel_flip =
-        ((tile_size_8bpp - tile_width_8bpp) -
-         vertical_pixel_offset) - vertical_pixel_offset;
+    // Render a single scanline of text tiles
+    u32 tilewidth = mode8bpp ? tile_width_8bpp : tile_width_4bpp;
+    u32 vert_pix_offset = (voffset % 8) * tilewidth;
+    // Calculate the pixel offset between a line and its "flipped" mirror.
+    // The values can be {56, 40, 24, 8, -8, -24, -40, -56}
+    s32 vflip_off = mode8bpp ?
+         tile_size_8bpp - 2*vert_pix_offset - tile_width_8bpp :
+         tile_size_4bpp - 2*vert_pix_offset - tile_width_4bpp;
 
-     tile_extra_variables_8bpp();
+    // The tilemap base is selected via bgcnt (16KiB chunks)
+    u32 tilecntrl = (bg_control >> 2) & 0x03;
+    // Account for the base offset plus the tile vertical offset
+    u8 *tile_base = &vram[tilecntrl * 16*1024 + vert_pix_offset];
+    // Number of pixels available until the end of the tile block
+    u32 pixel_run = 256 - hoffset;
 
-     u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
-        vertical_pixel_offset;
-     u32 pixel_run = 256 - (horizontal_offset % 256);
-     u32 current_tile;
+    u32 tile_hoff = hoffset % 8;
+    u32 partial_hcnt = 8 - tile_hoff;
 
-     map_base += ((vertical_offset % 256) / 8) * 32;
-     partial_tile_offset = (horizontal_offset % 8);
+    if (tile_hoff) {
+      // First partial tile, only right side is visible.
+      u32 todraw = MIN(end, partial_hcnt); // [1..7]
+      u32 stop = tile_hoff + todraw;   // Usually 8, unless short run.
 
-     if(pixel_run >= end)
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           if(end < partial_tile_run)
-           {
-              partial_tile_run = end;
-              partial_tile_mid_map(base, 8bpp, normal);
-              return;
-           }
-           else
-           {
-              end -= partial_tile_run;
-              partial_tile_right_map(base, 8bpp, normal);
-           }
-        }
-     }
-     else
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           partial_tile_right_map(base, 8bpp, normal);
-        }
+      u16 tile = eswap16(*map_ptr++);
+      if (tile & 0x400)   // Tile horizontal flip
+        render_tile_Nbpp<u16, transparent, true>(dest_ptr, mode8bpp, tile_hoff, stop, tile, tile_base, vflip_off);
+      else
+        render_tile_Nbpp<u16, transparent, false>(dest_ptr, mode8bpp, tile_hoff, stop, tile, tile_base, vflip_off);
 
-        tile_run = (pixel_run - partial_tile_run) / 8;
-        multiple_tile_map_base_8bpp_normal();
-        map_ptr = second_ptr;
-        end -= pixel_run;
-     }
-     tile_run = end / 8;
-     multiple_tile_map_base_8bpp_normal();
+      dest_ptr += todraw;
+      end -= todraw;
+      pixel_run -= todraw;
+    }
 
-     partial_tile_run = end % 8;
-     if(partial_tile_run)
-     {
-        partial_tile_left_map(base, 8bpp, normal);
-     }
+    if (!end)
+      return;
+
+    // Now render full tiles
+    u32 todraw = MIN(end, pixel_run) / 8;
+
+    for (i = 0; i < todraw; i++) {
+      u16 tile = eswap16(*map_ptr++);
+      if (tile & 0x400)   // Tile horizontal flip
+        render_tile_Nbpp<u16, transparent, true>(&dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+      else
+        render_tile_Nbpp<u16, transparent, false>(&dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+    }
+
+    end -= todraw * 8;
+    pixel_run -= todraw * 8;
+    dest_ptr += todraw * 8;
+
+    if (!end)
+      return;
+
+    // Switch to the next char block if we ran out of tiles
+    if (!pixel_run)
+      map_ptr = second_ptr;
+
+    todraw = end / 8;
+    if (todraw) {
+      for (i = 0; i < todraw; i++) {
+        u16 tile = eswap16(*map_ptr++);
+        if (tile & 0x400)   // Tile horizontal flip
+          render_tile_Nbpp<u16, transparent, true>(&dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+        else
+          render_tile_Nbpp<u16, transparent, false>(&dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+      }
+
+      end -= todraw * 8;
+      dest_ptr += todraw * 8;
+    }
+
+    // Finalize the tile rendering the left side of it (from 0 up to "end").
+    if (end) {
+      u16 tile = eswap16(*map_ptr++);
+      if (tile & 0x400)   // Tile horizontal flip
+        render_tile_Nbpp<u16, transparent, true>(dest_ptr, mode8bpp, 0, end, tile, tile_base, vflip_off);
+      else
+        render_tile_Nbpp<u16, transparent, false>(dest_ptr, mode8bpp, 0, end, tile, tile_base, vflip_off);
+    }
   }
-  else
-  {
-     /* color depth: 4bpp 
-      * combine: base
-      * alpha : normal
-      */
+}
 
-     /* Render a single scanline of text tiles */
-     u32 vertical_pixel_offset = (vertical_offset % 8) *
-        tile_width_4bpp;
-     s32 vertical_pixel_flip =
-        ((tile_size_4bpp - tile_width_4bpp) -
-         vertical_pixel_offset) - vertical_pixel_offset;
-
-     tile_extra_variables_4bpp();
-
-     u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
-        vertical_pixel_offset;
-     u32 pixel_run = 256 - (horizontal_offset % 256);
-     u32 current_tile;
-
-     map_base += ((vertical_offset % 256) / 8) * 32;
-     partial_tile_offset = (horizontal_offset % 8);
-
-     if(pixel_run >= end)
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           if(end < partial_tile_run)
-           {
-              partial_tile_run = end;
-              partial_tile_mid_map(base, 4bpp, normal);
-              return;
-           }
-           else
-           {
-              end -= partial_tile_run;
-              partial_tile_right_map(base, 4bpp, normal);
-           }
-        }
-     }
-     else
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           partial_tile_right_map(base, 4bpp, normal);
-        }
-
-        tile_run = (pixel_run - partial_tile_run) / 8;
-        multiple_tile_map_base_4bpp_normal();
-        map_ptr = second_ptr;
-        end -= pixel_run;
-     }
-     tile_run = end / 8;
-     multiple_tile_map_base_4bpp_normal();
-
-     partial_tile_run = end % 8;
-     if(partial_tile_run)
-     {
-        partial_tile_left_map(base, 4bpp, normal);
-     }
-  }
+// Temporary functions
+static void render_scanline_text_base_normal(u32 layer,
+ u32 start, u32 end, void *scanline)
+{
+  render_scanline_text_normal<false>(layer, start, end, scanline);
 }
 
 static void render_scanline_text_transparent_normal(u32 layer,
  u32 start, u32 end, void *scanline)
 {
-  render_scanline_extra_variables_transparent_normal(text);
-  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
-  u32 map_size = (bg_control >> 14) & 0x03;
-  u32 map_width = map_widths[map_size];
-  u32 horizontal_offset =
-   (read_ioreg(REG_BG0HOFS + (layer * 2)) + start) % 512;
-  u32 vertical_offset = (read_ioreg(REG_VCOUNT) +
-   read_ioreg(REG_BG0VOFS + (layer * 2))) % 512;
-  u32 current_pixel;
-  u32 current_pixels;
-  u32 partial_tile_run = 0;
-  u32 partial_tile_offset;
-  u32 tile_run;
-  u32 i;
-  render_scanline_dest_normal *dest_ptr =
-   ((render_scanline_dest_normal *)scanline) + start;
-
-  u16 *map_base = (u16 *)(vram + ((bg_control >> 8) & 0x1F) * (1024 * 2));
-  u16 *map_ptr, *second_ptr;
-  u8 *tile_ptr;
-
-  end -= start;
-
-  if((map_size & 0x02) && (vertical_offset >= 256))
-  {
-    map_base += ((map_width / 8) * 32) +
-     (((vertical_offset - 256) / 8) * 32);
-  }
-  else
-  {
-    map_base += (((vertical_offset % 256) / 8) * 32);
-  }
-
-  if(map_size & 0x01)
-  {
-    if(horizontal_offset >= 256)
-    {
-      horizontal_offset -= 256;
-      map_ptr = map_base + (32 * 32) + (horizontal_offset / 8);
-      second_ptr = map_base;
-    }
-    else
-    {
-      map_ptr = map_base + (horizontal_offset / 8);
-      second_ptr = map_base + (32 * 32);
-    }
-  }
-  else
-  {
-    horizontal_offset %= 256;
-    map_ptr = map_base + (horizontal_offset / 8);
-    second_ptr = map_base;
-  }
-
-  if(bg_control & 0x80)
-  {
-     /* color depth: 8bpp 
-      * combine: transparent
-      * alpha : normal
-      */
-
-     /* Render a single scanline of text tiles */
-
-     u32 vertical_pixel_offset = (vertical_offset % 8) *
-        tile_width_8bpp;
-     s32 vertical_pixel_flip =
-        ((tile_size_8bpp - tile_width_8bpp) -
-         vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
-     u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
-        vertical_pixel_offset;
-     u32 pixel_run = 256 - (horizontal_offset % 256);
-     u32 current_tile;
-
-     map_base += ((vertical_offset % 256) / 8) * 32;
-     partial_tile_offset = (horizontal_offset % 8);
-
-     if(pixel_run >= end)
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           if(end < partial_tile_run)
-           {
-              partial_tile_run = end;
-              partial_tile_mid_map(transparent, 8bpp, normal);
-              return;
-           }
-           else
-           {
-              end -= partial_tile_run;
-              partial_tile_right_map(transparent, 8bpp, normal);
-           }
-        }
-     }
-     else
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           partial_tile_right_map(transparent, 8bpp, normal);
-        }
-
-        tile_run = (pixel_run - partial_tile_run) / 8;
-        multiple_tile_map_transparent_8bpp_normal();
-        map_ptr = second_ptr;
-        end -= pixel_run;
-     }
-     tile_run = end / 8;
-     multiple_tile_map_transparent_8bpp_normal();
-
-     partial_tile_run = end % 8;
-     if(partial_tile_run)
-     {
-        partial_tile_left_map(transparent, 8bpp, normal);
-     }
-  }
-  else
-  {
-     /* color depth: 4bpp 
-      * combine: transparent
-      * alpha : normal
-      */
-
-     /* Render a single scanline of text tiles */
-
-     u32 vertical_pixel_offset = (vertical_offset % 8) *
-        tile_width_4bpp;
-     s32 vertical_pixel_flip =
-        ((tile_size_4bpp - tile_width_4bpp) -
-         vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_4bpp();
-     u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
-        vertical_pixel_offset;
-     u32 pixel_run = 256 - (horizontal_offset % 256);
-     u32 current_tile;
-
-     map_base += ((vertical_offset % 256) / 8) * 32;
-     partial_tile_offset = (horizontal_offset % 8);
-
-     if(pixel_run >= end)
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           if(end < partial_tile_run)
-           {
-              partial_tile_run = end;
-              partial_tile_mid_map(transparent, 4bpp, normal);
-              return;
-           }
-           else
-           {
-              end -= partial_tile_run;
-              partial_tile_right_map(transparent, 4bpp, normal);
-           }
-        }
-     }
-     else
-     {
-        if(partial_tile_offset)
-        {
-           partial_tile_run = 8 - partial_tile_offset;
-           partial_tile_right_map(transparent, 4bpp, normal);
-        }
-
-        tile_run = (pixel_run - partial_tile_run) / 8;
-        multiple_tile_map_transparent_4bpp_normal();
-        map_ptr = second_ptr;
-        end -= pixel_run;
-
-     }
-     tile_run = end / 8;
-     multiple_tile_map_transparent_4bpp_normal();
-
-     partial_tile_run = end % 8;
-     if(partial_tile_run)
-     {
-        partial_tile_left_map(transparent, 4bpp, normal);
-     }
-  }
+  render_scanline_text_normal<true>(layer, start, end, scanline);
 }
+
 
 static void render_scanline_text_base_color16(u32 layer,
  u32 start, u32 end, void *scanline)
@@ -1308,7 +1140,7 @@ static void render_scanline_text_base_color16(u32 layer,
      s32 vertical_pixel_flip =
         ((tile_size_8bpp - tile_width_8bpp) -
          vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
+
      u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
         vertical_pixel_offset;
      u32 pixel_run = 256 - (horizontal_offset % 256);
@@ -1493,7 +1325,7 @@ static void render_scanline_text_transparent_color16(u32 layer,
      s32 vertical_pixel_flip =
         ((tile_size_8bpp - tile_width_8bpp) -
          vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
+
      u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
         vertical_pixel_offset;
      u32 pixel_run = 256 - (horizontal_offset % 256);
@@ -1678,7 +1510,7 @@ static void render_scanline_text_base_color32(u32 layer,
      s32 vertical_pixel_flip =
         ((tile_size_8bpp - tile_width_8bpp) -
          vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
+
      u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
         vertical_pixel_offset;
      u32 pixel_run = 256 - (horizontal_offset % 256);
@@ -1863,7 +1695,7 @@ static void render_scanline_text_transparent_color32(u32 layer,
      s32 vertical_pixel_flip =
         ((tile_size_8bpp - tile_width_8bpp) -
          vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
+
      u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
         vertical_pixel_offset;
      u32 pixel_run = 256 - (horizontal_offset % 256);
@@ -2050,7 +1882,7 @@ static void render_scanline_text_base_alpha(u32 layer,
      s32 vertical_pixel_flip =
         ((tile_size_8bpp - tile_width_8bpp) -
          vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
+
      u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
         vertical_pixel_offset;
      u32 pixel_run = 256 - (horizontal_offset % 256);
@@ -2233,7 +2065,7 @@ static void render_scanline_text_transparent_alpha(u32 layer,
      s32 vertical_pixel_flip =
         ((tile_size_8bpp - tile_width_8bpp) -
          vertical_pixel_offset) - vertical_pixel_offset;
-     tile_extra_variables_8bpp();
+
      u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16)) +
         vertical_pixel_offset;
      u32 pixel_run = 256 - (horizontal_offset % 256);

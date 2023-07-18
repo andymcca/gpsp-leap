@@ -172,9 +172,11 @@ typedef enum
 } hardware_register;
 
 // Some useful macros to avoid reg math
-#define REG_BGxCNT(n) (REG_BG0CNT + (n))
-#define REG_WINxH(n)  (REG_WIN0H  + (n))
-#define REG_WINxV(n)  (REG_WIN0V  + (n))
+#define REG_BGxCNT(n)  (REG_BG0CNT + (n))
+#define REG_WINxH(n)   (REG_WIN0H  + (n))
+#define REG_WINxV(n)   (REG_WIN0V  + (n))
+#define REG_BGxHOFS(n) (REG_BG0HOFS + ((n) * 2))
+#define REG_BGxVOFS(n) (REG_BG0VOFS + ((n) * 2))
 
 #define FLASH_DEVICE_UNDEFINED       0x00
 #define FLASH_DEVICE_MACRONIX_64KB   0x1C

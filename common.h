@@ -134,9 +134,11 @@ typedef u32 fixed8_24;
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
   #define eswap16(value) __builtin_bswap16(value)
   #define eswap32(value) __builtin_bswap32(value)
+  #define eswap64(value) __builtin_bswap64(value)
 #else
   #define eswap16(value) (value)
   #define eswap32(value) (value)
+  #define eswap64(value) (value)
 #endif
 
 #define  readaddress8(base, offset) eswap8( address8( base, offset))
