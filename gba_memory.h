@@ -177,6 +177,10 @@ typedef enum
 #define REG_WINxV(n)   (REG_WIN0V  + (n))
 #define REG_BGxHOFS(n) (REG_BG0HOFS + ((n) * 2))
 #define REG_BGxVOFS(n) (REG_BG0VOFS + ((n) * 2))
+#define REG_BGxPA(n)   (REG_BG2PA + ((n)-2)*8)
+#define REG_BGxPB(n)   (REG_BG2PB + ((n)-2)*8)
+#define REG_BGxPC(n)   (REG_BG2PC + ((n)-2)*8)
+#define REG_BGxPD(n)   (REG_BG2PD + ((n)-2)*8)
 
 #define FLASH_DEVICE_UNDEFINED       0x00
 #define FLASH_DEVICE_MACRONIX_64KB   0x1C

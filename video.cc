@@ -685,55 +685,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define render_scanline_dest_copy_bitmap    u16
 
 
-// If rendering a scanline that is not a target A then there's no point in
-// keeping what's underneath it because it can't blend with it.
-
-#define render_scanline_skip_alpha(bg_type, combine_op)                       \
-  if((pixel_combine & 0x00000200) == 0)                                       \
-  {                                                                           \
-    render_scanline_##bg_type##_##combine_op##_color32(layer,                 \
-     start, end, scanline);                                                   \
-    return;                                                                   \
-  }                                                                           \
-
-
-#define render_scanline_extra_variables_base_normal(bg_type)                  \
-  u16 *palette = palette_ram_converted                                        \
-
-
-#define render_scanline_extra_variables_base_alpha(bg_type)                   \
-  u32 bg_combine = color_combine_mask(5);                                     \
-  u32 pixel_combine = color_combine_mask(layer) | (bg_combine << 16);         \
-  render_scanline_skip_alpha(bg_type, base)                                   \
-
-#define render_scanline_extra_variables_base_color()                          \
-  u32 bg_combine = color_combine_mask(5);                                     \
-  u32 pixel_combine = color_combine_mask(layer)                               \
-
-#define render_scanline_extra_variables_base_color16(bg_type)                 \
-  render_scanline_extra_variables_base_color()                                \
-
-#define render_scanline_extra_variables_base_color32(bg_type)                 \
-  render_scanline_extra_variables_base_color()                                \
-
-
-#define render_scanline_extra_variables_transparent_normal(bg_type)           \
-  render_scanline_extra_variables_base_normal(bg_type)                        \
-
-#define render_scanline_extra_variables_transparent_alpha(bg_type)            \
-  u32 pixel_combine = color_combine_mask(layer);                              \
-  render_scanline_skip_alpha(bg_type, transparent)                            \
-
-#define render_scanline_extra_variables_transparent_color()                   \
-  u32 pixel_combine = color_combine_mask(layer)                               \
-
-#define render_scanline_extra_variables_transparent_color16(bg_type)          \
-  render_scanline_extra_variables_transparent_color()                         \
-
-#define render_scanline_extra_variables_transparent_color32(bg_type)          \
-  render_scanline_extra_variables_transparent_color()                         \
-
-
 static const u32 map_widths[] = { 256, 512, 256, 512 };
 
 typedef enum
@@ -762,14 +713,14 @@ static inline void render_tile_Nbpp(u32 layer,
   // tile_base already points to the right tile-line vertical offset
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
 
-  // On vertical flip, apply the mirror offset
-  if (tile & 0x800)
-    tile_ptr += vertical_pixel_flip;
-
   // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
   // If set, the current pixel belongs to a layer that is 1st or 2nd target.
   u32 bg_comb = color_combine_mask(5);
   u32 px_comb = color_combine_mask(layer);
+
+  // On vertical flip, apply the mirror offset
+  if (tile & 0x800)
+    tile_ptr += vertical_pixel_flip;
 
   if (is8bpp) {
     // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
@@ -817,6 +768,17 @@ template<typename stype, rendtype rdtype, bool transparent>
 static void render_scanline_text(u32 layer,
  u32 start, u32 end, void *scanline)
 {
+  // TODO: Move this to the caller since it makes more sense
+  // If the layer is *NOT* first target, we will not combine with previous layer anyway
+  // so we can "drop" the mixing bit
+  if (rdtype == ALPHA && transparent) {
+    bool first_target = (read_ioreg(REG_BLDCNT) >> layer) & 1;
+    if (!first_target) {
+      render_scanline_text<stype, COLOR32, true>(layer, start, end, scanline);
+      return;
+    }
+  }
+
   u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u16 vcount = read_ioreg(REG_VCOUNT);
   u32 map_size = (bg_control >> 14) & 0x03;
@@ -954,62 +916,6 @@ static void render_scanline_text(u32 layer,
   }
 }
 
-// Temporary functions
-static void render_scanline_text_base_normal(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u16, NORMAL, false>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_transparent_normal(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u16, NORMAL, true>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_base_color16(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u16, COLOR16, false>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_transparent_color16(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u16, COLOR16, true>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_base_color32(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u32, COLOR32, false>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_transparent_color32(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u32, COLOR32, true>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_base_alpha(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  render_scanline_text<u32, ALPHA, false>(layer, start, end, scanline);
-}
-
-static void render_scanline_text_transparent_alpha(u32 layer,
- u32 start, u32 end, void *scanline)
-{
-  // TODO: Move this to the caller since it makes more sense
-  // If the layer is *NOT* first target, we will not combine with previous layer anyway
-  // so we can "drop" the mixing bit
-  bool first_target = (read_ioreg(REG_BLDCNT) >> layer) & 1;
-  if (!first_target)
-    render_scanline_text_transparent_color32(layer, start, end, scanline);
-  else
-    render_scanline_text<u32, ALPHA, true>(layer, start, end, scanline);
-}
-
 
 s32 affine_reference_x[2];
 s32 affine_reference_y[2];
@@ -1029,232 +935,187 @@ void video_reload_counters()
   affine_reference_y[1] = signext28(read_ioreg32(REG_BG3Y_L));
 }
 
-#define affine_render_bg_pixel_normal()                                       \
-  current_pixel = palette_ram_converted[0]                                    \
 
-#define affine_render_bg_pixel_alpha()                                        \
-  current_pixel = bg_combine                                                  \
+template<typename dsttype, rendtype rdtype, bool transparent>
+static inline void render_pixel_8bpp(u32 layer,
+  dsttype *dest_ptr, u32 px, u32 py, const u8 *tile_base, const u8 *map_base, u32 map_size
+) {
+  // Pitch represents the log2(number of tiles per row) (from 16 to 128)
+  u32 map_pitch = map_size + 4;
+  // Given coords (px,py) in the background space, find the tile.
+  u32 mapoff = (px / 8) + ((py / 8) << map_pitch);
+  // Each tile is 8x8, so 64 bytes each.
+  const u8 *tile_ptr = &tile_base[map_base[mapoff] * tile_size_8bpp];
+  // Read the 8bit color within the tile.
+  u8 pval = tile_ptr[(px % 8) + ((py % 8) * 8)];
 
-#define affine_render_bg_pixel_color16()                                      \
-  affine_render_bg_pixel_alpha()                                              \
+  // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
+  // If set, the current pixel belongs to a layer that is 1st or 2nd target.
+  u32 bg_comb = color_combine_mask(5);
+  u32 px_comb = color_combine_mask(layer);
 
-#define affine_render_bg_pixel_color32()                                      \
-  affine_render_bg_pixel_alpha()                                              \
+  // Combine mask is different if we are rendering the backdrop color
+  u16 combflg = pval ? px_comb : bg_comb;
+  // Alhpa mode stacks previous value (unless rendering the first layer)
+  if (!transparent || pval) {
+    if (rdtype == NORMAL)
+      *dest_ptr = palette_ram_converted[pval];
+    else if (rdtype == COLOR16 || rdtype == COLOR32)
+      *dest_ptr = pval | combflg;  // Add combine flags
+    else if (rdtype == ALPHA)
+      // Stack pixels on top of the pixel value and combine flags
+      *dest_ptr = pval | combflg | ((transparent ? *dest_ptr : bg_comb) << 16);
+  }
+}
 
-#define affine_render_bg_pixel_base(alpha_op)                                 \
-  affine_render_bg_pixel_##alpha_op()                                         \
+template<typename dsttype, rendtype rdtype>
+static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr) {
+  // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
+  // If set, the current pixel belongs to a layer that is 1st or 2nd target.
+  u32 bg_comb = color_combine_mask(5);
+  u32 pval = 0;
 
-#define affine_render_bg_pixel_transparent(alpha_op)                          \
+  // Alhpa mode stacks previous value (unless rendering the first layer)
+  if (rdtype == NORMAL)
+    *dest_ptr = palette_ram_converted[pval];
+  else if (rdtype == COLOR16 || rdtype == COLOR32)
+    *dest_ptr = pval | bg_comb;  // Add combine flags
+  else if (rdtype == ALPHA)
+    // Stack pixels on top of the pixel value and combine flags
+    *dest_ptr = pval | bg_comb | (bg_comb << 16);
+  // FIXME: Do we need double bg_comb? I do not think so!
+}
 
-#define affine_render_bg_pixel_copy(alpha_op)                                 \
+// Affine background rendering logic.
+// wrap extends the background infinitely, otherwise transparent/backdrop fill
+// rotate indicates if there's any rotation (optimized version for no-rotation)
+template <typename dsttype, rendtype rdtype, bool transparent, bool wrap, bool rotate>
+static inline void render_affine_background(
+  u32 layer, u32 start, u32 cnt, const u8 *map_base,
+  u32 map_size, const u8 *tile_base, dsttype *dst_ptr) {
 
-#define affine_render_bg_base(alpha_op)                                       \
-  dest_ptr[0] = current_pixel
+  s32 dx = (s16)read_ioreg(REG_BGxPA(layer));
+  s32 dy = (s16)read_ioreg(REG_BGxPC(layer));
 
-#define affine_render_bg_transparent(alpha_op)                                \
+  s32 source_x = affine_reference_x[layer - 2] + (start * dx);
+  s32 source_y = affine_reference_y[layer - 2] + (start * dy);
 
-#define affine_render_bg_copy(alpha_op)                                       \
+  // Maps are squared, four sizes available (128x128 to 1024x1024)
+  u32 width_height = 128 << map_size;
 
-#define affine_render_bg_remainder_base(alpha_op)                             \
-  affine_render_bg_pixel_##alpha_op();                                        \
-  for(; i < end; i++)                                                         \
-  {                                                                           \
-    affine_render_bg_base(alpha_op);                                          \
-    advance_dest_ptr_base(1);                                                 \
-  }                                                                           \
+  if (wrap) {
+    // In wrap mode the entire space is covered, since it "wraps" at the edges
+    while (cnt--) {
+      u32 pixel_x = (u32)(source_x >> 8) & (width_height-1);
+      u32 pixel_y = (u32)(source_y >> 8) & (width_height-1);
 
-#define affine_render_bg_remainder_transparent(alpha_op)                      \
+      // Lookup pixel and draw it.
+      render_pixel_8bpp<dsttype, rdtype, transparent>(
+        layer, dst_ptr++, pixel_x, pixel_y, tile_base, map_base, map_size);
 
-#define affine_render_bg_remainder_copy(alpha_op)                             \
+      // Move to the next pixel, update coords accordingly
+      source_x += dx;
+      if (rotate)
+        source_y += dy;
+    }
+  } else {
 
-#define affine_render_next(combine_op)                                        \
-  source_x += dx;                                                             \
-  source_y += dy;                                                             \
-  advance_dest_ptr_##combine_op(1)                                            \
+    // Early optimization if Y-coord is out completely for this line.
+    // (if there's no rotation Y coord remains identical throughout the line).
+    bool is_y_out = !rotate && ((u32)(source_y >> 8)) >= width_height;
 
-#define affine_render_scale_offset()                                          \
-  tile_base += ((pixel_y % 8) * 8);                                           \
-  map_base += (pixel_y / 8) << map_pitch                                      \
+    if (!is_y_out) {
+      // Draw backdrop pixels if necessary until we reach the background edge.
+      // TODO: on non-base cases this could perhaps be calculated in O(1)?
+      while (cnt) {
+        // Draw backdrop pixels if they lie outside of the background.
+        u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
 
-#define affine_render_scale_pixel(combine_op, alpha_op)                       \
-  map_offset = (pixel_x / 8);                                                 \
-  if(map_offset != last_map_offset)                                           \
-  {                                                                           \
-    tile_ptr = tile_base + (map_base[map_offset] * 64);                       \
-    last_map_offset = map_offset;                                             \
-  }                                                                           \
-  tile_ptr = tile_base + (map_base[(pixel_x / 8)] * 64);                      \
-  current_pixel = tile_ptr[(pixel_x % 8)];                                    \
-  tile_8bpp_draw_##combine_op(0, none, 0, alpha_op);                          \
-  affine_render_next(combine_op)                                              \
+        // Stop once we find a pixel that is actually *inside* the map.
+        if (pixel_x < width_height && pixel_y < width_height)
+          break;
 
-#define affine_render_scale(combine_op, alpha_op)                             \
-{                                                                             \
-  pixel_y = source_y >> 8;                                                    \
-  u32 i = 0;                                                                  \
-  affine_render_bg_pixel_##combine_op(alpha_op);                              \
-  if((u32)pixel_y < (u32)width_height)                                        \
-  {                                                                           \
-    affine_render_scale_offset();                                             \
-    for(; i < end; i++)                                                       \
-    {                                                                         \
-      pixel_x = source_x >> 8;                                                \
-                                                                              \
-      if((u32)pixel_x < (u32)width_height)                                    \
-      {                                                                       \
-        break;                                                                \
-      }                                                                       \
-                                                                              \
-      affine_render_bg_##combine_op(alpha_op);                                \
-      affine_render_next(combine_op);                                         \
-    }                                                                         \
-                                                                              \
-    for(; i < end; i++)                                                       \
-    {                                                                         \
-      pixel_x = source_x >> 8;                                                \
-                                                                              \
-      if((u32)pixel_x >= (u32)width_height)                                   \
-        break;                                                                \
-                                                                              \
-      affine_render_scale_pixel(combine_op, alpha_op);                        \
-    }                                                                         \
-  }                                                                           \
-  affine_render_bg_remainder_##combine_op(alpha_op);                          \
-}                                                                             \
+        // Draw a "transparent" pixel if we are the base layer.
+        if (!transparent)
+          render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr);
 
-#define affine_render_scale_wrap(combine_op, alpha_op)                        \
-{                                                                             \
-  u32 wrap_mask = width_height - 1;                                           \
-  pixel_y = (source_y >> 8) & wrap_mask;                                      \
-  if((u32)pixel_y < (u32)width_height)                                        \
-  {                                                                           \
-    affine_render_scale_offset();                                             \
-    for(i = 0; i < end; i++)                                                  \
-    {                                                                         \
-      pixel_x = (source_x >> 8) & wrap_mask;                                  \
-      affine_render_scale_pixel(combine_op, alpha_op);                        \
-    }                                                                         \
-  }                                                                           \
-}                                                                             \
+        dst_ptr++;
+        source_x += dx;
+        if (rotate)
+          source_y += dy;
+        cnt--;
+      }
 
+      // Draw background pixels by looking them up in the map
+      while (cnt) {
+        u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
 
-#define affine_render_rotate_pixel(combine_op, alpha_op)                      \
-  map_offset = (pixel_x / 8) + ((pixel_y / 8) << map_pitch);                  \
-  if(map_offset != last_map_offset)                                           \
-  {                                                                           \
-    tile_ptr = tile_base + (map_base[map_offset] * 64);                       \
-    last_map_offset = map_offset;                                             \
-  }                                                                           \
-                                                                              \
-  current_pixel = tile_ptr[(pixel_x % 8) + ((pixel_y % 8) * 8)];              \
-  tile_8bpp_draw_##combine_op(0, none, 0, alpha_op);                          \
-  affine_render_next(combine_op)                                              \
+        // Check if we run out of background pixels, stop drawing.
+        if (pixel_x >= width_height || pixel_y >= width_height)
+          break;
 
-#define affine_render_rotate(combine_op, alpha_op)                            \
-{                                                                             \
-  affine_render_bg_pixel_##combine_op(alpha_op);                              \
-  for(i = 0; i < end; i++)                                                    \
-  {                                                                           \
-    pixel_x = source_x >> 8;                                                  \
-    pixel_y = source_y >> 8;                                                  \
-                                                                              \
-    if(((u32)pixel_x < (u32)width_height) &&                                  \
-     ((u32)pixel_y < (u32)width_height))                                      \
-    {                                                                         \
-      break;                                                                  \
-    }                                                                         \
-    affine_render_bg_##combine_op(alpha_op);                                  \
-    affine_render_next(combine_op);                                           \
-  }                                                                           \
-                                                                              \
-  for(; i < end; i++)                                                         \
-  {                                                                           \
-    pixel_x = source_x >> 8;                                                  \
-    pixel_y = source_y >> 8;                                                  \
-                                                                              \
-    if(((u32)pixel_x >= (u32)width_height) ||                                 \
-     ((u32)pixel_y >= (u32)width_height))                                     \
-    {                                                                         \
-      affine_render_bg_remainder_##combine_op(alpha_op);                      \
-      break;                                                                  \
-    }                                                                         \
-                                                                              \
-    affine_render_rotate_pixel(combine_op, alpha_op);                         \
-  }                                                                           \
-}                                                                             \
+        // Lookup pixel and draw it.
+        render_pixel_8bpp<dsttype, rdtype, transparent>(
+          layer, dst_ptr++, pixel_x, pixel_y, tile_base, map_base, map_size);
 
-#define affine_render_rotate_wrap(combine_op, alpha_op)                       \
-{                                                                             \
-  u32 wrap_mask = width_height - 1;                                           \
-  for(i = 0; i < end; i++)                                                    \
-  {                                                                           \
-    pixel_x = (source_x >> 8) & wrap_mask;                                    \
-    pixel_y = (source_y >> 8) & wrap_mask;                                    \
-                                                                              \
-    affine_render_rotate_pixel(combine_op, alpha_op);                         \
-  }                                                                           \
-}                                                                             \
+        // Move to the next pixel, update coords accordingly
+        cnt--;
+        source_x += dx;
+        if (rotate)
+          source_y += dy;
+      }
+    }
+
+    // Complete the line on the right, if we ran out over the bg edge.
+    // Only necessary for the base layer, otherwise we can safely finish.
+    if (!transparent)
+      while (cnt--)
+        render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr++);
+  }
+}
 
 
-// Build affine background renderers.
+// Renders affine backgrounds. These differ substantially from non-affine
+// ones. Tile maps are byte arrays (instead of 16 bit), limiting the map to
+// 256 different tiles (with no flip bits and just one single 256 color pal).
 
-#define render_scanline_affine_builder(combine_op, alpha_op)                  \
-void render_scanline_affine_##combine_op##_##alpha_op(u32 layer,              \
- u32 start, u32 end, void *scanline)                                          \
-{                                                                             \
-  render_scanline_extra_variables_##combine_op##_##alpha_op(affine);          \
-  u32 bg_control = read_ioreg(REG_BGxCNT(layer));                             \
-  u32 current_pixel;                                                          \
-  s32 source_x, source_y;                                                     \
-  u32 pixel_x, pixel_y;                                                       \
-  u32 layer_offset = (layer - 2) * 8;                                         \
-  s32 dx, dy;                                                                 \
-  u32 map_size = (bg_control >> 14) & 0x03;                                   \
-  u32 width_height = 1 << (7 + map_size);                                     \
-  u32 map_pitch = map_size + 4;                                               \
-  u8 *map_base = vram + (((bg_control >> 8) & 0x1F) * (1024 * 2));            \
-  u8 *tile_base = vram + (((bg_control >> 2) & 0x03) * (1024 * 16));          \
-  u8 *tile_ptr = NULL;                                                        \
-  u32 map_offset, last_map_offset = (u32)-1;                                  \
-  u32 i;                                                                      \
-  render_scanline_dest_##alpha_op *dest_ptr =                                 \
-   ((render_scanline_dest_##alpha_op *)scanline) + start;                     \
-                                                                              \
-  dx = (s16)read_ioreg(REG_BG2PA + layer_offset);                             \
-  dy = (s16)read_ioreg(REG_BG2PC + layer_offset);                             \
-  source_x = affine_reference_x[layer - 2] + (start * dx);                    \
-  source_y = affine_reference_y[layer - 2] + (start * dy);                    \
-                                                                              \
-  end -= start;                                                               \
-                                                                              \
-  switch(((bg_control >> 12) & 0x02) | (dy != 0))                             \
-  {                                                                           \
-    case 0x00:                                                                \
-      affine_render_scale(combine_op, alpha_op);                              \
-      break;                                                                  \
-                                                                              \
-    case 0x01:                                                                \
-      affine_render_rotate(combine_op, alpha_op);                             \
-      break;                                                                  \
-                                                                              \
-    case 0x02:                                                                \
-      affine_render_scale_wrap(combine_op, alpha_op);                         \
-      break;                                                                  \
-                                                                              \
-    case 0x03:                                                                \
-      affine_render_rotate_wrap(combine_op, alpha_op);                        \
-      break;                                                                  \
-  }                                                                           \
-}                                                                             \
+template<typename dsttype, rendtype rdtype, bool transparent>
+static void render_scanline_affine(u32 layer,
+ u32 start, u32 end, void *scanline)
+{
+  u32 bg_control = read_ioreg(REG_BGxCNT(layer));
+  u32 map_size = (bg_control >> 14) & 0x03;
 
-render_scanline_affine_builder(base, normal);
-render_scanline_affine_builder(transparent, normal);
-render_scanline_affine_builder(base, color16);
-render_scanline_affine_builder(transparent, color16);
-render_scanline_affine_builder(base, color32);
-render_scanline_affine_builder(transparent, color32);
-render_scanline_affine_builder(base, alpha);
-render_scanline_affine_builder(transparent, alpha);
+  // Char block base pointer
+  u32 base_block = (bg_control >> 8) & 0x1F;
+  u8 *map_base = &vram[base_block * 2048];
+  // The tilemap base is selected via bgcnt (16KiB chunks)
+  u32 tilecntrl = (bg_control >> 2) & 0x03;
+  u8 *tile_base = &vram[tilecntrl * 16*1024];
+
+  dsttype *dest_ptr = ((dsttype*)scanline) + start;
+
+  bool has_rotation = read_ioreg(REG_BGxPC(layer)) != 0;
+  bool has_wrap = (bg_control >> 13) & 1;
+
+  // Four specialized versions for faster rendering on specific cases like
+  // scaling only or non-wrapped backgrounds.
+  if (has_wrap) {
+    if (has_rotation)
+      render_affine_background<dsttype, rdtype, transparent, true, true>(
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+    else
+      render_affine_background<dsttype, rdtype, transparent, true, false>(
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+  } else {
+    if (has_rotation)
+      render_affine_background<dsttype, rdtype, transparent, false, true>(
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+    else
+      render_affine_background<dsttype, rdtype, transparent, false, false>(
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+  }
+}
 
 
 #define bitmap_render_pixel_mode3(alpha_op)                                   \
@@ -1422,14 +1283,14 @@ render_scanline_bitmap_builder(mode5, normal, 160, 128);
 
 #define tile_layer_render_functions(type)                                     \
 {                                                                             \
-  render_scanline_##type##_base_normal,                                       \
-  render_scanline_##type##_transparent_normal,                                \
-  render_scanline_##type##_base_alpha,                                        \
-  render_scanline_##type##_transparent_alpha,                                 \
-  render_scanline_##type##_base_color16,                                      \
-  render_scanline_##type##_transparent_color16,                               \
-  render_scanline_##type##_base_color32,                                      \
-  render_scanline_##type##_transparent_color32                                \
+  render_scanline_##type<u16, NORMAL, false>,                                 \
+  render_scanline_##type<u16, NORMAL, true>,                                  \
+  render_scanline_##type<u32, ALPHA, false>,                                  \
+  render_scanline_##type<u32, ALPHA, true>,                                   \
+  render_scanline_##type<u16, COLOR16, false>,                                \
+  render_scanline_##type<u16, COLOR16, true>,                                 \
+  render_scanline_##type<u32, COLOR32, false>,                                \
+  render_scanline_##type<u32, COLOR32, true>,                                 \
 }                                                                             \
 
 
