@@ -92,24 +92,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
   (color_combine_mask_a(layer) |                                              \
    ((read_ioreg(REG_BLDCNT) >> (layer + 7)) & 0x02)) << 9                     \
 
-// For alpha blending renderers, draw the palette index (9bpp) and
-// layer bits rather than the raw RGB. For the base this should write to
-// the 32bit location directly.
-
-#define tile_expand_base_alpha(index)                                         \
-  dest_ptr[index] = current_pixel | pixel_combine                             \
-
-#define tile_expand_base_bg(index)                                            \
-  dest_ptr[index] = bg_combine                                                \
-
-
-// For layered (transparent) writes this should shift the "stack" and write
-// to the bottom. This will preserve the topmost pixel and the most recent
-// one.
-
-#define tile_expand_transparent_alpha(index)                                  \
-  dest_ptr[index] = (dest_ptr[index] << 16) | current_pixel | pixel_combine   \
-
 
 // OBJ should only shift if the top isn't already OBJ
 #define tile_expand_transparent_alpha_obj(index)                              \
@@ -149,34 +131,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
   current_pixel = current_pixels >> shift                                     \
 
 #define tile_8bpp_pixel_op_none(shift)                                        \
-
-// Base should always draw raw in 8bpp mode; color 0 will be drawn where
-// color 0 is.
-
-#define tile_8bpp_draw_base_normal(index)                                     \
-  tile_expand_base_normal(index)                                              \
-
-#define tile_8bpp_draw_base_alpha(index)                                      \
-  if(current_pixel)                                                           \
-  {                                                                           \
-    tile_expand_base_alpha(index);                                            \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    tile_expand_base_bg(index);                                               \
-  }                                                                           \
-
-
-#define tile_8bpp_draw_base_color16(index)                                    \
-  tile_8bpp_draw_base_alpha(index)                                            \
-
-#define tile_8bpp_draw_base_color32(index)                                    \
-  tile_8bpp_draw_base_alpha(index)                                            \
-
-
-#define tile_8bpp_draw_base(index, op, op_param, alpha_op)                    \
-  tile_8bpp_pixel_op_##op(op_param);                                          \
-  tile_8bpp_draw_base_##alpha_op(index)                                       \
 
 // Transparent (layered) writes should only replace what is there if the
 // pixel is not transparent (zero)
@@ -218,9 +172,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
   tile_8bpp_draw_##combine_op(index + 2, shift_mask, 8, alpha_op);            \
   tile_8bpp_draw_##combine_op(index + 1, shift_mask, 16, alpha_op);           \
   tile_8bpp_draw_##combine_op(index + 0, shift, 24, alpha_op)                 \
-
-#define tile_8bpp_draw_four_base(index, alpha_op, flip_op)                    \
-  tile_8bpp_draw_four_##flip_op(index, base, alpha_op)                        \
 
 
 // Draw half of a tile in 8bpp mode, for transparent renderer; as an
@@ -404,40 +355,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 
 #define tile_4bpp_pixel_op_none(op_param)                                     \
 
-// Draws a single 4bpp pixel as base, normal renderer; checks to see if the
-// pixel is zero because if so the current palette should not be applied.
-// These ifs can be replaced with a lookup table, may or may not be superior
-// this way, should be benchmarked. The lookup table would be from 0-255
-// identity map except for multiples of 16, which would map to 0.
-
-#define tile_4bpp_draw_base_normal(index)                                     \
-  if(current_pixel)                                                           \
-    current_pixel |= current_palette;                                         \
-  tile_expand_base_normal(index);                                             \
-
-
-#define tile_4bpp_draw_base_alpha(index)                                      \
-  if(current_pixel)                                                           \
-  {                                                                           \
-    current_pixel |= current_palette;                                         \
-    tile_expand_base_alpha(index);                                            \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    tile_expand_base_bg(index);                                               \
-  }                                                                           \
-
-#define tile_4bpp_draw_base_color16(index)                                    \
-  tile_4bpp_draw_base_alpha(index)                                            \
-
-#define tile_4bpp_draw_base_color32(index)                                    \
-  tile_4bpp_draw_base_alpha(index)                                            \
-
-
-#define tile_4bpp_draw_base(index, op, op_param, alpha_op)                    \
-  tile_4bpp_pixel_op_##op(op_param);                                          \
-  tile_4bpp_draw_base_##alpha_op(index)                                       \
-
 
 // Draws a single 4bpp pixel as layered, if not transparent.
 
@@ -456,42 +373,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
     current_pixel |= current_palette;                                         \
     tile_expand_copy(index);                                                  \
   }                                                                           \
-
-
-// Draws eight background pixels in transparent mode, for alpha or normal
-// renderers.
-
-#define tile_4bpp_draw_eight_base_zero(value)                                 \
-  dest_ptr[0] = value;                                                        \
-  dest_ptr[1] = value;                                                        \
-  dest_ptr[2] = value;                                                        \
-  dest_ptr[3] = value;                                                        \
-  dest_ptr[4] = value;                                                        \
-  dest_ptr[5] = value;                                                        \
-  dest_ptr[6] = value;                                                        \
-  dest_ptr[7] = value                                                         \
-
-
-// Draws eight background pixels for the alpha renderer, basically color zero
-// with the background flag high.
-
-#define tile_4bpp_draw_eight_base_zero_alpha()                                \
-  tile_4bpp_draw_eight_base_zero(bg_combine)                                  \
-
-#define tile_4bpp_draw_eight_base_zero_color16()                              \
-  tile_4bpp_draw_eight_base_zero_alpha()                                      \
-
-#define tile_4bpp_draw_eight_base_zero_color32()                              \
-  tile_4bpp_draw_eight_base_zero_alpha()                                      \
-
-
-// Draws eight background pixels for the normal renderer, just a bunch of
-// zeros.
-
-#define tile_4bpp_draw_eight_base_zero_normal()                               \
-  current_pixel = palette[0];                                                 \
-  tile_4bpp_draw_eight_base_zero(current_pixel)                               \
-
 
 // Draws eight 4bpp pixels.
 
@@ -517,20 +398,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
   tile_4bpp_draw_##combine_op(2, shift_mask, 20, alpha_op);                   \
   tile_4bpp_draw_##combine_op(1, shift_mask, 24, alpha_op);                   \
   tile_4bpp_draw_##combine_op(0, shift, 28, alpha_op)                         \
-
-
-// Draws eight 4bpp pixels in base mode, checks if all are zero, if so draws
-// the appropriate background pixels.
-
-#define tile_4bpp_draw_eight_base(alpha_op, flip_op)                          \
-  if(current_pixels != 0)                                                     \
-  {                                                                           \
-    tile_4bpp_draw_eight_##flip_op(base, alpha_op);                           \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    tile_4bpp_draw_eight_base_zero_##alpha_op();                              \
-  }                                                                           \
 
 
 // Draws eight 4bpp pixels in transparent (layered) mode, checks if all are
