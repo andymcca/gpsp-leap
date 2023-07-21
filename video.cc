@@ -30,6 +30,29 @@ typedef struct {
   u16 attr0, attr1, attr2, attr3;
 } t_oam;
 
+typedef void (* tile_render_function)(u32 layer_number, u32 start, u32 end,
+ void *dest_ptr);
+typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
+
+typedef struct
+{
+  tile_render_function normal_render_base;
+  tile_render_function normal_render_transparent;
+  tile_render_function alpha_render_base;
+  tile_render_function alpha_render_transparent;
+  tile_render_function color16_render_base;
+  tile_render_function color16_render_transparent;
+  tile_render_function color32_render_base;
+  tile_render_function color32_render_transparent;
+} tile_layer_render_struct;
+
+typedef struct
+{
+  bitmap_render_function blit_render;
+  bitmap_render_function scale_render;
+  bitmap_render_function affine_render;
+} bitmap_layer_render_struct;
+
 static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
  u32 enable_flags, u32 dispcnt, u32 bldcnt, const tile_layer_render_struct
  *layer_renderers);
@@ -40,13 +63,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define tile_expand_base_normal(index)                                        \
   current_pixel = palette[current_pixel];                                     \
   dest_ptr[index] = current_pixel                                             \
-
-#define tile_expand_base_normal_mode4(index)                                  \
-  if(current_pixel != 0)                                                      \
-  {                                                                           \
-    current_pixel = palette[current_pixel];                                   \
-    dest_ptr[index] = current_pixel;                                          \
-  }                                                                           \
 
 #define tile_expand_transparent_normal(index)                                 \
   tile_expand_base_normal(index)                                              \
@@ -1118,166 +1134,99 @@ static void render_scanline_affine(u32 layer,
 }
 
 
-#define bitmap_render_pixel_mode3(alpha_op)                                   \
-  current_pixel = convert_palette(current_pixel);                             \
-  *dest_ptr = current_pixel                                                   \
+// Renders a bitmap honoring the pixel mode and any affine transformations.
+// There's optimized versions for bitmaps without scaling / rotation.
+template<unsigned mode, typename pixfmt, unsigned width, unsigned height, bool scale, bool rotate>
+static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
 
-#define bitmap_render_pixel_mode4(alpha_op)                                   \
-  tile_expand_base_##alpha_op##_mode4(0)                                      \
+  // Modes 4 and 5 feature double buffering.
+  bool second_frame = (mode >= 4) && (read_ioreg(REG_DISPCNT) & 0x10);
+  pixfmt *src_ptr = (pixfmt*)&vram[second_frame ? 0xA000 : 0x0000];
+  u16 *dst_ptr = ((u16*)scanline) + start;
 
-#define bitmap_render_pixel_mode5(alpha_op)                                   \
-  bitmap_render_pixel_mode3(alpha_op)                                         \
+  s32 dx = (s16)read_ioreg(REG_BG2PA);
+  s32 dy = (s16)read_ioreg(REG_BG2PC);
 
+  s32 source_x = affine_reference_x[0] + (start * dx); // Always BG2
+  s32 source_y = affine_reference_y[0] + (start * dy);
 
-#define bitmap_render_scale(type, alpha_op, width, height)                    \
-  pixel_y = (source_y >> 8);                                                  \
-  if((u32)pixel_y < (u32)height)                                              \
-  {                                                                           \
-    pixel_x = (source_x >> 8);                                                \
-    src_ptr += (pixel_y * width);                                             \
-    if(dx == 0x100)                                                           \
-    {                                                                         \
-      if(pixel_x < 0)                                                         \
-      {                                                                       \
-        end += pixel_x;                                                       \
-        dest_ptr -= pixel_x;                                                  \
-        pixel_x = 0;                                                          \
-      }                                                                       \
-      else if(pixel_x > 0)                                                    \
-        src_ptr += pixel_x;                                                   \
-                                                                              \
-      if((pixel_x + end) >= width)                                            \
-        end = (width - pixel_x);                                              \
-                                                                              \
-      for(i = 0; (s32)i < (s32)end; i++)                                      \
-      {                                                                       \
-        current_pixel = srcread_##type(*src_ptr);                             \
-        bitmap_render_pixel_##type(alpha_op);                                 \
-        src_ptr++;                                                            \
-        dest_ptr++;                                                           \
-      }                                                                       \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      if((u32)(source_y >> 8) < (u32)height)                                  \
-      {                                                                       \
-        for(i = 0; i < end; i++)                                              \
-        {                                                                     \
-          pixel_x = (source_x >> 8);                                          \
-                                                                              \
-          if((u32)pixel_x < (u32)width)                                       \
-            break;                                                            \
-                                                                              \
-          source_x += dx;                                                     \
-          dest_ptr++;                                                         \
-        }                                                                     \
-                                                                              \
-        for(; i < end; i++)                                                   \
-        {                                                                     \
-          pixel_x = (source_x >> 8);                                          \
-                                                                              \
-          if((u32)pixel_x >= (u32)width)                                      \
-            break;                                                            \
-                                                                              \
-          current_pixel = srcread_##type(src_ptr[pixel_x]);                   \
-          bitmap_render_pixel_##type(alpha_op);                               \
-                                                                              \
-          source_x += dx;                                                     \
-          dest_ptr++;                                                         \
-        }                                                                     \
-      }                                                                       \
-    }                                                                         \
-  }                                                                           \
+  // Premature abort render optimization if bitmap out of Y coordinate.
+  bool is_y_out = !rotate && ((u32)(source_y >> 8)) >= height;
+  if (is_y_out)
+    return;
 
-#define bitmap_render_rotate(type, alpha_op, width, height)                   \
-  for(i = 0; i < end; i++)                                                    \
-  {                                                                           \
-    pixel_x = source_x >> 8;                                                  \
-    pixel_y = source_y >> 8;                                                  \
-                                                                              \
-    if(((u32)pixel_x < (u32)width) && ((u32)pixel_y < (u32)height))           \
-      break;                                                                  \
-                                                                              \
-    source_x += dx;                                                           \
-    source_y += dy;                                                           \
-    dest_ptr++;                                                               \
-  }                                                                           \
-                                                                              \
-  for(; i < end; i++)                                                         \
-  {                                                                           \
-    pixel_x = (source_x >> 8);                                                \
-    pixel_y = (source_y >> 8);                                                \
-                                                                              \
-    if(((u32)pixel_x >= (u32)width) || ((u32)pixel_y >= (u32)height))         \
-      break;                                                                  \
-                                                                              \
-    current_pixel = srcread_##type(src_ptr[pixel_x + (pixel_y * width)]);     \
-     bitmap_render_pixel_##type(alpha_op);                                    \
-                                                                              \
-    source_x += dx;                                                           \
-    source_y += dy;                                                           \
-    dest_ptr++;                                                               \
-  }                                                                           \
+  if (!scale) {
+    // Pretty much a blit onto the output buffer.
+    // Skip to the X pixel (dest) and start copying (drawing really)
+    if (source_x < 0) {
+      // TODO: Not sure if the math is OK for non-integer offsets
+      u32 delta = (-source_x + 255) >> 8;
+      dst_ptr += delta;
+      start += delta;
+      source_x += delta << 8;
+    }
 
+    u32 pixel_y = (u32)(source_y >> 8);
+    u32 pixel_x = (u32)(source_x >> 8);
+    while (start < end && pixel_x < width) {
+      // Pretty much pixel copier
+      pixfmt *valptr = &src_ptr[pixel_x + (pixel_y * width)];
+      pixfmt val = sizeof(pixfmt) == 2 ? eswap16(*valptr) : *valptr;
 
-#define render_scanline_vram_setup_mode3()                                    \
-  u16 *src_ptr = (u16 *)vram                                                  \
+      if (mode != 4)
+        *dst_ptr = convert_palette(val);         // Direct color
+      else if (val)
+        *dst_ptr = palette_ram_converted[val];   // Indexed color
 
-#define render_scanline_vram_setup_mode5()                                    \
-  u16 *src_ptr = (u16 *)vram;                                                 \
-  if(read_ioreg(REG_DISPCNT) & 0x10)                                          \
-    src_ptr = (u16 *)(vram + 0xA000);                                         \
+      // Move to the next pixel, update coords accordingly
+      start++;
+      dst_ptr++;
+      pixel_x++;
+    }
+  } else {
 
+    // Look for the first pixel to be drawn.
+    // TODO This can be calculated in O(1), at least for non-rotation
+    while (start < end) {
+      u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
 
-#define render_scanline_vram_setup_mode4()                                    \
-  u16 *palette = palette_ram_converted;                                       \
-  u8 *src_ptr = vram;                                                         \
-  if(read_ioreg(REG_DISPCNT) & 0x10)                                          \
-    src_ptr = vram + 0xA000;                                                  \
+      // Stop once we find a pixel that is actually *inside*
+      if (pixel_x < width && pixel_y < height)
+        break;
 
-#define srcread_mode3(v) eswap16(v)
-#define srcread_mode5(v) eswap16(v)
-#define srcread_mode4(v) (v)
+      dst_ptr++;
+      source_x += dx;
+      if (rotate)
+        source_y += dy;
+      start++;
+    }
 
+    // Draw background pixels by looking them up in the map
+    while (start < end) {
+      u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
 
-// Build bitmap scanline rendering functions.
+      // Check if we run out of background pixels, stop drawing.
+      if (pixel_x >= width || pixel_y >= height)
+        break;
 
-#define render_scanline_bitmap_builder(type, alpha_op, width, height)         \
-static void render_scanline_bitmap_##type##_##alpha_op(u32 start, u32 end,    \
- void *scanline)                                                              \
-{                                                                             \
-  u32 current_pixel;                                                          \
-  s32 source_x, source_y;                                                     \
-  s32 pixel_x, pixel_y;                                                       \
-                                                                              \
-  s32 dx = (s16)read_ioreg(REG_BG2PA);                                        \
-  s32 dy = (s16)read_ioreg(REG_BG2PC);                                        \
-                                                                              \
-  u32 i;                                                                      \
-                                                                              \
-  render_scanline_dest_##alpha_op *dest_ptr =                                 \
-   ((render_scanline_dest_##alpha_op *)scanline) + start;                     \
-  render_scanline_vram_setup_##type();                                        \
-                                                                              \
-  end -= start;                                                               \
-                                                                              \
-  source_x = affine_reference_x[0] + (start * dx);                            \
-  source_y = affine_reference_y[0] + (start * dy);                            \
-                                                                              \
-  if(dy == 0)                                                                 \
-  {                                                                           \
-    bitmap_render_scale(type, alpha_op, width, height);                       \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    bitmap_render_rotate(type, alpha_op, width, height);                      \
-  }                                                                           \
-}                                                                             \
+      // Lookup pixel and draw it.
+      pixfmt *valptr = &src_ptr[pixel_x + (pixel_y * width)];
+      pixfmt val = sizeof(pixfmt) == 2 ? eswap16(*valptr) : *valptr;
 
-render_scanline_bitmap_builder(mode3, normal, 240, 160);
-render_scanline_bitmap_builder(mode4, normal, 240, 160);
-render_scanline_bitmap_builder(mode5, normal, 160, 128);
+      if (mode != 4)
+        *dst_ptr = convert_palette(val);         // Direct color
+      else if (val)
+        *dst_ptr = palette_ram_converted[val];   // Indexed color
 
+      // Move to the next pixel, update coords accordingly
+      start++;
+      dst_ptr++;
+      source_x += dx;
+      if (rotate)
+        source_y += dy;
+    }
+  }
+}
 
 // Fill in the renderers for a layer based on the mode type,
 
@@ -1293,17 +1242,11 @@ render_scanline_bitmap_builder(mode5, normal, 160, 128);
   render_scanline_##type<u32, COLOR32, true>,                                 \
 }                                                                             \
 
-
-// Use if a layer is unsupported for that mode.
-
-#define tile_layer_render_null()                                              \
+#define bitmap_layer_render_functions(mode, ttype, w, h)                      \
 {                                                                             \
-  NULL, NULL, NULL, NULL                                                      \
-}                                                                             \
-
-#define bitmap_layer_render_functions(type)                                   \
-{                                                                             \
-  render_scanline_bitmap_##type##_normal                                      \
+  render_scanline_bitmap<mode, ttype, w, h, false, false>,                    \
+  render_scanline_bitmap<mode, ttype, w, h, true, false>,                     \
+  render_scanline_bitmap<mode, ttype, w, h, true, true>,                      \
 }                                                                             \
 
 // Structs containing functions to render the layers for each mode, for
@@ -1326,11 +1269,10 @@ static const tile_layer_render_struct tile_mode_renderers[3][4] =
 
 static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
 {
-  bitmap_layer_render_functions(mode3),
-  bitmap_layer_render_functions(mode4),
-  bitmap_layer_render_functions(mode5)
+  bitmap_layer_render_functions(3, u16, 240, 160),
+  bitmap_layer_render_functions(4, u8,  240, 160),
+  bitmap_layer_render_functions(5, u16, 160, 128)
 };
-
 
 #define render_scanline_layer_functions_tile()                                \
   const tile_layer_render_struct *layer_renderers =                           \
@@ -2545,7 +2487,15 @@ static void render_scanline(u16 *scanline, u32 dispcnt)
       }
       else
       {
-        layer_renderers->normal_render(0, 240, scanline);
+        s32 dx = (s16)read_ioreg(REG_BG2PA);
+        s32 dy = (s16)read_ioreg(REG_BG2PC);
+
+        if (dy)
+          layer_renderers->affine_render(0, 240, scanline);
+        else if (dx == 256)
+          layer_renderers->blit_render(0, 240, scanline);
+        else
+          layer_renderers->scale_render(0, 240, scanline);
       }
     }
   }
@@ -2688,8 +2638,17 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
     }
     else
     {
-      if(enable_flags & 0x04)
-        layer_renderers->normal_render(start, end, scanline);
+      if(enable_flags & 0x04) {
+        s32 dx = (s16)read_ioreg(REG_BG2PA);
+        s32 dy = (s16)read_ioreg(REG_BG2PC);
+
+        if (dy)
+          layer_renderers->affine_render(start, end, scanline);
+        else if (dx == 256)
+          layer_renderers->blit_render(start, end, scanline);
+        else
+          layer_renderers->scale_render(start, end, scanline);
+      }
     }
   }
 }
