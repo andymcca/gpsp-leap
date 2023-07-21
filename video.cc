@@ -572,10 +572,9 @@ static const u32 map_widths[] = { 256, 512, 256, 512 };
 
 typedef enum
 {
-  NORMAL,     // Regular rendering, output a 16 bit color
-  COLOR16,    // Rendering to indexed color, so we can later apply dark/bright
-  COLOR32,    // Same as color16 but using 32 bits, for blended sprites
-  ALPHA       // Stacks two indexed pixels (+flags) to apply blending
+  FULLCOLOR,  // Regular rendering, output a 16 bit color
+  INDXCOLOR,  // Rendering to indexed color, so we can later apply dark/bright
+  STCKCOLOR   // Stacks two indexed pixels (+flags) to apply blending
 } rendtype;
 
 // Renders non-affine tiled background layer.
@@ -616,11 +615,11 @@ static inline void render_tile_Nbpp(u32 layer,
       u16 combflg = pval ? px_comb : bg_comb;
       // Alhpa mode stacks previous value (unless rendering the first layer)
       if (!transparent || pval) {
-        if (rdtype == NORMAL)
+        if (rdtype == FULLCOLOR)
           *dest_ptr = palette_ram_converted[pval];
-        else if (rdtype == COLOR16 || rdtype == COLOR32)
+        else if (rdtype == INDXCOLOR)
           *dest_ptr = pval | combflg;  // Add combine flags
-        else if (rdtype == ALPHA)
+        else if (rdtype == STCKCOLOR)
           // Stack pixels on top of the pixel value and combine flags
           *dest_ptr = pval | combflg | ((transparent ? *dest_ptr : bg_comb) << 16);
       }
@@ -636,11 +635,11 @@ static inline void render_tile_Nbpp(u32 layer,
       u16 combflg = pval ? px_comb : bg_comb;
       if (!transparent || pval) {
         u8 colidx = pval ? (pval | tilepal) : 0;
-        if (rdtype == NORMAL)
+        if (rdtype == FULLCOLOR)
           *dest_ptr = palette_ram_converted[colidx];
-        else if (rdtype == COLOR16 || rdtype == COLOR32)
+        else if (rdtype == INDXCOLOR)
           *dest_ptr = colidx | combflg;
-        else if (rdtype == ALPHA)
+        else if (rdtype == STCKCOLOR)
           *dest_ptr = colidx | combflg | ((transparent ? *dest_ptr : bg_comb) << 16);  // Stack pixels
       }
     }
@@ -654,10 +653,10 @@ static void render_scanline_text(u32 layer,
   // TODO: Move this to the caller since it makes more sense
   // If the layer is *NOT* first target, we will not combine with previous layer anyway
   // so we can "drop" the mixing bit
-  if (rdtype == ALPHA && transparent) {
+  if (rdtype == STCKCOLOR && transparent) {
     bool first_target = (read_ioreg(REG_BLDCNT) >> layer) & 1;
     if (!first_target) {
-      render_scanline_text<stype, COLOR32, true>(layer, start, end, scanline);
+      render_scanline_text<stype, INDXCOLOR, true>(layer, start, end, scanline);
       return;
     }
   }
@@ -841,11 +840,11 @@ static inline void render_pixel_8bpp(u32 layer,
   u16 combflg = pval ? px_comb : bg_comb;
   // Alhpa mode stacks previous value (unless rendering the first layer)
   if (!transparent || pval) {
-    if (rdtype == NORMAL)
+    if (rdtype == FULLCOLOR)
       *dest_ptr = palette_ram_converted[pval];
-    else if (rdtype == COLOR16 || rdtype == COLOR32)
+    else if (rdtype == INDXCOLOR)
       *dest_ptr = pval | combflg;  // Add combine flags
-    else if (rdtype == ALPHA)
+    else if (rdtype == STCKCOLOR)
       // Stack pixels on top of the pixel value and combine flags
       *dest_ptr = pval | combflg | ((transparent ? *dest_ptr : bg_comb) << 16);
   }
@@ -859,11 +858,11 @@ static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr) {
   u32 pval = 0;
 
   // Alhpa mode stacks previous value (unless rendering the first layer)
-  if (rdtype == NORMAL)
+  if (rdtype == FULLCOLOR)
     *dest_ptr = palette_ram_converted[pval];
-  else if (rdtype == COLOR16 || rdtype == COLOR32)
+  else if (rdtype == INDXCOLOR)
     *dest_ptr = pval | bg_comb;  // Add combine flags
-  else if (rdtype == ALPHA)
+  else if (rdtype == STCKCOLOR)
     // Stack pixels on top of the pixel value and combine flags
     *dest_ptr = pval | bg_comb | (bg_comb << 16);
   // FIXME: Do we need double bg_comb? I do not think so!
@@ -1099,14 +1098,14 @@ static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
 
 #define tile_layer_render_functions(type)                                     \
 {                                                                             \
-  render_scanline_##type<u16, NORMAL, false>,                                 \
-  render_scanline_##type<u16, NORMAL, true>,                                  \
-  render_scanline_##type<u32, ALPHA, false>,                                  \
-  render_scanline_##type<u32, ALPHA, true>,                                   \
-  render_scanline_##type<u16, COLOR16, false>,                                \
-  render_scanline_##type<u16, COLOR16, true>,                                 \
-  render_scanline_##type<u32, COLOR32, false>,                                \
-  render_scanline_##type<u32, COLOR32, true>,                                 \
+  render_scanline_##type<u16, FULLCOLOR, false>,                              \
+  render_scanline_##type<u16, FULLCOLOR, true>,                               \
+  render_scanline_##type<u32, STCKCOLOR, false>,    /* for alpha blending */  \
+  render_scanline_##type<u32, STCKCOLOR, true>,                               \
+  render_scanline_##type<u16, INDXCOLOR, false>,    /* former color16 */      \
+  render_scanline_##type<u16, INDXCOLOR, true>,                               \
+  render_scanline_##type<u32, INDXCOLOR, false>,    /* former color32 */      \
+  render_scanline_##type<u32, INDXCOLOR, true>,                               \
 }                                                                             \
 
 #define bitmap_layer_render_functions(mode, ttype, w, h)                      \
