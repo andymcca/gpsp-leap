@@ -36,14 +36,8 @@ typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
 
 typedef struct
 {
-  tile_render_function normal_render_base;
-  tile_render_function normal_render_transparent;
-  tile_render_function alpha_render_base;
-  tile_render_function alpha_render_transparent;
-  tile_render_function color16_render_base;
-  tile_render_function color16_render_transparent;
-  tile_render_function color32_render_base;
-  tile_render_function color32_render_transparent;
+  tile_render_function base[4];
+  tile_render_function trans[4];
 } tile_layer_render_struct;
 
 typedef struct
@@ -54,10 +48,10 @@ typedef struct
 } bitmap_layer_render_struct;
 
 static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, u32 dispcnt, u32 bldcnt, const tile_layer_render_struct
+ u32 enable_flags, const tile_layer_render_struct
  *layer_renderers);
 static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, u32 dispcnt, u32 bldcnt, const bitmap_layer_render_struct
+ u32 enable_flags, const bitmap_layer_render_struct
  *layer_renderers);
 
 #define tile_expand_base_normal(index)                                        \
@@ -1098,14 +1092,17 @@ static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
 
 #define tile_layer_render_functions(type)                                     \
 {                                                                             \
-  render_scanline_##type<u16, FULLCOLOR, false>,                              \
-  render_scanline_##type<u16, FULLCOLOR, true>,                               \
-  render_scanline_##type<u32, STCKCOLOR, false>,    /* for alpha blending */  \
-  render_scanline_##type<u32, STCKCOLOR, true>,                               \
-  render_scanline_##type<u16, INDXCOLOR, false>,    /* former color16 */      \
-  render_scanline_##type<u16, INDXCOLOR, true>,                               \
-  render_scanline_##type<u32, INDXCOLOR, false>,    /* former color32 */      \
-  render_scanline_##type<u32, INDXCOLOR, true>,                               \
+  {                                                                           \
+    render_scanline_##type<u16, FULLCOLOR, false>,                            \
+    render_scanline_##type<u16, INDXCOLOR, false>,   /* former color16 */     \
+    render_scanline_##type<u32, INDXCOLOR, false>,   /* former color32 */     \
+    render_scanline_##type<u32, STCKCOLOR, false>,   /* for alpha blending */ \
+  },{                                                                         \
+    render_scanline_##type<u16, FULLCOLOR, true>,                             \
+    render_scanline_##type<u16, INDXCOLOR, true>,                             \
+    render_scanline_##type<u32, INDXCOLOR, true>,                             \
+    render_scanline_##type<u32, STCKCOLOR, true>,                             \
+  }                                                                           \
 }                                                                             \
 
 #define bitmap_layer_render_functions(mode, ttype, w, h)                      \
@@ -1522,7 +1519,6 @@ static u8 obj_alpha_count[160];
   u32 dest                                                                    \
 
 #define render_scanline_obj_extra_variables_copy(type)                        \
-  u32 bldcnt = read_ioreg(REG_BLDCNT);                                        \
   u32 dispcnt = read_ioreg(REG_DISPCNT);                                      \
   u32 obj_enable = read_ioreg(REG_WINOUT) >> 8;                               \
   render_scanline_layer_functions_##type();                                   \
@@ -1608,7 +1604,7 @@ static u8 obj_alpha_count[160];
   if((copy_start < end) && (copy_end > start))                                \
   {                                                                           \
     render_scanline_conditional_##type(copy_start, copy_end, copy_buffer,     \
-     obj_enable, dispcnt, bldcnt, layer_renderers);                           \
+                                       obj_enable, layer_renderers);          \
     copy_ptr = copy_buffer + copy_start;                                      \
   }                                                                           \
   else                                                                        \
@@ -1629,8 +1625,10 @@ static u8 obj_alpha_count[160];
 #define render_scanline_obj_builder(combine_op, alpha_op, map_space,          \
  partial_alpha_op)                                                            \
 static void render_scanline_obj_##alpha_op##_##map_space(u32 priority,        \
- u32 start, u32 end, render_scanline_dest_##alpha_op *scanline)               \
+ u32 start, u32 end, void *raw_dst)                                           \
 {                                                                             \
+  render_scanline_dest_##alpha_op *scanline =                                 \
+                                  (render_scanline_dest_##alpha_op*)raw_dst;  \
   render_scanline_obj_extra_variables_##alpha_op(map_space);                  \
   u32 obj_num, i;                                                             \
   s32 obj_x, obj_y;                                                           \
@@ -1686,6 +1684,14 @@ render_scanline_obj_builder(transparent, alpha_obj, 1D, no_partial_alpha);
 render_scanline_obj_builder(transparent, alpha_obj, 2D, no_partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 1D, partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 2D, partial_alpha);
+
+static const tile_render_function obj_mode_renderers[5][2] = {
+  { render_scanline_obj_normal_2D,        render_scanline_obj_normal_1D        },
+  { render_scanline_obj_color16_2D,       render_scanline_obj_color16_1D       },
+  { render_scanline_obj_color32_2D,       render_scanline_obj_color32_1D       },
+  { render_scanline_obj_alpha_obj_2D,     render_scanline_obj_alpha_obj_1D     },
+  { render_scanline_obj_partial_alpha_2D, render_scanline_obj_partial_alpha_1D },
+};
 
 // These are used for winobj rendering
 render_scanline_obj_builder(copy, copy_tile, 1D, no_partial_alpha);
@@ -1817,35 +1823,6 @@ static void order_layers(u32 layer_flags, u32 vcnt)
       layer_order[layer_count++] = priority | 0x04;
   }
 }
-
-#define fill_line(_start, _end)                                               \
-  u32 i;                                                                      \
-                                                                              \
-  for(i = _start; i < _end; i++)                                              \
-    dest_ptr[i] = color;                                                      \
-
-
-#define fill_line_color_normal()                                              \
-  color = palette_ram_converted[color]                                        \
-
-#define fill_line_color_alpha()                                               \
-
-#define fill_line_color_color16()                                             \
-
-#define fill_line_color_color32()                                             \
-
-#define fill_line_builder(type)                                               \
-static void fill_line_##type(u16 color, render_scanline_dest_##type *dest_ptr,\
- u32 start, u32 end)                                                          \
-{                                                                             \
-  fill_line_color_##type();                                                   \
-  fill_line(start, end);                                                      \
-}                                                                             \
-
-fill_line_builder(normal);
-fill_line_builder(alpha);
-fill_line_builder(color16);
-fill_line_builder(color32);
 
 
 // Blending is performed by separating an RGB value into 0G0R0B (32 bit)
@@ -2136,213 +2113,233 @@ static void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_
 // Render a target all the way with the background color as taken from the
 // palette.
 
-#define fill_line_bg(type, dest, _start, _end)                                \
-  fill_line_##type(0, dest, _start, _end)                                     \
+template<bool indexed, typename dsttype>
+void fill_line_background(u32 start, u32 end, void *scanline) {
+  dsttype *ptr = (dsttype*)scanline;
+  while (start < end)
+    if (indexed)
+      ptr[start++] = 0;
+    else
+      ptr[start++] = palette_ram_converted[0];
+}
 
+#define COL_EFFECT_NONE   0x0
+#define COL_EFFECT_BLEND  0x1
+#define COL_EFFECT_BRIGHT 0x2
+#define COL_EFFECT_DARK   0x3
 
-// Render all layers as they appear in the layer order.
+// Renders the backdrop color (ie. whenever no layer is active) applying
+// any effects that might still apply (usually darken/brighten).
+static void render_backdrop(u32 start, u32 end, u16 *scanline) {
+  u16 bldcnt = read_ioreg(REG_BLDCNT);
+  u16 pixcol = palette_ram_converted[0];
+  u32 effect = (bldcnt >> 6) & 0x03;
+  u32 bd_1st_target = ((bldcnt >> 0x5) & 0x01);
 
-#define render_layers(tile_alpha, obj_alpha, dest)                            \
-{                                                                             \
-  current_layer = layer_order[0];                                             \
-  if(current_layer & 0x04)                                                    \
-  {                                                                           \
-    /* If the first one is OBJ render the background then render it. */       \
-    fill_line_bg(tile_alpha, dest, 0, 240);                                   \
-    render_obj_layer(obj_alpha, dest, 0, 240);                                \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    /* Otherwise render a base layer. */                                      \
-    layer_renderers[current_layer].tile_alpha##_render_base(current_layer,    \
-     0, 240, dest);                                                           \
-  }                                                                           \
-                                                                              \
-  /* Render the rest of the layers. */                                        \
-  for(layer_order_pos = 1; layer_order_pos < layer_count; layer_order_pos++)  \
-  {                                                                           \
-    current_layer = layer_order[layer_order_pos];                             \
-    if(current_layer & 0x04)                                                  \
-    {                                                                         \
-      render_obj_layer(obj_alpha, dest, 0, 240);                              \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      layer_renderers[current_layer].                                         \
-       tile_alpha##_render_transparent(current_layer, 0, 240, dest);          \
-    }                                                                         \
-  }                                                                           \
-}                                                                             \
+  if (bd_1st_target && effect == COL_EFFECT_BRIGHT) {
+    u32 brightness = MIN(16, read_ioreg(REG_BLDY) & 0x1F);
 
-#define render_condition_alpha                                                \
-  (((read_ioreg(REG_BLDALPHA) & 0x1F1F) != 0x001F) &&                         \
-   ((read_ioreg(REG_BLDCNT) & 0x3F) != 0) &&                                  \
-   ((read_ioreg(REG_BLDCNT) & 0x3F00) != 0))                                  \
+    // Unpack 16 bit pixel for fast blending operation
+    u32 epixel = (pixcol | (pixcol << 16)) & BLND_MSK;
+    u32 pa = ((BLND_MSK * brightness)      >> 4) & BLND_MSK;  // White color
+    u32 pb = ((epixel * (16 - brightness)) >> 4) & BLND_MSK;  // Pixel color
+    epixel = (pa + pb) & BLND_MSK;
+    pixcol = (epixel >> 16) | epixel;
+  }
+  else if (bd_1st_target && effect == COL_EFFECT_DARK) {
+    u32 brightness = MIN(16, read_ioreg(REG_BLDY) & 0x1F);
+    u32 epixel = (pixcol | (pixcol << 16)) & BLND_MSK;
+    epixel = ((epixel * (16 - brightness)) >> 4) & BLND_MSK;  // Pixel color
+    pixcol = (epixel >> 16) | epixel;
+  }
 
-#define render_condition_fade                                                 \
-  (((read_ioreg(REG_BLDY) & 0x1F) != 0) &&                                    \
-   ((read_ioreg(REG_BLDCNT) & 0x3F) != 0))                                    \
+  // Fill the line with that color
+  while (start < end)
+    scanline[start++] = pixcol;
+}
 
-#define render_layers_color_effect(renderer, layer_condition,                 \
- alpha_condition, fade_condition, _start, _end)                               \
-{                                                                             \
-  if(layer_condition)                                                         \
-  {                                                                           \
-    if(obj_alpha_count[read_ioreg(REG_VCOUNT)])                               \
-    {                                                                         \
-      /* Render based on special effects mode. */                             \
-      u32 screen_buffer[240];                                                 \
-      switch((bldcnt >> 6) & 0x03)                                            \
-      {                                                                       \
-        /* Alpha blend */                                                     \
-        case 0x01:                                                            \
-        {                                                                     \
-          if(alpha_condition)                                                 \
-          {                                                                   \
-            renderer(alpha, alpha_obj, screen_buffer);                        \
-            expand_blend(screen_buffer, scanline, _start, _end);              \
-            return;                                                           \
-          }                                                                   \
-          break;                                                              \
-        }                                                                     \
-                                                                              \
-        /* Fade to white */                                                   \
-        case 0x02:                                                            \
-        {                                                                     \
-          if(fade_condition)                                                  \
-          {                                                                   \
-            renderer(color32, partial_alpha, screen_buffer);                  \
-            expand_brighten_partial_alpha(screen_buffer, scanline,            \
-             _start, _end);                                                   \
-            return;                                                           \
-          }                                                                   \
-          break;                                                              \
-        }                                                                     \
-                                                                              \
-        /* Fade to black */                                                   \
-        case 0x03:                                                            \
-        {                                                                     \
-          if(fade_condition)                                                  \
-          {                                                                   \
-            renderer(color32, partial_alpha, screen_buffer);                  \
-            expand_darken_partial_alpha(screen_buffer, scanline,              \
-             _start, _end);                                                   \
-            return;                                                           \
-          }                                                                   \
-          break;                                                              \
-        }                                                                     \
-      }                                                                       \
-                                                                              \
-      renderer(color32, partial_alpha, screen_buffer);                        \
-      expand_blend(screen_buffer, scanline, _start, _end);                    \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      /* Render based on special effects mode. */                             \
-      switch((bldcnt >> 6) & 0x03)                                            \
-      {                                                                       \
-        /* Alpha blend */                                                     \
-        case 0x01:                                                            \
-        {                                                                     \
-          if(alpha_condition)                                                 \
-          {                                                                   \
-            u32 screen_buffer[240];                                           \
-            renderer(alpha, alpha_obj, screen_buffer);                        \
-            expand_blend(screen_buffer, scanline, _start, _end);              \
-            return;                                                           \
-          }                                                                   \
-          break;                                                              \
-        }                                                                     \
-                                                                              \
-        /* Fade to white */                                                   \
-        case 0x02:                                                            \
-        {                                                                     \
-          if(fade_condition)                                                  \
-          {                                                                   \
-            renderer(color16, color16, scanline);                             \
-            expand_brighten(scanline, scanline, _start, _end);                \
-            return;                                                           \
-          }                                                                   \
-          break;                                                              \
-        }                                                                     \
-                                                                              \
-        /* Fade to black */                                                   \
-        case 0x03:                                                            \
-        {                                                                     \
-          if(fade_condition)                                                  \
-          {                                                                   \
-            renderer(color16, color16, scanline);                             \
-            expand_darken(scanline, scanline, _start, _end);                  \
-            return;                                                           \
-          }                                                                   \
-          break;                                                              \
-        }                                                                     \
-      }                                                                       \
-                                                                              \
-      renderer(normal, normal, scanline);                                     \
-      expand_normal(scanline, _start, _end);                                  \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    u32 pixel_top = palette_ram_converted[0];                                 \
-    switch((bldcnt >> 6) & 0x03)                                              \
-    {                                                                         \
-      /* Fade to white */                                                     \
-      case 0x02:                                                              \
-      {                                                                       \
-        if(color_combine_mask_a(5))                                           \
-        {                                                                     \
-          u32 blend = read_ioreg(REG_BLDY) & 0x1F;                            \
-          u32 upper;                                                          \
-                                                                              \
-          if(blend > 16)                                                      \
-            blend = 16;                                                       \
-                                                                              \
-          upper = ((BLND_MSK * blend) >> 4) & BLND_MSK;                       \
-          blend = 16 - blend;                                                 \
-                                                                              \
-          expand_pixel_no_dest(brighten, pixel_top);                          \
-        }                                                                     \
-        break;                                                                \
-      }                                                                       \
-                                                                              \
-      /* Fade to black */                                                     \
-      case 0x03:                                                              \
-      {                                                                       \
-        if(color_combine_mask_a(5))                                           \
-        {                                                                     \
-          s32 blend = 16 - (read_ioreg(REG_BLDY) & 0x1F);                     \
-                                                                              \
-          if(blend < 0)                                                       \
-            blend = 0;                                                        \
-                                                                              \
-          expand_pixel_no_dest(darken, pixel_top);                            \
-        }                                                                     \
-        break;                                                                \
-      }                                                                       \
-    }                                                                         \
-    fill_line_color16(pixel_top, scanline, _start, _end);                     \
-  }                                                                           \
-}                                                                             \
+#define RENDER_NORMAL   0
+#define RENDER_COL16    1
+#define RENDER_COL32    2
+#define RENDER_ALPHA    3
+
+#define OBJ_NORMAL   0
+#define OBJ_COL16    1
+#define OBJ_COL32    2
+#define OBJ_ALPHA    3
+#define OBJ_PALPHA   4
+
+void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
+                   u32 rend_mode, u32 obj_mode) {
+  u32 lnum;
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
+  bool obj_enabled = (enabled_layers & 0x10);   // Objects are visible
+  // Renderers for this mode (affine or text pointers)
+  const tile_layer_render_struct * r = tile_mode_renderers[dispcnt & 0x07];
+
+  for (lnum = 0; lnum < layer_count; lnum++) {
+    u32 layer = layer_order[lnum];
+    bool is_obj = layer & 0x4;
+    if (is_obj && obj_enabled) {
+      // Draw an object first-layer, we need to fill backdrop color first!
+      if (rend_mode == RENDER_NORMAL)
+        fill_line_background<false, u16>(start, end, dst_ptr);
+      else if (rend_mode == OBJ_COL16)
+        fill_line_background<true, u16>(start, end, dst_ptr);
+      else
+        fill_line_background<true, u32>(start, end, dst_ptr);
+
+      obj_mode_renderers[obj_mode][(dispcnt >> 6) & 1](layer & 0x3, start, end, dst_ptr);
+      break;
+    }
+    else if (!is_obj && ((1 << layer) & enabled_layers)) {
+      // Draw base layer
+      r[layer].base[rend_mode](layer, start, end, dst_ptr);
+      break;
+    }
+  }
+
+  if (lnum == layer_count) {
+    // Render background, no layers are active!
+    // TODO improve this code.
+    if (rend_mode == RENDER_NORMAL)
+      fill_line_background<false, u16>(start, end, dst_ptr);
+    else if (rend_mode == OBJ_COL16)
+      fill_line_background<true, u16>(start, end, dst_ptr);
+    else
+      fill_line_background<true, u32>(start, end, dst_ptr);
+
+    return;
+  }
+
+  while (++lnum < layer_count) {
+    u32 layer = layer_order[lnum];
+    bool is_obj = layer & 0x4;
+    if (is_obj && obj_enabled)
+      obj_mode_renderers[obj_mode][(dispcnt >> 6) & 1](layer & 0x3, start, end, dst_ptr);
+    else if (!is_obj && ((1 << layer) & enabled_layers))
+      r[layer].trans[rend_mode](layer, start, end, dst_ptr);
+  }
+}
+
+// Renders a partial scanline without using any coloring effects (with the
+// exception of OBJ blending).
+
+static void render_color_no_effect(
+  u32 start, u32 end, u16* scanline, u32 enable_flags
+) {
+  bool obj_blend = obj_alpha_count[read_ioreg(REG_VCOUNT)] > 0;
+
+  // Default rendering mode, without layer effects (except perhaps sprites).
+  if (obj_blend) {
+    u32 screen_buffer[240];
+    render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
+    expand_blend(screen_buffer, scanline, start, end);
+  } else {
+    render_layers(start, end, scanline, enable_flags, RENDER_NORMAL, OBJ_NORMAL);
+  }
+}
+
+// Renders all layers honoring color effects (blending, brighten/darken).
+// It uses different rendering routines depending on the coloring effect
+// requirements, speeding up common cases where no effects are used.
+
+// No effects use NORMAL mode (RBB565 color is written on the buffer).
+// For blending, we use BLEND mode to record the two top-most pixels.
+// For other effects we use COLOR16, which records an indexed color in the
+// buffer (used for darken/brighten effects at later passes) or COLOR32,
+// which similarly uses an indexed color for rendering but recording one
+// color for the background and another one for the object layer.
+
+static void render_color_effect(
+  u32 start, u32 end, u16* scanline, u32 enable_flags = 0x1F /* all enabled */
+) {
+  bool obj_blend = obj_alpha_count[read_ioreg(REG_VCOUNT)] > 0;
+  u16 bldcnt = read_ioreg(REG_BLDCNT);
+
+  switch((bldcnt >> 6) & 0x03) {
+  case COL_EFFECT_BRIGHT:
+    {
+      // If no layers are 1st target, no effect will really happen.
+      bool some_1st_tgt = (read_ioreg(REG_BLDCNT) & 0x3F) != 0;
+      // If the factor is zero, it's the same as "regular" rendering.
+      bool non_zero_blend = (read_ioreg(REG_BLDY) & 0x1F) != 0;
+      if (some_1st_tgt && non_zero_blend) {
+        if (obj_blend) {
+          u32 screen_buffer[240];
+          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
+          expand_brighten_partial_alpha(screen_buffer, scanline, start, end);
+        } else {
+          render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
+          expand_brighten(scanline, scanline, start, end);
+        }
+        return;
+      }
+    }
+    break;
+
+  case COL_EFFECT_DARK:
+    {
+      // If no layers are 1st target, no effect will really happen.
+      bool some_1st_tgt = (read_ioreg(REG_BLDCNT) & 0x3F) != 0;
+      // If the factor is zero, it's the same as "regular" rendering.
+      bool non_zero_blend = (read_ioreg(REG_BLDY) & 0x1F) != 0;
+      if (some_1st_tgt && non_zero_blend) {
+        if (obj_blend) {
+          u32 screen_buffer[240];
+          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
+          expand_darken_partial_alpha(screen_buffer, scanline, start, end);
+        } else {
+          render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
+          expand_darken(scanline, scanline, start, end);
+        }
+        return;
+      }
+    }
+    break;
+
+  case COL_EFFECT_BLEND:
+    {
+      // If no layers are 1st or 2nd target, no effect will really happen.
+      bool some_1st_tgt = (read_ioreg(REG_BLDCNT) & 0x003F) != 0;
+      bool some_2nd_tgt = (read_ioreg(REG_BLDCNT) & 0x3F00) != 0;
+      // If 1st target is 100% opacity and 2nd is 0%, just render regularly.
+      bool non_trns_tgt = (read_ioreg(REG_BLDALPHA) & 0x1F1F) != 0x001F;
+      if (some_1st_tgt && some_2nd_tgt && non_trns_tgt) {
+        u32 screen_buffer[240];
+        render_layers(start, end, screen_buffer, enable_flags, RENDER_ALPHA, OBJ_ALPHA);
+        expand_blend(screen_buffer, scanline, start, end);
+        return;
+      }
+    }
+    break;
+
+  case COL_EFFECT_NONE:
+    // Default case, see below.
+    break;
+  };
+
+  // Default case, just a regular no-effects render.
+  render_color_no_effect(start, end, scanline, enable_flags);
+}
 
 
 // Renders an entire scanline from 0 to 240, based on current color mode.
 template<bool tiled>
-static void render_scanline(u16 *scanline, u32 dispcnt)
+static void render_scanline(u16 *scanline)
 {
   u32 current_layer;
   u32 layer_order_pos;
 
   if (tiled) {
-    u32 bldcnt = read_ioreg(REG_BLDCNT);
-    render_scanline_layer_functions_tile();
-
-    render_layers_color_effect(render_layers, layer_count,
-      render_condition_alpha, render_condition_fade, 0, 240);
+    if (layer_count)
+      render_color_effect(0, 240, scanline);
+    else
+      render_backdrop(0, 240, scanline);
   } else {
-    render_scanline_layer_functions_bitmap();
-    fill_line_bg(normal, scanline, 0, 240);
+    u16 dispcnt = read_ioreg(REG_DISPCNT);
+    const bitmap_layer_render_struct *lrend = &bitmap_mode_renderers[(dispcnt & 0x07) - 3];
+    fill_line_background<false, u16>(0, 240, scanline);
 
     for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
     {
@@ -2357,126 +2354,31 @@ static void render_scanline(u16 *scanline, u32 dispcnt)
         s32 dy = (s16)read_ioreg(REG_BG2PC);
 
         if (dy)
-          layer_renderers->affine_render(0, 240, scanline);
+          lrend->affine_render(0, 240, scanline);
         else if (dx == 256)
-          layer_renderers->blit_render(0, 240, scanline);
+          lrend->blit_render(0, 240, scanline);
         else
-          layer_renderers->scale_render(0, 240, scanline);
+          lrend->scale_render(0, 240, scanline);
       }
     }
   }
 }
 
-
-// Render layers from start to end based on if they're allowed in the
-// enable flags.
-
-#define render_layers_conditional(tile_alpha, obj_alpha, dest)                \
-{                                                                             \
-  __label__ skip;                                                             \
-  current_layer = layer_order[layer_order_pos];                               \
-  /* If OBJ aren't enabled skip to the first non-OBJ layer */                 \
-  if(!(enable_flags & 0x10))                                                  \
-  {                                                                           \
-    while((current_layer & 0x04) || !((1 << current_layer) & enable_flags))   \
-    {                                                                         \
-      layer_order_pos++;                                                      \
-      current_layer = layer_order[layer_order_pos];                           \
-                                                                              \
-      /* Oops, ran out of layers, render the background. */                   \
-      if(layer_order_pos == layer_count)                                      \
-      {                                                                       \
-        fill_line_bg(tile_alpha, dest, start, end);                           \
-        goto skip;                                                            \
-      }                                                                       \
-    }                                                                         \
-                                                                              \
-    /* Render the first valid layer */                                        \
-    layer_renderers[current_layer].tile_alpha##_render_base(current_layer,    \
-     start, end, dest);                                                       \
-                                                                              \
-    layer_order_pos++;                                                        \
-                                                                              \
-    /* Render the rest of the layers if active, skipping OBJ ones. */         \
-    for(; layer_order_pos < layer_count; layer_order_pos++)                   \
-    {                                                                         \
-      current_layer = layer_order[layer_order_pos];                           \
-      if(!(current_layer & 0x04) && ((1 << current_layer) & enable_flags))    \
-      {                                                                       \
-        layer_renderers[current_layer].                                       \
-         tile_alpha##_render_transparent(current_layer, start, end, dest);    \
-      }                                                                       \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    /* Find the first active layer, skip all of the inactive ones */          \
-    while(!((current_layer & 0x04) || ((1 << current_layer) & enable_flags))) \
-    {                                                                         \
-      layer_order_pos++;                                                      \
-      current_layer = layer_order[layer_order_pos];                           \
-                                                                              \
-      /* Oops, ran out of layers, render the background. */                   \
-      if(layer_order_pos == layer_count)                                      \
-      {                                                                       \
-        fill_line_bg(tile_alpha, dest, start, end);                           \
-        goto skip;                                                            \
-      }                                                                       \
-    }                                                                         \
-                                                                              \
-    if(current_layer & 0x04)                                                  \
-    {                                                                         \
-      /* If the first one is OBJ render the background then render it. */     \
-      fill_line_bg(tile_alpha, dest, start, end);                             \
-      render_obj_layer(obj_alpha, dest, start, end);                          \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      /* Otherwise render a base layer. */                                    \
-      layer_renderers[current_layer].                                         \
-       tile_alpha##_render_base(current_layer, start, end, dest);             \
-    }                                                                         \
-                                                                              \
-    layer_order_pos++;                                                        \
-                                                                              \
-    /* Render the rest of the layers. */                                      \
-    for(; layer_order_pos < layer_count; layer_order_pos++)                   \
-    {                                                                         \
-      current_layer = layer_order[layer_order_pos];                           \
-      if(current_layer & 0x04)                                                \
-      {                                                                       \
-        render_obj_layer(obj_alpha, dest, start, end);                        \
-      }                                                                       \
-      else                                                                    \
-      {                                                                       \
-        if(enable_flags & (1 << current_layer))                               \
-        {                                                                     \
-          layer_renderers[current_layer].                                     \
-           tile_alpha##_render_transparent(current_layer, start, end, dest);  \
-        }                                                                     \
-      }                                                                       \
-    }                                                                         \
-  }                                                                           \
-                                                                              \
-  skip:                                                                       \
-    ;                                                                         \
-}                                                                             \
-
-
 // Render all of the BG and OBJ in a tiled scanline from start to end ONLY if
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
 static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, u32 dispcnt, u32 bldcnt, const tile_layer_render_struct
- *layer_renderers)
+ u32 enable_flags, const tile_layer_render_struct *layer_renderers)
 {
-  u32 current_layer;
-  u32 layer_order_pos = 0;
-
-  render_layers_color_effect(render_layers_conditional,
-   (layer_count && (enable_flags & 0x1F)),
-   ((enable_flags & 0x20) && render_condition_alpha),
-   ((enable_flags & 0x20) && render_condition_fade), start, end);
+  if (layer_count && (enable_flags & 0x1F)) {
+    bool effects_enabled = enable_flags & 0x20;   // Window bit for effects.
+    if (effects_enabled)
+      render_color_effect(start, end, scanline, enable_flags);
+    else
+      render_color_no_effect(start, end, scanline, enable_flags);
+  }
+  else
+    render_backdrop(start, end, scanline);
 }
 
 
@@ -2484,13 +2386,13 @@ static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
 static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, u32 dispcnt, u32 bldcnt, const bitmap_layer_render_struct
- *layer_renderers)
+ u32 enable_flags, const bitmap_layer_render_struct *layer_renderers)
 {
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 current_layer;
   u32 layer_order_pos;
 
-  fill_line_bg(normal, scanline, start, end);
+  fill_line_background<false, u16>(start, end, scanline);
 
   for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
   {
@@ -2539,27 +2441,27 @@ inline bool in_window_y(u32 vcount, u32 top, u32 bottom) {
 
 template <bool tiled>
 static inline void render_scanline_conditional(u32 start, u32 end,
-  u16 *scanline, u32 enable_flags, u32 dispcnt, u32 bldcnt)
+  u16 *scanline, u32 enable_flags)
 {
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
   if (tiled) {
     const tile_layer_render_struct *layer_renderers = tile_mode_renderers[dispcnt & 0x07];
-    render_scanline_conditional_tile(start, end, scanline, enable_flags, dispcnt, bldcnt, layer_renderers);
+    render_scanline_conditional_tile(start, end, scanline, enable_flags, layer_renderers);
   }
   else {
     const bitmap_layer_render_struct *layer_renderers = &bitmap_mode_renderers[(dispcnt & 0x07) - 3];
-    render_scanline_conditional_bitmap(start, end, scanline, enable_flags, dispcnt, bldcnt, layer_renderers);
+    render_scanline_conditional_bitmap(start, end, scanline, enable_flags, layer_renderers);
   }
 }
 
 // Renders window1 (low priority window) and outside/obj areas for a given range.
 template <bool tiled>
-static void render_windowobj_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
+static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
 {
-  u32 bldcnt = read_ioreg(REG_BLDCNT);
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 winout = read_ioreg(REG_WINOUT);
   u32 wndout_enable = winout & 0x3F;
-  render_scanline_conditional<tiled>(start, end, scanline,
-    wndout_enable, dispcnt, bldcnt);
+  render_scanline_conditional<tiled>(start, end, scanline, wndout_enable);
 
   if (dispcnt >> 15) {
     // Perform the actual object rendering in copy mode
@@ -2579,19 +2481,19 @@ static void render_windowobj_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end
 
 // Renders window1 (low priority window) and outside/obj areas for a given range.
 template <bool tiled>
-static void render_window1_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
+static void render_window1_pass(u16 *scanline, u32 start, u32 end)
 {
-  u32 bldcnt = read_ioreg(REG_BLDCNT);
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 winout = read_ioreg(REG_WINOUT);
   u32 wndout_enable = winout & 0x3F;
 
   switch (dispcnt >> 14) {
   case 0x0:    // No Win1 nor WinObj
     render_scanline_conditional<tiled>(
-      start, end, scanline, wndout_enable, dispcnt, bldcnt);
+      start, end, scanline, wndout_enable);
     break;
   case 0x2:    // Only winobj enabled, render it.
-    render_windowobj_pass<tiled>(scanline, dispcnt, start, end);
+    render_windowobj_pass<tiled>(scanline, start, end);
     break;
   case 0x1: case 0x3:   // Win1 is enabled (and perhaps WinObj too)
     {
@@ -2607,8 +2509,7 @@ static void render_window1_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
 
       if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
         // Window1 is completely out, just render all out.
-        render_windowobj_pass<tiled>(
-          scanline, dispcnt, start, end);
+        render_windowobj_pass<tiled>(scanline, start, end);
       else {
         // Render win1 withtin the clipped range
         // Enable bits for stuff inside the window (and outside)
@@ -2619,24 +2520,24 @@ static void render_window1_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
         if (win_l < win_r) {
           // Render [start, win_l) range (which is outside the window)
           if (win_l != start)
-            render_windowobj_pass<tiled>(scanline, dispcnt, start, win_l);
+            render_windowobj_pass<tiled>(scanline, start, win_l);
           // Render the actual window0 pixels
           render_scanline_conditional<tiled>(
-            win_l, win_r, scanline, wnd1_enable, dispcnt, bldcnt);
+            win_l, win_r, scanline, wnd1_enable);
           // Render the [win_l, end] range (outside)
           if (win_r != end)
-            render_windowobj_pass<tiled>(scanline, dispcnt, win_r, end);
+            render_windowobj_pass<tiled>(scanline, win_r, end);
         } else {
           // Render [0, win_r) range (which is "inside" window0)
           if (win_r != start)
             render_scanline_conditional<tiled>(
-              start, win_r, scanline, wnd1_enable, dispcnt, bldcnt);
+              start, win_r, scanline, wnd1_enable);
           // The actual window is now outside, render recursively
-          render_windowobj_pass<tiled>(scanline, dispcnt, win_r, win_l);
+          render_windowobj_pass<tiled>(scanline, win_r, win_l);
           // Render the [win_l, 240] range ("inside")
           if (win_l != end)
             render_scanline_conditional<tiled>(
-              win_l, end, scanline, wnd1_enable, dispcnt, bldcnt);
+              win_l, end, scanline, wnd1_enable);
         }
       }
     }
@@ -2648,9 +2549,8 @@ static void render_window1_pass(u16 *scanline, u16 dispcnt, u32 start, u32 end)
 // on the area that falls outside. It will call the above function for
 // outside areas to "recursively" render segments.
 template <bool tiled>
-static void render_window0_pass(u16 *scanline, u16 dispcnt)
+static void render_window0_pass(u16 *scanline)
 {
-  u32 bldcnt = read_ioreg(REG_BLDCNT);
   u32 vcount = read_ioreg(REG_VCOUNT);
   // Check the Y coordinates to check if they fall in the right row
   u32 win_top = read_ioreg(REG_WINxV(0)) >> 8;
@@ -2661,7 +2561,7 @@ static void render_window0_pass(u16 *scanline, u16 dispcnt)
 
   if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
     // No windowing, everything is "outside", just render win1.
-    render_window1_pass<tiled>(scanline, dispcnt, 0, 240);
+    render_window1_pass<tiled>(scanline, 0, 240);
   else {
     u32 winin  = read_ioreg(REG_WININ);
     // Enable bits for stuff inside the window
@@ -2671,24 +2571,24 @@ static void render_window0_pass(u16 *scanline, u16 dispcnt)
     if (win_l < win_r) {
       // Render [0, win_l) range (which is outside the window)
       if (win_l)
-        render_window1_pass<tiled>(scanline, dispcnt, 0, win_l);
+        render_window1_pass<tiled>(scanline, 0, win_l);
       // Render the actual window0 pixels
       render_scanline_conditional<tiled>(
-        win_l, win_r, scanline, wnd0_enable, dispcnt, bldcnt);
+        win_l, win_r, scanline, wnd0_enable);
       // Render the [win_l, 240] range (outside)
       if (win_r != 240)
-        render_window1_pass<tiled>(scanline, dispcnt, win_r, 240);
+        render_window1_pass<tiled>(scanline, win_r, 240);
     } else {
       // Render [0, win_r) range (which is "inside" window0)
       if (win_r)
         render_scanline_conditional<tiled>(
-          0, win_r, scanline, wnd0_enable, dispcnt, bldcnt);
+          0, win_r, scanline, wnd0_enable);
       // The actual window is now outside, render recursively
-      render_window1_pass<tiled>(scanline, dispcnt, win_r, win_l);
+      render_window1_pass<tiled>(scanline, win_r, win_l);
       // Render the [win_l, 240] range ("inside")
       if (win_l != 240)
         render_scanline_conditional<tiled>(
-          win_l, 240, scanline, wnd0_enable, dispcnt, bldcnt);
+          win_l, 240, scanline, wnd0_enable);
     }
   }
 }
@@ -2697,8 +2597,9 @@ static void render_window0_pass(u16 *scanline, u16 dispcnt)
 // Renders a full scaleline, taking into consideration windowing effects.
 // Breaks the rendering step into N steps, for each windowed region.
 template <bool tiled>
-static void render_scanline_window(u16 *scanline, u16 dispcnt)
+static void render_scanline_window(u16 *scanline)
 {
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 win_ctrl = (dispcnt >> 13);
 
   // Priority decoding for windows
@@ -2706,19 +2607,19 @@ static void render_scanline_window(u16 *scanline, u16 dispcnt)
   case 0x1: case 0x3: case 0x5: case 0x7:
     // Window 0 is enabled, call the win0 render function. It does recursively
     // check for window 1 and Obj, so no worries.
-    render_window0_pass<tiled>(scanline, dispcnt);
+    render_window0_pass<tiled>(scanline);
     break;
   case 0x2: case 0x6:
     // Window 1 is active, call the window1 renderer.
-    render_window1_pass<tiled>(scanline, dispcnt, 0, 240);
+    render_window1_pass<tiled>(scanline, 0, 240);
     break;
   case 0x4:
     // Only winobj seems active
-    render_windowobj_pass<tiled>(scanline, dispcnt, 0, 240);
+    render_windowobj_pass<tiled>(scanline, 0, 240);
     break;
   case 0x0:
     // No windows are active?
-    render_scanline<tiled>(scanline, dispcnt);
+    render_scanline<tiled>(scanline);
     break;
   }
 }
@@ -2758,15 +2659,15 @@ void update_scanline(void)
   // If the screen is in in forced blank draw pure white.
   if(dispcnt & 0x80)
   {
-    fill_line_color16(0xFFFF, screen_offset, 0, 240);
+    memset(screen_offset, 0xff, 240*sizeof(u16));
   }
   else
   {
     // Modes 0..2 are tiled modes, 3..5 are bitmap-based modes.
     if(video_mode < 3)
-      render_scanline_window<true>(screen_offset, dispcnt);
+      render_scanline_window<true>(screen_offset);
     else
-      render_scanline_window<false>(screen_offset, dispcnt);
+      render_scanline_window<false>(screen_offset);
   }
 
   affine_reference_x[0] += (s16)read_ioreg(REG_BG2PB);
