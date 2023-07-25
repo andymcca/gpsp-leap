@@ -1850,254 +1850,111 @@ static void order_layers(u32 layer_flags, u32 vcnt)
   #define SATB_MSK 0x0000001F
 #endif
 
-// Alpha blend two pixels (pixel_top and pixel_bottom).
-
-#define blend_pixel()                                                         \
-  pixel_bottom = palette_ram_converted[(pixel_pair >> 16) & 0x1FF];           \
-  pixel_bottom = (pixel_bottom | (pixel_bottom << 16)) & BLND_MSK;            \
-  pixel_top = ((pixel_top * blend_a) + (pixel_bottom * blend_b)) >> 4         \
-
-
-// Alpha blend two pixels, allowing for saturation (individual channels > 31).
-// The operation is optimized towards saturation not occuring.
-
-#define blend_saturate_pixel()                                                \
-  pixel_bottom = palette_ram_converted[(pixel_pair >> 16) & 0x1FF];           \
-  pixel_bottom = (pixel_bottom | (pixel_bottom << 16)) & BLND_MSK;            \
-  pixel_top = ((pixel_top * blend_a) + (pixel_bottom * blend_b)) >> 4;        \
-  if(pixel_top & (OVFR_MSK | OVFG_MSK | OVFB_MSK))                            \
-  {                                                                           \
-    if(pixel_top & OVFG_MSK)                                                  \
-      pixel_top |= SATG_MSK;                                                  \
-                                                                              \
-    if(pixel_top & OVFR_MSK)                                                  \
-      pixel_top |= SATR_MSK;                                                  \
-                                                                              \
-    if(pixel_top & OVFB_MSK)                                                  \
-      pixel_top |= SATB_MSK;                                                  \
-  }                                                                           \
-
-#define brighten_pixel()                                                      \
-  pixel_top = upper + ((pixel_top * blend) >> 4);                             \
-
-#define darken_pixel()                                                        \
-  pixel_top = (pixel_top * blend) >> 4;                                       \
-
-#define effect_condition_alpha                                                \
-  ((pixel_pair & 0x04000200) == 0x04000200)                                   \
-
-#define effect_condition_fade(pixel_source)                                   \
-  ((pixel_source & 0x00000200) == 0x00000200)                                 \
-
-#define expand_pixel_no_dest(expand_type, pixel_source)                       \
-  pixel_top = (pixel_top | (pixel_top << 16)) & BLND_MSK;                     \
-  expand_type##_pixel();                                                      \
-  pixel_top &= BLND_MSK;                                                      \
-  pixel_top = (pixel_top >> 16) | pixel_top                                   \
-
-#define expand_pixel(expand_type, pixel_source)                               \
-  pixel_top = palette_ram_converted[pixel_source & 0x1FF];                    \
-  expand_pixel_no_dest(expand_type, pixel_source);                            \
-  *screen_dest_ptr = pixel_top                                                \
-
-#define expand_loop(expand_type, effect_condition, pixel_source)              \
-  screen_src_ptr += start;                                                    \
-  screen_dest_ptr += start;                                                   \
-                                                                              \
-  end -= start;                                                               \
-                                                                              \
-  for(i = 0; i < end; i++)                                                    \
-  {                                                                           \
-    pixel_source = *screen_src_ptr;                                           \
-    if(effect_condition)                                                      \
-    {                                                                         \
-      expand_pixel(expand_type, pixel_source);                                \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      *screen_dest_ptr =                                                      \
-       palette_ram_converted[pixel_source & 0x1FF];                           \
-    }                                                                         \
-                                                                              \
-    screen_src_ptr++;                                                         \
-    screen_dest_ptr++;                                                        \
-  }                                                                           \
-
-
-#define expand_loop_partial_alpha(alpha_expand, expand_type)                  \
-  screen_src_ptr += start;                                                    \
-  screen_dest_ptr += start;                                                   \
-                                                                              \
-  end -= start;                                                               \
-                                                                              \
-  for(i = 0; i < end; i++)                                                    \
-  {                                                                           \
-    pixel_pair = *screen_src_ptr;                                             \
-    if(effect_condition_fade(pixel_pair))                                     \
-    {                                                                         \
-      if(effect_condition_alpha)                                              \
-      {                                                                       \
-        expand_pixel(alpha_expand, pixel_pair);                               \
-      }                                                                       \
-      else                                                                    \
-      {                                                                       \
-        expand_pixel(expand_type, pixel_pair);                                \
-      }                                                                       \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      *screen_dest_ptr =                                                      \
-       palette_ram_converted[pixel_pair & 0x1FF];                             \
-    }                                                                         \
-                                                                              \
-    screen_src_ptr++;                                                         \
-    screen_dest_ptr++;                                                        \
-  }                                                                           \
-
-
-#define expand_partial_alpha(expand_type)                                     \
-  if((blend_a + blend_b) > 16)                                                \
-  {                                                                           \
-    expand_loop_partial_alpha(blend_saturate, expand_type);                   \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    expand_loop_partial_alpha(blend, expand_type);                            \
-  }                                                                           \
-
-
-
-// Blend top two pixels of scanline with each other.
-
-#define expand_normal(screen_ptr, start, end)
-
-
-void expand_blend(u32 *screen_src_ptr, u16 *screen_dest_ptr,
- u32 start, u32 end);
-
-#ifndef ARM_ARCH_BLENDING_OPTS
-
-void expand_blend(u32 *screen_src_ptr, u16 *screen_dest_ptr,
- u32 start, u32 end)
+typedef enum
 {
-  u32 pixel_pair;
-  u32 pixel_top, pixel_bottom;
+  BLEND_ONLY,   // Just alpha blending (if the pixels are 1st and 2nd target)
+  BLEND_BRIGHT, // Perform alpha blending if appropiate, and brighten otherwise
+  BLEND_DARK,   // Same but with darken effecg
+} blendtype;
+
+// Applies blending (and optional brighten/darken) effect to a bunch of
+// color-indexed pixel pairs. Depending on the mode and the pixel target
+// number, blending, darken/brighten or no effect will be applied.
+template <blendtype bldtype>
+static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
   u32 bldalpha = read_ioreg(REG_BLDALPHA);
-  u32 blend_a = bldalpha & 0x1F;
-  u32 blend_b = (bldalpha >> 8) & 0x1F;
-  u32 i;
+  u32 brightf = MIN(16, read_ioreg(REG_BLDY) & 0x1F);
+  u32 blend_a = MIN(16, (bldalpha >> 0) & 0x1F);
+  u32 blend_b = MIN(16, (bldalpha >> 8) & 0x1F);
 
-  if(blend_a > 16)
-    blend_a = 16;
+  bool can_saturate = blend_a + blend_b > 16;
 
-  if(blend_b > 16)
-    blend_b = 16;
+  if (can_saturate) {
+    // If blending can result in saturation, we need to clamp output values.
+    while (start < end) {
+      u32 pixpair = src[start];
+      if ((pixpair & 0x04000200) == 0x04000200) {
+        // Top pixel is 1st target, pixel below is 2nd target. Blend!
+        u16 p1 = palette_ram_converted[(pixpair >>  0) & 0x1FF];
+        u16 p2 = palette_ram_converted[(pixpair >> 16) & 0x1FF];
+        u32 p1e = (p1 | (p1 << 16)) & BLND_MSK;
+        u32 p2e = (p2 | (p2 << 16)) & BLND_MSK;
+        u32 pfe = (((p1e * blend_a) + (p2e * blend_b)) >> 4);
 
-  // The individual colors can saturate over 31, this should be taken
-  // care of in an alternate pass as it incurs a huge additional speedhit.
-  if((blend_a + blend_b) > 16)
-  {
-    expand_loop(blend_saturate, effect_condition_alpha, pixel_pair);
-  }
-  else
-  {
-    expand_loop(blend, effect_condition_alpha, pixel_pair);
+        // If the overflow bit is set, saturate (set) all bits to one.
+        if (pfe & (OVFR_MSK | OVFG_MSK | OVFB_MSK)) {
+          if (pfe & OVFG_MSK)
+            pfe |= SATG_MSK;
+          if (pfe & OVFR_MSK)
+            pfe |= SATR_MSK;
+          if (pfe & OVFB_MSK)
+            pfe |= SATB_MSK;
+        }
+        pfe &= BLND_MSK;
+        dst[start++] = (pfe >> 16) | pfe;
+      }
+      else if ((bldtype != BLEND_ONLY) && (pixpair & 0x200) == 0x200) {
+        // Top pixel is 1st-target, can still apply bright/dark effect.
+        u16 pidx = palette_ram_converted[pixpair & 0x1FF];
+        u32 epixel = (pidx | (pidx << 16)) & BLND_MSK;
+        u32 pa = bldtype == BLEND_DARK ? 0 : ((BLND_MSK * brightf) >> 4) & BLND_MSK;
+        u32 pb = ((epixel * (16 - brightf)) >> 4) & BLND_MSK;
+        epixel = (pa + pb) & BLND_MSK;
+        dst[start++] = (epixel >> 16) | epixel;
+      }
+      else {
+        dst[start++] = palette_ram_converted[pixpair & 0x1FF];   // No effects
+      }
+    }
+  } else {
+    while (start < end) {
+      u32 pixpair = src[start];
+      if ((pixpair & 0x04000200) == 0x04000200) {
+        // Top pixel is 1st target, pixel below is 2nd target. Blend!
+        u16 p1 = palette_ram_converted[(pixpair >>  0) & 0x1FF];
+        u16 p2 = palette_ram_converted[(pixpair >> 16) & 0x1FF];
+        u32 p1e = (p1 | (p1 << 16)) & BLND_MSK;
+        u32 p2e = (p2 | (p2 << 16)) & BLND_MSK;
+        u32 pfe = (((p1e * blend_a) + (p2e * blend_b)) >> 4) & BLND_MSK;
+        dst[start++] = (pfe >> 16) | pfe;
+      }
+      else if ((bldtype != BLEND_ONLY) && (pixpair & 0x200) == 0x200) {
+        // Top pixel is 1st-target, can still apply bright/dark effect.
+        u16 pidx = palette_ram_converted[pixpair & 0x1FF];
+        u32 epixel = (pidx | (pidx << 16)) & BLND_MSK;
+        u32 pa = bldtype == BLEND_DARK ? 0 : ((BLND_MSK * brightf) >> 4) & BLND_MSK;
+        u32 pb = ((epixel * (16 - brightf)) >> 4) & BLND_MSK;
+        epixel = (pa + pb) & BLND_MSK;
+        dst[start++] = (epixel >> 16) | epixel;
+      }
+      else {
+        dst[start++] = palette_ram_converted[pixpair & 0x1FF];   // No effects
+      }
+    }
   }
 }
 
-#endif
+// Applies brighten/darken effect to a bunch of color-indexed pixels.
+template <blendtype bldtype>
+static void merge_brightness(u32 start, u32 end, u16 *srcdst) {
+  u32 brightness = MIN(16, read_ioreg(REG_BLDY) & 0x1F);
 
-// Blend scanline with white.
+  while (start < end) {
+    u16 spix = srcdst[start];
+    u16 pixcol = palette_ram_converted[spix & 0x1FF];
 
-static void expand_darken(u16 *screen_src_ptr, u16 *screen_dest_ptr,
- u32 start, u32 end)
-{
-  u32 pixel_top;
-  s32 blend = 16 - (read_ioreg(REG_BLDY) & 0x1F);
-  u32 i;
+    if ((spix & 0x200) == 0x200) {
+      // Pixel is 1st target, can apply color effect.
+      u32 epixel = (pixcol | (pixcol << 16)) & BLND_MSK;
+      u32 pa = bldtype == BLEND_DARK ? 0 : ((BLND_MSK * brightness) >> 4) & BLND_MSK; // B/W
+      u32 pb = ((epixel * (16 - brightness)) >> 4) & BLND_MSK;  // Pixel color
+      epixel = (pa + pb) & BLND_MSK;
+      pixcol = (epixel >> 16) | epixel;
+    }
 
-  if(blend < 0)
-    blend = 0;
-
-  expand_loop(darken, effect_condition_fade(pixel_top), pixel_top);
+    srcdst[start++] = pixcol;
+  }
 }
-
-
-// Blend scanline with black.
-
-static void expand_brighten(u16 *screen_src_ptr, u16 *screen_dest_ptr,
- u32 start, u32 end)
-{
-  u32 pixel_top;
-  u32 blend = read_ioreg(REG_BLDY) & 0x1F;
-  u32 upper;
-  u32 i;
-
-  if(blend > 16)
-    blend = 16;
-
-  upper = ((BLND_MSK * blend) >> 4) & BLND_MSK;
-  blend = 16 - blend;
-
-  expand_loop(brighten, effect_condition_fade(pixel_top), pixel_top);
-
-}
-
-
-// Expand scanline such that if both top and bottom pass it's alpha,
-// if only top passes it's as specified, and if neither pass it's normal.
-
-static void expand_darken_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_ptr,
- u32 start, u32 end)
-{
-  s32 blend = 16 - (read_ioreg(REG_BLDY) & 0x1F);
-  u32 pixel_pair;
-  u32 pixel_top, pixel_bottom;
-  u32 bldalpha = read_ioreg(REG_BLDALPHA);
-  u32 blend_a = bldalpha & 0x1F;
-  u32 blend_b = (bldalpha >> 8) & 0x1F;
-  u32 i;
-
-  if(blend < 0)
-    blend = 0;
-
-  if(blend_a > 16)
-    blend_a = 16;
-
-  if(blend_b > 16)
-    blend_b = 16;
-
-  expand_partial_alpha(darken);
-}
-
-
-static void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_ptr,
- u32 start, u32 end)
-{
-  s32 blend = read_ioreg(REG_BLDY) & 0x1F;
-  u32 pixel_pair;
-  u32 pixel_top, pixel_bottom;
-  u32 bldalpha = read_ioreg(REG_BLDALPHA);
-  u32 blend_a = bldalpha & 0x1F;
-  u32 blend_b = (bldalpha >> 8) & 0x1F;
-  u32 upper;
-  u32 i;
-
-  if(blend > 16)
-    blend = 16;
-
-  upper = ((BLND_MSK * blend) >> 4) & BLND_MSK;
-  blend = 16 - blend;
-
-  if(blend_a > 16)
-    blend_a = 16;
-
-  if(blend_b > 16)
-    blend_b = 16;
-
-  expand_partial_alpha(brighten);
-}
-
 
 // Render an OBJ layer from start to end, depending on the type (1D or 2D)
 // stored in dispcnt.
@@ -2234,7 +2091,7 @@ static void render_color_no_effect(
   if (obj_blend) {
     u32 screen_buffer[240];
     render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
-    expand_blend(screen_buffer, scanline, start, end);
+    merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
   } else {
     render_layers(start, end, scanline, enable_flags, RENDER_NORMAL, OBJ_NORMAL);
   }
@@ -2268,10 +2125,10 @@ static void render_color_effect(
         if (obj_blend) {
           u32 screen_buffer[240];
           render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
-          expand_brighten_partial_alpha(screen_buffer, scanline, start, end);
+          merge_blend<BLEND_BRIGHT>(start, end, scanline, screen_buffer);
         } else {
           render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
-          expand_brighten(scanline, scanline, start, end);
+          merge_brightness<BLEND_BRIGHT>(start, end, scanline);
         }
         return;
       }
@@ -2288,10 +2145,10 @@ static void render_color_effect(
         if (obj_blend) {
           u32 screen_buffer[240];
           render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
-          expand_darken_partial_alpha(screen_buffer, scanline, start, end);
+          merge_blend<BLEND_DARK>(start, end, scanline, screen_buffer);
         } else {
           render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
-          expand_darken(scanline, scanline, start, end);
+          merge_brightness<BLEND_DARK>(start, end, scanline);
         }
         return;
       }
@@ -2308,7 +2165,7 @@ static void render_color_effect(
       if (some_1st_tgt && some_2nd_tgt && non_trns_tgt) {
         u32 screen_buffer[240];
         render_layers(start, end, screen_buffer, enable_flags, RENDER_ALPHA, OBJ_ALPHA);
-        expand_blend(screen_buffer, scanline, start, end);
+        merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
         return;
       }
     }
@@ -2656,9 +2513,9 @@ void update_scanline(void)
   if(skip_next_frame)
     return;
 
-  // If the screen is in in forced blank draw pure white.
   if(dispcnt & 0x80)
   {
+    // If the screen is in in forced blank draw pure white.
     memset(screen_offset, 0xff, 240*sizeof(u16));
   }
   else
