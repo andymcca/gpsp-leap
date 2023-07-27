@@ -30,6 +30,17 @@ typedef struct {
   u16 attr0, attr1, attr2, attr3;
 } t_oam;
 
+typedef struct {
+  u16 pad0[3];
+  u16 dx;
+  u16 pad1[3];
+  u16 dmx;
+  u16 pad2[3];
+  u16 dy;
+  u16 pad3[3];
+  u16 dmy;
+} t_affp;
+
 typedef void (* tile_render_function)(u32 layer_number, u32 start, u32 end,
  void *dest_ptr);
 typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
@@ -54,12 +65,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
  u32 enable_flags, const bitmap_layer_render_struct
  *layer_renderers);
 
-#define tile_expand_base_normal(index)                                        \
-  current_pixel = palette[current_pixel];                                     \
-  dest_ptr[index] = current_pixel                                             \
-
-#define tile_expand_transparent_normal(index)                                 \
-  tile_expand_base_normal(index)                                              \
 
 #define tile_expand_copy(index)                                               \
   dest_ptr[index] = copy_ptr[index]                                           \
@@ -552,11 +557,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define tile_width_8bpp 8
 #define tile_size_8bpp 64
 
-#define render_scanline_dest_normal         u16
-#define render_scanline_dest_alpha          u32
-#define render_scanline_dest_alpha_obj      u32
-#define render_scanline_dest_color16        u16
-#define render_scanline_dest_color32        u32
 #define render_scanline_dest_partial_alpha  u32
 #define render_scanline_dest_copy_tile      u16
 #define render_scanline_dest_copy_bitmap    u16
@@ -1137,6 +1137,379 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
   bitmap_layer_render_functions(5, u16, 160, 128)
 };
 
+
+// Object/Sprite rendering logic
+
+static const u32 obj_width_table[] =
+  { 8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32 };
+static const u32 obj_height_table[] =
+  { 8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64 };
+
+static const u8 obj_dim_table[3][4][2] = {
+  { {8, 8}, {16, 16}, {32, 32}, {64, 64} },
+  { {16, 8}, {32, 8}, {32, 16}, {64, 32} },
+  { {8, 16}, {8, 32}, {16, 32}, {32, 64} }
+};
+
+static u8 obj_priority_list[5][160][128];
+static u8 obj_priority_count[5][160];
+static u8 obj_alpha_count[160];
+
+typedef struct {
+  s32 obj_x, obj_y;
+  s32 obj_w, obj_h;
+} t_sprite;
+
+// Renders a tile row (8 pixels) for a regular (non-affine) object/sprite.
+template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
+static inline void render_obj_tile_Nbpp(
+  dsttype *dest_ptr, u32 start, u32 end, const u8 *tile_ptr, u16 palette
+) {
+  // tile_ptr points to the tile row (32 or 64 bits depending on bpp).
+  // renders the tile honoring hflip and start/end constraints
+
+  // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
+  // If set, the current pixel belongs to a layer that is 1st or 2nd target.
+  u32 px_comb = color_combine_mask(4);
+
+  if (is8bpp) {
+    // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
+    u64 tilepix = eswap64(*(u64*)tile_ptr);
+    for (u32 i = start; i < end; i++, dest_ptr++) {
+      // Honor hflip by selecting bytes in the correct order
+      u32 sel = hflip ? (7-i) : i;
+      u8 pval = (tilepix >> (sel*8)) & 0xFF;
+      // Alhpa mode stacks previous value
+      if (pval) {
+        if (rdtype == FULLCOLOR)
+          *dest_ptr = palette_ram_converted[pval | 0x100];
+        else if (rdtype == INDXCOLOR)
+          *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
+        else if (rdtype == STCKCOLOR) {
+          // Stack pixels on top of the pixel value and combine flags
+          // We do not stack OBJ on OBJ, rather overwrite the previous object
+          if (*dest_ptr & 0x100)
+            *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+          else
+            *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) << 16);
+        }
+        // TODO implement partial alpha blending
+      }
+    }
+  } else {
+    // Only 32 bits (8 pixels * 4 bits)
+    u32 tilepix = eswap32(*(u32*)tile_ptr);
+    for (u32 i = start; i < end; i++, dest_ptr++) {
+      u32 sel = hflip ? (7-i) : i;
+      u8 pval = (tilepix >> (sel*4)) & 0xF;
+      if (pval) {
+        u8 colidx = pval | palette;
+        if (rdtype == FULLCOLOR)
+          *dest_ptr = palette_ram_converted[colidx | 0x100];
+        else if (rdtype == INDXCOLOR)
+          *dest_ptr = colidx | px_comb | 0x100;
+        else if (rdtype == STCKCOLOR) {
+          if (*dest_ptr & 0x100)
+            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+          else
+            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) << 16);  // Stack pixels
+        }
+      }
+    }
+  }
+}
+
+// Renders a regular sprite (non-affine) row to screen.
+// delta_x is the object X coordinate referenced from the window start.
+// cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
+template <typename stype, rendtype rdtype, bool is8bpp, bool hflip>
+static void render_object(
+  s32 delta_x, u32 cnt, stype *dst_ptr, const u8* tile_ptr, u16 palette
+) {
+  // Tile size in bytes for each mode
+  u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
+  // Number of bytes to advance (or rewind) on the tile map
+  s32 tile_size_off = hflip ? -tile_bsize : tile_bsize;
+
+  if (delta_x < 0) {      // Left part is outside of the screen/window.
+    u32 offx = -delta_x;  // How many pixels did we skip from the object?
+    s32 block_off = offx / 8;
+    u32 tile_off = offx % 8;
+
+    // Skip the first object tiles (skips in the flip direction)
+    tile_ptr += block_off * tile_size_off;
+
+    // Render a partial tile to the left
+    if (tile_off) {
+      u32 residual = 8 - tile_off;   // Pixel count to complete the first tile
+      u32 maxpix = MIN(residual, cnt);
+      render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, tile_off, tile_off + maxpix, tile_ptr, palette);
+
+      // Move to the next tile
+      tile_ptr += tile_size_off;
+      // Account for drawn pixels
+      cnt -= maxpix;
+      dst_ptr += maxpix;
+    }
+  } else {
+    // Render object completely from the left. Skip the empty space to the left
+    dst_ptr += delta_x;
+  }
+
+  // Render full tiles to the scan line.
+  s32 num_tiles = cnt / 8;
+  while (num_tiles--) {
+    // Render full tiles
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, 8, tile_ptr, palette);
+    tile_ptr += tile_size_off;
+    dst_ptr += 8;
+  }
+
+  // Render any partial tile on the end
+  cnt = cnt % 8;
+  if (cnt)
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, cnt, tile_ptr, palette);
+}
+
+
+// Renders an affine sprite row to screen.
+template <typename stype, rendtype rdtype, bool is8bpp, bool rotate>
+static void render_affine_object(
+  const t_sprite *obji, const t_affp *affp, bool is_double, u32 start, u32 end, stype *dst_ptr,
+  const u8 *base_tile, u16 palette
+) {
+  // Tile size in bytes for each mode
+  const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
+  const u32 tile_bwidth = is8bpp ? tile_width_8bpp : tile_width_4bpp;
+
+  // Affine params
+  s32 dx = (s16)eswap16(affp->dx);
+  s32 dy = (s16)eswap16(affp->dy);
+  s32 dmx = (s16)eswap16(affp->dmx);
+  s32 dmy = (s16)eswap16(affp->dmy);
+
+  // Object dimensions and boundaries
+  u32 obj_dimw = obji->obj_w;
+  u32 obj_dimh = obji->obj_h;
+  s32 middle_x = is_double ? obji->obj_w : (obji->obj_w / 2);
+  s32 middle_y = is_double ? obji->obj_h : (obji->obj_h / 2);
+  s32 obj_width  = is_double ? obji->obj_w * 2 : obji->obj_w;
+  s32 obj_height = is_double ? obji->obj_h * 2 : obji->obj_h;
+
+  s32 vcount = read_ioreg(REG_VCOUNT);
+  s32 y_delta = vcount - (obji->obj_y + middle_y);
+
+  if (obji->obj_x < (signed)start)
+    middle_x -= (start - obji->obj_x);
+  s32 source_x = (obj_dimw << 7) + (y_delta * dmx) - (middle_x * dx);
+  s32 source_y = (obj_dimh << 7) + (y_delta * dmy) - (middle_x * dy);
+
+  // Early optimization if Y-coord is out completely for this line.
+  // (if there's no rotation Y coord remains identical throughout the line).
+  if (!rotate && ((u32)(source_y >> 8)) >= (u32)obj_height)
+    return;
+
+  u32 d_start = MAX((signed)start, obji->obj_x);
+  u32 d_end   = MIN((signed)end,   obji->obj_x + obj_width);
+  u32 cnt = d_end - d_start;
+  dst_ptr += d_start;
+
+  bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
+  const u32 tile_pitch = obj1dmap ? (obj_dimw / 8) * tile_bsize : 1024;
+
+  // Skip pixels outside of the sprite area, until we reach the sprite "inside"
+  while (cnt) {
+    u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
+
+    // Stop once we find a pixel that is actually *inside* the map.
+    if (pixel_x < obj_dimw && pixel_y < obj_dimh)
+      break;
+
+    dst_ptr++;
+    source_x += dx;
+    if (rotate)
+      source_y += dy;
+    cnt--;
+  }
+
+  // Draw sprite pixels by looking them up first. Lookup address is tricky!
+  while (cnt) {
+    u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
+
+    // Check if we run out of the sprite, then we can safely abort.
+    if (pixel_x >= obj_dimw || pixel_y >= obj_dimh)
+      return;
+
+    // Lookup pixel and draw it.
+    //render_pixel_8bpp<dsttype, rdtype, transparent>(
+    //  layer, dst_ptr++, pixel_x, pixel_y, tile_base, map_base, map_size);
+    u8 pixval;
+    if (is8bpp) {
+      // We lookup the byte directly and render it.
+      const u32 tile_off =
+        ((pixel_y >> 3) * tile_pitch) +    // Skip vertical blocks
+        ((pixel_x >> 3) * tile_bsize) +    // Skip horizontal blocks
+        ((pixel_y & 0x7) * tile_bwidth) +  // Skip vertical rows to the pixel
+        (pixel_x & 0x7);                   // Skip the horizontal offset
+
+      pixval = base_tile[tile_off];     // Read pixel value!
+    } else {
+      const u32 tile_off =
+        ((pixel_y >> 3) * tile_pitch) +    // Skip vertical blocks
+        ((pixel_x >> 3) * tile_bsize) +    // Skip horizontal blocks
+        ((pixel_y & 0x7) * tile_bwidth) +  // Skip vertical rows to the pixel
+        ((pixel_x >> 1) & 0x3);            // Skip the horizontal offset
+
+      u8 pixpair = base_tile[tile_off];     // Read two pixels (4bit each)
+      pixval = ((pixel_x & 1) ? pixpair >> 4 : pixpair & 0xF);
+    }
+
+    // Render the pixel value
+    u32 comb = color_combine_mask(4);
+    if (pixval) {
+      if (rdtype == FULLCOLOR)
+        *dst_ptr = palette_ram_converted[pixval | palette| 0x100];
+      else if (rdtype == INDXCOLOR)
+        *dst_ptr = pixval | palette | 0x100 | comb;  // Add combine flags
+      else if (rdtype == STCKCOLOR) {
+        // Stack pixels on top of the pixel value and combine flags
+        if (*dst_ptr & 0x100)
+          *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) & 0xFFFF0000);
+        else
+          *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) << 16);  // Stack pixels
+        // TODO partial alpha
+      }
+    }
+
+    // Move to the next pixel, update coords accordingly
+    cnt--;
+    dst_ptr++;
+    source_x += dx;
+    if (rotate)
+      source_y += dy;
+  }
+}
+
+// Renders objects on a scanline for a given priority.
+template <typename stype, rendtype rdtype>
+static void render_scanline_objects(
+  u32 start, u32 end, stype *scanline, u32 priority
+) {
+  // TODO move this to another place?
+  // Skip alpha pass if you can do a regular color32 pass
+  if (rdtype == STCKCOLOR && ((read_ioreg(REG_BLDCNT) >> 4) & 1) == 0) {
+    render_scanline_objects<stype, INDXCOLOR>(start, end, scanline, priority);
+    return;
+  }
+
+  s32 vcount = read_ioreg(REG_VCOUNT);
+  bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
+  u32 objn;
+  u32 objcnt = obj_priority_count[priority][vcount];
+  u8 *objlist = obj_priority_list[priority][vcount];
+
+  // Render all the visible objects for this priority.
+  for (objn = 0; objn < objcnt; objn++) {
+    // Objects in the list are pre-filtered and sorted in the appropriate order
+    u32 objoff = objlist[objn];
+    const t_oam *oamentry = &((t_oam*)oam_ram)[objoff];
+
+    u16 obj_attr0 = eswap16(oamentry->attr0);
+    u16 obj_attr1 = eswap16(oamentry->attr1);
+    u16 obj_attr2 = eswap16(oamentry->attr2);
+    u16 obj_shape = obj_attr0 >> 14;
+    u16 obj_size = (obj_attr1 >> 14);
+    bool is_affine = obj_attr0 & 0x100;
+    bool is_8bpp = obj_attr0 & 0x2000;
+
+    t_sprite obji = {
+      .obj_x = (s32)(obj_attr1 << 23) >> 23,
+      .obj_y = obj_attr0 & 0xFF,
+      .obj_w = obj_dim_table[obj_shape][obj_size][0],
+      .obj_h = obj_dim_table[obj_shape][obj_size][1]
+    };
+
+    const u8 *base_tile = &vram[
+      0x10000 +                      // VRAM base for OBJ tile data
+      (obj_attr2 & 0x3FF) * 32];     // Selected character block
+
+    if (obji.obj_y > 160)
+      obji.obj_y -= 256;
+
+    if (is_affine) {
+      bool is_double = obj_attr0 & 0x200;
+      u32 pnum = (obj_attr1 >> 9) & 0x1f;
+      const t_affp *affp_base = (t_affp*)oam_ram;
+      const t_affp *affp = &affp_base[pnum];
+      u16 palette = (obj_attr2 >> 8) & 0xF0;
+
+      // The object could be out of the window, check and skip.
+      if (obji.obj_x >= (signed)end ||
+          obji.obj_x + obji.obj_w * (is_double ? 2 : 1) <= (signed)start)
+        continue;
+
+      if (affp->dy == 0) {   // No rotation happening (just scale)
+        if (is_8bpp)
+          render_affine_object<stype, rdtype, true, false>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
+        else
+          render_affine_object<stype, rdtype, false, false>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+      } else {               // Full rotation and scaling
+        if (is_8bpp)
+          render_affine_object<stype, rdtype, true, true>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
+        else
+          render_affine_object<stype, rdtype, false, true>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+      }
+    } else {
+      // The object could be out of the window, check and skip.
+      if (obji.obj_x >= (signed)end || obji.obj_x + obji.obj_w <= (signed)start)
+        continue;
+
+      // Non-affine objects can be flipped on both edges.
+      bool hflip = obj_attr1 & 0x1000;
+      bool vflip = obj_attr1 & 0x2000;
+
+      // Calulate the vertical offset (row) to be displayed. Account for vflip.
+      u32 voffset = vflip ? obji.obj_y + obji.obj_h - vcount - 1 : vcount - obji.obj_y;
+
+      // Calculate base tile for the object (points to the row to be drawn).
+      u32 tile_bsize  = is_8bpp ? tile_size_8bpp : tile_size_4bpp;
+      u32 tile_bwidth = is_8bpp ? tile_width_8bpp : tile_width_4bpp;
+      u32 obj_pitch = obj1dmap ? (obji.obj_w / 8) * tile_bsize : 1024;
+      u32 hflip_off = hflip ? ((obji.obj_w / 8) - 1) * tile_bsize : 0;
+
+      // Calculate the pointer to the tile.
+      const u8 *tile_ptr = &base_tile[
+        (voffset / 8) * obj_pitch +    // Select tile row offset
+        (voffset % 8) * tile_bwidth +  // Skip tile rows
+        hflip_off];                     // Account for horizontal flip
+
+      // Make everything relative to start
+      s32 obj_x_offset  = obji.obj_x - start;
+      u32 clipped_width = obj_x_offset >= 0 ? obji.obj_w : obji.obj_w + obj_x_offset;
+      u32 max_range = obj_x_offset >= 0 ? end - obji.obj_x : end - start;
+      u32 max_draw = MIN(max_range, clipped_width);
+
+      // Render the object scanline using the correct mode.
+      if (is_8bpp) {
+        if (hflip)
+          render_object<stype, rdtype, true, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+        else
+          render_object<stype, rdtype, true, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+      } else {
+        // In 4bpp mode calculate the palette number
+        u16 palette = (obj_attr2 >> 8) & 0xF0;
+
+        if (hflip)
+          render_object<stype, rdtype, false, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+        else
+          render_object<stype, rdtype, false, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+      }
+    }
+  }
+}
+
+
+
 #define render_scanline_layer_functions_tile()                                \
   const tile_layer_render_struct *layer_renderers =                           \
    tile_mode_renderers[dispcnt & 0x07]                                        \
@@ -1473,21 +1846,6 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
   }                                                                           \
 }                                                                             \
 
-static const u32 obj_width_table[] =
-  { 8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32 };
-static const u32 obj_height_table[] =
-  { 8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64 };
-
-static const u8 obj_dim_table[3][4][2] = {
-  { {8, 8}, {16, 16}, {32, 32}, {64, 64} },
-  { {16, 8}, {32, 8}, {32, 16}, {64, 32} },
-  { {8, 16}, {8, 32}, {16, 32}, {32, 64} }
-};
-
-static u8 obj_priority_list[5][160][128];
-static u8 obj_priority_count[5][160];
-static u8 obj_alpha_count[160];
-
 
 // Build obj rendering functions
 
@@ -1506,12 +1864,6 @@ static u8 obj_alpha_count[160];
     render_scanline_obj_color32_##map_space(priority, start, end, scanline);  \
     return;                                                                   \
   }                                                                           \
-
-#define render_scanline_obj_extra_variables_color16(map_space)                \
-  render_scanline_obj_extra_variables_color()                                 \
-
-#define render_scanline_obj_extra_variables_color32(map_space)                \
-  render_scanline_obj_extra_variables_color()                                 \
 
 #define render_scanline_obj_extra_variables_partial_alpha(map_space)          \
   render_scanline_obj_extra_variables_color();                                \
@@ -1579,7 +1931,7 @@ static u8 obj_alpha_count[160];
 #define render_scanline_obj_partial_alpha(combine_op, alpha_op, map_space)    \
   if((obj_attribute_0 >> 10) & 0x03)                                          \
   {                                                                           \
-    pixel_combine = 0x00000300;                                               \
+    pixel_combine = 0x00000300;    /* 1st target and palette 256 */           \
     render_scanline_obj_main(combine_op, alpha_obj, map_space);               \
   }                                                                           \
   else                                                                        \
@@ -1674,14 +2026,44 @@ static void render_scanline_obj_##alpha_op##_##map_space(u32 priority,        \
 }                                                                             \
 
 // There are actually used to render sprites to the scanline
-render_scanline_obj_builder(transparent, normal, 1D, no_partial_alpha);
-render_scanline_obj_builder(transparent, normal, 2D, no_partial_alpha);
-render_scanline_obj_builder(transparent, color16, 1D, no_partial_alpha);
-render_scanline_obj_builder(transparent, color16, 2D, no_partial_alpha);
-render_scanline_obj_builder(transparent, color32, 1D, no_partial_alpha);
-render_scanline_obj_builder(transparent, color32, 2D, no_partial_alpha);
-render_scanline_obj_builder(transparent, alpha_obj, 1D, no_partial_alpha);
-render_scanline_obj_builder(transparent, alpha_obj, 2D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, normal, 1D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, normal, 2D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, color16, 1D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, color16, 2D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, color32, 1D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, color32, 2D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, alpha_obj, 1D, no_partial_alpha);
+// render_scanline_obj_builder(transparent, alpha_obj, 2D, no_partial_alpha);
+
+// WIP: Remove these once we merge things with partial alpha and copy mode.
+void render_scanline_obj_normal_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u16, FULLCOLOR>(start, end, (u16*)raw_dst, priority);
+}
+void render_scanline_obj_normal_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u16, FULLCOLOR>(start, end, (u16*)raw_dst, priority);
+}
+
+void render_scanline_obj_color16_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u16, INDXCOLOR>(start, end, (u16*)raw_dst, priority);
+}
+void render_scanline_obj_color16_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u16, INDXCOLOR>(start, end, (u16*)raw_dst, priority);
+}
+
+void render_scanline_obj_color32_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u32, INDXCOLOR>(start, end, (u32*)raw_dst, priority);
+}
+void render_scanline_obj_color32_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u32, INDXCOLOR>(start, end, (u32*)raw_dst, priority);
+}
+
+void render_scanline_obj_alpha_obj_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u32, STCKCOLOR>(start, end, (u32*)raw_dst, priority);
+}
+void render_scanline_obj_alpha_obj_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
+  render_scanline_objects<u32, STCKCOLOR>(start, end, (u32*)raw_dst, priority);
+}
+
 render_scanline_obj_builder(transparent, partial_alpha, 1D, partial_alpha);
 render_scanline_obj_builder(transparent, partial_alpha, 2D, partial_alpha);
 
@@ -2318,8 +2700,14 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
   u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 winout = read_ioreg(REG_WINOUT);
   u32 wndout_enable = winout & 0x3F;
+
+  // First we render the "window-out" segment.
   render_scanline_conditional<tiled>(start, end, scanline, wndout_enable);
 
+  // Now we render the objects in "copy" mode. This renders the scanline in
+  // WinObj-mode to a temporary buffer and performs a "copy-mode" render.
+  // In this mode, we copy pixels from the temp buffer to the final buffer
+  // whenever an object pixel is rendered.
   if (dispcnt >> 15) {
     // Perform the actual object rendering in copy mode
     if (tiled) {
