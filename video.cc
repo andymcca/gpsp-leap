@@ -930,16 +930,17 @@ static void render_affine_object(
 // Renders objects on a scanline for a given priority.
 template <typename stype, rendtype rdtype, conditional_render_function copyfn>
 static void render_scanline_objects(
-  u32 start, u32 end, stype *scanline, u32 priority
+  u32 priority, u32 start, u32 end, void *raw_ptr
 ) {
   // TODO move this to another place?
   // Skip alpha pass if you can do a regular color32 pass
   if (rdtype == STCKCOLOR && ((read_ioreg(REG_BLDCNT) >> 4) & 1) == 0) {
     // We cannot skip if there's some object being rendered TODO TODO
-    render_scanline_objects<stype, INDXCOLOR, copyfn>(start, end, scanline, priority);
+    render_scanline_objects<stype, INDXCOLOR, copyfn>(priority, start, end, raw_ptr);
     return;
   }
 
+  stype *scanline = (stype*)raw_ptr;
   s32 vcount = read_ioreg(REG_VCOUNT);
   bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
   u32 objn;
@@ -1094,41 +1095,11 @@ static void render_scanline_objects(
 
 
 // There are actually used to render sprites to the scanline
-
-// WIP: Remove these once we merge things with partial alpha and copy mode.
-void render_scanline_obj_normal_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, FULLCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
-}
-void render_scanline_obj_normal_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, FULLCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
-}
-
-void render_scanline_obj_color16_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, INDXCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
-}
-void render_scanline_obj_color16_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, INDXCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
-}
-
-void render_scanline_obj_color32_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, INDXCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
-}
-void render_scanline_obj_color32_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, INDXCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
-}
-
-void render_scanline_obj_alpha_obj_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, STCKCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
-}
-void render_scanline_obj_alpha_obj_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, STCKCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
-}
-
-static const tile_render_function obj_mode_renderers[4][2] = {
-  { render_scanline_obj_normal_2D,        render_scanline_obj_normal_1D        },
-  { render_scanline_obj_color16_2D,       render_scanline_obj_color16_1D       },
-  { render_scanline_obj_color32_2D,       render_scanline_obj_color32_1D       },
-  { render_scanline_obj_alpha_obj_2D,     render_scanline_obj_alpha_obj_1D     },
+static const tile_render_function obj_mode_renderers[4] = {
+  render_scanline_objects<u16, FULLCOLOR, nullptr>,
+  render_scanline_objects<u16, INDXCOLOR, nullptr>,
+  render_scanline_objects<u32, INDXCOLOR, nullptr>,
+  render_scanline_objects<u32, STCKCOLOR, nullptr>,
 };
 
 
@@ -1384,17 +1355,6 @@ static void merge_brightness(u32 start, u32 end, u16 *srcdst) {
   }
 }
 
-// Render an OBJ layer from start to end, depending on the type (1D or 2D)
-// stored in dispcnt.
-
-#define render_obj_layer(type, dest, _start, _end)                            \
-  current_layer &= ~0x04;                                                     \
-  if(dispcnt & 0x40)                                                          \
-    render_scanline_obj_##type##_1D(current_layer, _start, _end, dest);       \
-  else                                                                        \
-    render_scanline_obj_##type##_2D(current_layer, _start, _end, dest)        \
-
-
 // Render a target all the way with the background color as taken from the
 // palette.
 
@@ -1475,7 +1435,7 @@ void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
       else
         fill_line_background<true, u32>(start, end, dst_ptr);
 
-      obj_mode_renderers[obj_mode][(dispcnt >> 6) & 1](layer & 0x3, start, end, dst_ptr);
+      obj_mode_renderers[obj_mode](layer & 0x3, start, end, dst_ptr);
       break;
     }
     else if (!is_obj && ((1 << layer) & enabled_layers)) {
@@ -1502,7 +1462,7 @@ void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
     u32 layer = layer_order[lnum];
     bool is_obj = layer & 0x4;
     if (is_obj && obj_enabled)
-      obj_mode_renderers[obj_mode][(dispcnt >> 6) & 1](layer & 0x3, start, end, dst_ptr);
+      obj_mode_renderers[obj_mode](layer & 0x3, start, end, dst_ptr);
     else if (!is_obj && ((1 << layer) & enabled_layers))
       r[layer].trans[rend_mode](layer, start, end, dst_ptr);
   }
@@ -1632,7 +1592,7 @@ static void render_scanline(u16 *scanline)
       current_layer = layer_order[layer_order_pos];
       if(current_layer & 0x04)
       {
-        render_obj_layer(normal, scanline, 0, 240);
+        render_scanline_objects<u16, FULLCOLOR, nullptr>(current_layer & 3, 0, 240, scanline);
       }
       else
       {
@@ -1690,7 +1650,7 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
     {
       if(enable_flags & 0x10)
       {
-        render_obj_layer(normal, scanline, start, end);
+        render_scanline_objects<u16, FULLCOLOR, nullptr>(current_layer & 3, start, end, scanline);
       }
     }
     else
@@ -1757,9 +1717,9 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
     // Perform the actual object rendering in copy mode
     if (tiled) {
       // TODO: Make version 1D/2D?   if (dispcnt & 0x40)
-      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_tile>(start, end, scanline, 4);
+      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_tile>(4, start, end, scanline);
     } else {
-      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_bitmap>(start, end, scanline, 4);
+      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_bitmap>(4, start, end, scanline);
     }
   }
 }
