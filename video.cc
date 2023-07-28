@@ -68,13 +68,17 @@ static void render_scanline_conditional_bitmap(
   u32 start, u32 end, u16 *scanline, u32 enable_flags);
 
 
+#define OBJ_MOD_NORMAL     0
+#define OBJ_MOD_SEMITRAN   1
+#define OBJ_MOD_WINDOW     2
+#define OBJ_MOD_INVALID    3
 
-#define advance_dest_ptr_base(delta)                                          \
-  dest_ptr += delta                                                           \
+// Byte lengths of complete tiles and tile rows in 4bpp and 8bpp.
 
-#define advance_dest_ptr_transparent(delta)                                   \
-  advance_dest_ptr_base(delta)                                                \
-
+#define tile_width_4bpp 4
+#define tile_size_4bpp 32
+#define tile_width_8bpp 8
+#define tile_size_8bpp 64
 
 #define color_combine_mask_a(layer)                                           \
   ((read_ioreg(REG_BLDCNT) >> layer) & 0x01)                                  \
@@ -87,445 +91,6 @@ static void render_scanline_conditional_bitmap(
    ((read_ioreg(REG_BLDCNT) >> (layer + 7)) & 0x02)) << 9                     \
 
 
-// OBJ should only shift if the top isn't already OBJ
-#define tile_expand_transparent_alpha_obj(index)                              \
-  dest = dest_ptr[index];                                                     \
-  if(dest & 0x00000100)                                                       \
-    dest_ptr[index] = (dest & 0xFFFF0000) | current_pixel | pixel_combine;    \
-  else                                                                        \
-    dest_ptr[index] = (dest << 16) | current_pixel | pixel_combine;           \
-
-
-// For color effects that don't need to preserve the previous layer.
-// The color32 version should be used with 32bit wide dest_ptr so as to be
-// compatible with alpha combine on top of it.
-
-#define tile_expand_base_color16(index)                                       \
-  dest_ptr[index] = current_pixel | pixel_combine                             \
-
-#define tile_expand_transparent_color16(index)                                \
-  tile_expand_base_color16(index)                                             \
-
-#define tile_expand_transparent_color32(index)                                \
-  tile_expand_base_color16(index)                                             \
-
-
-// Operations for isolation 8bpp pixels within 32bpp pixel blocks.
-
-#define tile_8bpp_pixel_op_mask(op_param)                                     \
-  current_pixel = current_pixels & 0xFF                                       \
-
-#define tile_8bpp_pixel_op_shift_mask(shift)                                  \
-  current_pixel = (current_pixels >> shift) & 0xFF                            \
-
-#define tile_8bpp_pixel_op_shift(shift)                                       \
-  current_pixel = current_pixels >> shift                                     \
-
-#define tile_8bpp_pixel_op_none(shift)                                        \
-
-// Transparent (layered) writes should only replace what is there if the
-// pixel is not transparent (zero)
-
-#define tile_8bpp_draw_transparent(index, op, op_param, alpha_op)             \
-  tile_8bpp_pixel_op_##op(op_param);                                          \
-  if(current_pixel)                                                           \
-  {                                                                           \
-    tile_expand_transparent_##alpha_op(index);                                \
-  }                                                                           \
-
-
-// Get the current tile from the map in 8bpp mode
-
-#define get_tile_8bpp()                                                       \
-  current_tile = eswap16(*map_ptr);                                           \
-  tile_ptr = tile_base + ((current_tile & 0x3FF) * 64)                        \
-
-
-// Draw half of a tile in 8bpp mode, for base renderer
-
-#define tile_8bpp_draw_four_noflip(index, combine_op, alpha_op)               \
-  tile_8bpp_draw_##combine_op(index + 0, mask, 0, alpha_op);                  \
-  tile_8bpp_draw_##combine_op(index + 1, shift_mask, 8, alpha_op);            \
-  tile_8bpp_draw_##combine_op(index + 2, shift_mask, 16, alpha_op);           \
-  tile_8bpp_draw_##combine_op(index + 3, shift, 24, alpha_op)                 \
-
-
-// Like the above, but draws the half-tile horizontally flipped
-
-#define tile_8bpp_draw_four_flip(index, combine_op, alpha_op)                 \
-  tile_8bpp_draw_##combine_op(index + 3, mask, 0, alpha_op);                  \
-  tile_8bpp_draw_##combine_op(index + 2, shift_mask, 8, alpha_op);            \
-  tile_8bpp_draw_##combine_op(index + 1, shift_mask, 16, alpha_op);           \
-  tile_8bpp_draw_##combine_op(index + 0, shift, 24, alpha_op)                 \
-
-
-// Draw half of a tile in 8bpp mode, for transparent renderer; as an
-// optimization the entire thing is checked against zero (in transparent
-// capable renders it is more likely for the pixels to be transparent than
-// opaque)
-
-#define tile_8bpp_draw_four_transparent(index, alpha_op, flip_op)             \
-  if(current_pixels != 0)                                                     \
-  {                                                                           \
-    tile_8bpp_draw_four_##flip_op(index, transparent, alpha_op);              \
-  }                                                                           \
-
-// Helper macro for drawing 8bpp tiles clipped against the edge of the screen
-
-#define partial_tile_8bpp(combine_op, alpha_op)                               \
-  for(i = 0; i < partial_tile_run; i++)                                       \
-  {                                                                           \
-    tile_8bpp_draw_##combine_op(0, mask, 0, alpha_op);                        \
-    current_pixels >>= 8;                                                     \
-    advance_dest_ptr_##combine_op(1);                                         \
-  }                                                                           \
-
-
-// Draws 8bpp tiles clipped against the left side of the screen,
-// partial_tile_offset indicates how much clipped in it is, partial_tile_run
-// indicates how much it should draw.
-
-#define partial_tile_right_noflip_8bpp(combine_op, alpha_op)                  \
-  if(partial_tile_offset >= 4)                                                \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)(tile_ptr + 4))) >>                     \
-     ((partial_tile_offset - 4) * 8);                                         \
-    partial_tile_8bpp(combine_op, alpha_op);                                  \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    partial_tile_run -= 4;                                                    \
-    current_pixels = eswap32(*((u32 *)tile_ptr)) >> (partial_tile_offset * 8);\
-    partial_tile_8bpp(combine_op, alpha_op);                                  \
-    current_pixels = eswap32(*((u32 *)(tile_ptr + 4)));                       \
-    tile_8bpp_draw_four_##combine_op(0, alpha_op, noflip);                    \
-    advance_dest_ptr_##combine_op(4);                                         \
-  }                                                                           \
-
-
-// Draws 8bpp tiles clipped against both the left and right side of the
-// screen, IE, runs of less than 8 - partial_tile_offset.
-
-#define partial_tile_mid_noflip_8bpp(combine_op, alpha_op)                    \
-  if(partial_tile_offset >= 4)                                                \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)(tile_ptr + 4))) >>                     \
-     ((partial_tile_offset - 4) * 8);                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)tile_ptr)) >> (partial_tile_offset * 8);\
-    if((partial_tile_offset + partial_tile_run) > 4)                          \
-    {                                                                         \
-      u32 old_run = partial_tile_run;                                         \
-      partial_tile_run = 4 - partial_tile_offset;                             \
-      partial_tile_8bpp(combine_op, alpha_op);                                \
-      partial_tile_run = old_run - partial_tile_run;                          \
-      current_pixels = eswap32(*((u32 *)(tile_ptr + 4)));                     \
-    }                                                                         \
-  }                                                                           \
-  partial_tile_8bpp(combine_op, alpha_op);                                    \
-
-
-// Draws 8bpp tiles clipped against the right side of the screen,
-// partial_tile_run indicates how much there is to draw.
-
-#define partial_tile_left_noflip_8bpp(combine_op, alpha_op)                   \
-  if(partial_tile_run >= 4)                                                   \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)tile_ptr));                             \
-    tile_8bpp_draw_four_##combine_op(0, alpha_op, noflip);                    \
-    advance_dest_ptr_##combine_op(4);                                         \
-    tile_ptr += 4;                                                            \
-    partial_tile_run -= 4;                                                    \
-  }                                                                           \
-                                                                              \
-  current_pixels = eswap32(*((u32 *)(tile_ptr)));                             \
-  partial_tile_8bpp(combine_op, alpha_op)                                     \
-
-
-// Draws a non-clipped (complete) 8bpp tile.
-
-#define tile_noflip_8bpp(combine_op, alpha_op)                                \
-  current_pixels = eswap32(*((u32 *)tile_ptr));                               \
-  tile_8bpp_draw_four_##combine_op(0, alpha_op, noflip);                      \
-  current_pixels = eswap32(*((u32 *)(tile_ptr + 4)));                         \
-  tile_8bpp_draw_four_##combine_op(4, alpha_op, noflip)                       \
-
-
-// Like the above versions but draws flipped tiles.
-
-#define partial_tile_flip_8bpp(combine_op, alpha_op)                          \
-  for(i = 0; i < partial_tile_run; i++)                                       \
-  {                                                                           \
-    tile_8bpp_draw_##combine_op(0, shift, 24, alpha_op);                      \
-    current_pixels <<= 8;                                                     \
-    advance_dest_ptr_##combine_op(1);                                         \
-  }                                                                           \
-
-#define partial_tile_right_flip_8bpp(combine_op, alpha_op)                    \
-  if(partial_tile_offset >= 4)                                                \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)tile_ptr)) <<                           \
-                              ((partial_tile_offset - 4) * 8);                \
-    partial_tile_flip_8bpp(combine_op, alpha_op);                             \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    partial_tile_run -= 4;                                                    \
-    current_pixels = eswap32(*((u32 *)(tile_ptr + 4))) <<                     \
-     ((partial_tile_offset - 4) * 8);                                         \
-    partial_tile_flip_8bpp(combine_op, alpha_op);                             \
-    current_pixels = eswap32(*((u32 *)tile_ptr));                             \
-    tile_8bpp_draw_four_##combine_op(0, alpha_op, flip);                      \
-    advance_dest_ptr_##combine_op(4);                                         \
-  }                                                                           \
-
-#define partial_tile_mid_flip_8bpp(combine_op, alpha_op)                      \
-  if(partial_tile_offset >= 4)                                                \
-    current_pixels = eswap32(*((u32 *)tile_ptr)) <<                           \
-                              ((partial_tile_offset - 4) * 8);                \
-  else                                                                        \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)(tile_ptr + 4))) <<                     \
-     ((partial_tile_offset - 4) * 8);                                         \
-                                                                              \
-    if((partial_tile_offset + partial_tile_run) > 4)                          \
-    {                                                                         \
-      u32 old_run = partial_tile_run;                                         \
-      partial_tile_run = 4 - partial_tile_offset;                             \
-      partial_tile_flip_8bpp(combine_op, alpha_op);                           \
-      partial_tile_run = old_run - partial_tile_run;                          \
-      current_pixels = eswap32(*((u32 *)(tile_ptr)));                         \
-    }                                                                         \
-  }                                                                           \
-  partial_tile_flip_8bpp(combine_op, alpha_op);                               \
-
-#define partial_tile_left_flip_8bpp(combine_op, alpha_op)                     \
-  if(partial_tile_run >= 4)                                                   \
-  {                                                                           \
-    current_pixels = eswap32(*((u32 *)(tile_ptr + 4)));                       \
-    tile_8bpp_draw_four_##combine_op(0, alpha_op, flip);                      \
-    advance_dest_ptr_##combine_op(4);                                         \
-    tile_ptr -= 4;                                                            \
-    partial_tile_run -= 4;                                                    \
-  }                                                                           \
-                                                                              \
-  current_pixels = eswap32(*((u32 *)(tile_ptr + 4)));                         \
-  partial_tile_flip_8bpp(combine_op, alpha_op)                                \
-
-#define tile_flip_8bpp(combine_op, alpha_op)                                  \
-  current_pixels = eswap32(*((u32 *)(tile_ptr + 4)));                         \
-  tile_8bpp_draw_four_##combine_op(0, alpha_op, flip);                        \
-  current_pixels = eswap32(*((u32 *)tile_ptr));                               \
-  tile_8bpp_draw_four_##combine_op(4, alpha_op, flip)                         \
-
-
-// Operations for isolating 4bpp tiles in a 32bit block
-
-#define tile_4bpp_pixel_op_mask(op_param)                                     \
-  current_pixel = current_pixels & 0x0F                                       \
-
-#define tile_4bpp_pixel_op_shift_mask(shift)                                  \
-  current_pixel = (current_pixels >> shift) & 0x0F                            \
-
-#define tile_4bpp_pixel_op_shift(shift)                                       \
-  current_pixel = current_pixels >> shift                                     \
-
-#define tile_4bpp_pixel_op_none(op_param)                                     \
-
-
-// Draws a single 4bpp pixel as layered, if not transparent.
-
-#define tile_4bpp_draw_transparent(index, op, op_param, alpha_op)             \
-  tile_4bpp_pixel_op_##op(op_param);                                          \
-  if(current_pixel)                                                           \
-  {                                                                           \
-    current_pixel |= current_palette;                                         \
-    tile_expand_transparent_##alpha_op(index);                                \
-  }                                                                           \
-
-// Draws eight 4bpp pixels.
-
-#define tile_4bpp_draw_eight_noflip(combine_op, alpha_op)                     \
-  tile_4bpp_draw_##combine_op(0, mask, 0, alpha_op);                          \
-  tile_4bpp_draw_##combine_op(1, shift_mask, 4, alpha_op);                    \
-  tile_4bpp_draw_##combine_op(2, shift_mask, 8, alpha_op);                    \
-  tile_4bpp_draw_##combine_op(3, shift_mask, 12, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(4, shift_mask, 16, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(5, shift_mask, 20, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(6, shift_mask, 24, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(7, shift, 28, alpha_op)                         \
-
-
-// Draws eight 4bpp pixels in reverse order (for hflip).
-
-#define tile_4bpp_draw_eight_flip(combine_op, alpha_op)                       \
-  tile_4bpp_draw_##combine_op(7, mask, 0, alpha_op);                          \
-  tile_4bpp_draw_##combine_op(6, shift_mask, 4, alpha_op);                    \
-  tile_4bpp_draw_##combine_op(5, shift_mask, 8, alpha_op);                    \
-  tile_4bpp_draw_##combine_op(4, shift_mask, 12, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(3, shift_mask, 16, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(2, shift_mask, 20, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(1, shift_mask, 24, alpha_op);                   \
-  tile_4bpp_draw_##combine_op(0, shift, 28, alpha_op)                         \
-
-
-// Draws eight 4bpp pixels in transparent (layered) mode, checks if all are
-// zero and if so draws nothing.
-
-#define tile_4bpp_draw_eight_transparent(alpha_op, flip_op)                   \
-  if(current_pixels != 0)                                                     \
-  {                                                                           \
-    tile_4bpp_draw_eight_##flip_op(transparent, alpha_op);                    \
-  }                                                                           \
-
-
-// Gets the current tile in 4bpp mode, also getting the current palette and
-// the pixel block.
-
-#define get_tile_4bpp()                                                       \
-  current_tile = eswap16(*map_ptr);                                           \
-  current_palette = (current_tile >> 12) << 4;                                \
-  tile_ptr = tile_base + ((current_tile & 0x3FF) * 32);                       \
-
-
-// Helper macro for drawing clipped 4bpp tiles.
-
-#define partial_tile_4bpp(combine_op, alpha_op)                               \
-  for(i = 0; i < partial_tile_run; i++)                                       \
-  {                                                                           \
-    tile_4bpp_draw_##combine_op(0, mask, 0, alpha_op);                        \
-    current_pixels >>= 4;                                                     \
-    advance_dest_ptr_##combine_op(1);                                         \
-  }                                                                           \
-
-
-// Draws a 4bpp tile clipped against the left edge of the screen.
-// partial_tile_offset is how far in it's clipped, partial_tile_run is
-// how many to draw.
-
-#define partial_tile_right_noflip_4bpp(combine_op, alpha_op)                  \
-  current_pixels = eswap32(*((u32 *)tile_ptr)) >> (partial_tile_offset * 4);  \
-  partial_tile_4bpp(combine_op, alpha_op)                                     \
-
-
-// Draws a 4bpp tile clipped against both edges of the screen, same as right.
-
-#define partial_tile_mid_noflip_4bpp(combine_op, alpha_op)                    \
-  partial_tile_right_noflip_4bpp(combine_op, alpha_op)                        \
-
-
-// Draws a 4bpp tile clipped against the right edge of the screen.
-// partial_tile_offset is how many to draw.
-
-#define partial_tile_left_noflip_4bpp(combine_op, alpha_op)                   \
-  current_pixels = eswap32(*((u32 *)tile_ptr));                               \
-  partial_tile_4bpp(combine_op, alpha_op)                                     \
-
-
-// Draws a complete 4bpp tile row (not clipped)
-#define tile_noflip_4bpp(combine_op, alpha_op)                                \
-  current_pixels = eswap32(*((u32 *)tile_ptr));                               \
-  tile_4bpp_draw_eight_##combine_op(alpha_op, noflip)                         \
-
-
-// Like the above, but draws flipped tiles.
-
-#define partial_tile_flip_4bpp(combine_op, alpha_op)                          \
-  for(i = 0; i < partial_tile_run; i++)                                       \
-  {                                                                           \
-    tile_4bpp_draw_##combine_op(0, shift, 28, alpha_op);                      \
-    current_pixels <<= 4;                                                     \
-    advance_dest_ptr_##combine_op(1);                                         \
-  }                                                                           \
-
-#define partial_tile_right_flip_4bpp(combine_op, alpha_op)                    \
-  current_pixels = eswap32(*((u32 *)tile_ptr)) << (partial_tile_offset * 4);  \
-  partial_tile_flip_4bpp(combine_op, alpha_op)                                \
-
-#define partial_tile_mid_flip_4bpp(combine_op, alpha_op)                      \
-  partial_tile_right_flip_4bpp(combine_op, alpha_op)                          \
-
-#define partial_tile_left_flip_4bpp(combine_op, alpha_op)                     \
-  current_pixels = eswap32(*((u32 *)tile_ptr));                               \
-  partial_tile_flip_4bpp(combine_op, alpha_op)                                \
-
-#define tile_flip_4bpp(combine_op, alpha_op)                                  \
-  current_pixels = eswap32(*((u32 *)tile_ptr));                               \
-  tile_4bpp_draw_eight_##combine_op(alpha_op, flip)                           \
-
-
-// Advances a non-flipped 4bpp obj to the next tile.
-
-#define obj_advance_noflip_4bpp()                                             \
-  tile_ptr += 32                                                              \
-
-
-// Advances a non-flipped 8bpp obj to the next tile.
-
-#define obj_advance_noflip_8bpp()                                             \
-  tile_ptr += 64                                                              \
-
-
-// Advances a flipped 4bpp obj to the next tile.
-
-#define obj_advance_flip_4bpp()                                               \
-  tile_ptr -= 32                                                              \
-
-
-// Advances a flipped 8bpp obj to the next tile.
-
-#define obj_advance_flip_8bpp()                                               \
-  tile_ptr -= 64                                                              \
-
-
-
-// Draws multiple sequential tiles from an obj, flip_op determines if it should
-// be flipped or not (set to flip or noflip)
-
-#define multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op)         \
-  for(i = 0; i < tile_run; i++)                                               \
-  {                                                                           \
-    tile_##flip_op##_##color_depth(combine_op, alpha_op);                     \
-    obj_advance_##flip_op##_##color_depth();                                  \
-    advance_dest_ptr_##combine_op(8);                                         \
-  }                                                                           \
-
-
-// Draws an obj's tile clipped against the left side of the screen
-
-#define partial_tile_right_obj(combine_op, color_depth, alpha_op, flip_op)    \
-  partial_tile_right_##flip_op##_##color_depth(combine_op, alpha_op);         \
-  obj_advance_##flip_op##_##color_depth()                                     \
-
-// Draws an obj's tile clipped against both sides of the screen
-
-#define partial_tile_mid_obj(combine_op, color_depth, alpha_op, flip_op)      \
-  partial_tile_mid_##flip_op##_##color_depth(combine_op, alpha_op)            \
-
-// Draws an obj's tile clipped against the right side of the screen
-
-#define partial_tile_left_obj(combine_op, color_depth, alpha_op, flip_op)     \
-  partial_tile_left_##flip_op##_##color_depth(combine_op, alpha_op)           \
-
-
-// Extra variables specific for 8bpp/4bpp tile renderers.
-
-#define tile_extra_variables_4bpp()                                           \
-  u32 current_palette                                                         \
-
-
-// Byte lengths of complete tiles and tile rows in 4bpp and 8bpp.
-
-#define tile_width_4bpp 4
-#define tile_size_4bpp 32
-#define tile_width_8bpp 8
-#define tile_size_8bpp 64
-
-#define render_scanline_dest_partial_alpha  u32
-
-
 static const u32 map_widths[] = { 256, 512, 256, 512 };
 
 typedef enum
@@ -533,6 +98,7 @@ typedef enum
   FULLCOLOR,  // Regular rendering, output a 16 bit color
   INDXCOLOR,  // Rendering to indexed color, so we can later apply dark/bright
   STCKCOLOR,  // Stacks two indexed pixels (+flags) to apply blending
+  STCKCOLORF, // Same as above, but forces 1st target bits for objects
   PIXCOPY     // Special mode used for sprites, to allow for obj-window drawing
 } rendtype;
 
@@ -1135,7 +701,7 @@ static inline void render_obj_tile_Nbpp(
 
   // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
   // If set, the current pixel belongs to a layer that is 1st or 2nd target.
-  u32 px_comb = color_combine_mask(4);
+  u32 px_comb = (rdtype == STCKCOLORF ? 0x200 : color_combine_mask(4));
 
   if (is8bpp) {
     // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
@@ -1150,7 +716,7 @@ static inline void render_obj_tile_Nbpp(
           *dest_ptr = palette_ram_converted[pval | 0x100];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
-        else if (rdtype == STCKCOLOR) {
+        else if (rdtype == STCKCOLOR || rdtype == STCKCOLORF) {
           // Stack pixels on top of the pixel value and combine flags
           // We do not stack OBJ on OBJ, rather overwrite the previous object
           if (*dest_ptr & 0x100)
@@ -1175,7 +741,7 @@ static inline void render_obj_tile_Nbpp(
           *dest_ptr = palette_ram_converted[colidx | 0x100];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = colidx | px_comb | 0x100;
-        else if (rdtype == STCKCOLOR) {
+        else if (rdtype == STCKCOLOR || rdtype == STCKCOLORF) {
           if (*dest_ptr & 0x100)
             *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
           else
@@ -1334,13 +900,13 @@ static void render_affine_object(
     }
 
     // Render the pixel value
-    u32 comb = color_combine_mask(4);
+    u32 comb = (rdtype == STCKCOLORF ? 0x200 : color_combine_mask(4));
     if (pixval) {
       if (rdtype == FULLCOLOR)
-        *dst_ptr = palette_ram_converted[pixval | palette| 0x100];
+        *dst_ptr = palette_ram_converted[pixval | palette | 0x100];
       else if (rdtype == INDXCOLOR)
         *dst_ptr = pixval | palette | 0x100 | comb;  // Add combine flags
-      else if (rdtype == STCKCOLOR) {
+      else if (rdtype == STCKCOLOR || rdtype == STCKCOLORF) {
         // Stack pixels on top of the pixel value and combine flags
         if (*dst_ptr & 0x100)
           *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) & 0xFFFF0000);
@@ -1394,6 +960,7 @@ static void render_scanline_objects(
     bool is_affine = obj_attr0 & 0x100;
     bool is_8bpp = obj_attr0 & 0x2000;
     bool is_double = obj_attr0 & 0x200;
+    bool is_trans = ((obj_attr0 >> 10) & 0x3) == OBJ_MOD_SEMITRAN;
 
     t_sprite obji = {
       .obj_x = (s32)(obj_attr1 << 23) >> 23,
@@ -1433,16 +1000,31 @@ static void render_scanline_objects(
       const t_affp *affp = &affp_base[pnum];
       u16 palette = (obj_attr2 >> 8) & 0xF0;
 
-      if (affp->dy == 0) {   // No rotation happening (just scale)
-        if (is_8bpp)
-          render_affine_object<stype, rdtype, true, false>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
-        else
-          render_affine_object<stype, rdtype, false, false>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
-      } else {               // Full rotation and scaling
-        if (is_8bpp)
-          render_affine_object<stype, rdtype, true, true>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
-        else
-          render_affine_object<stype, rdtype, false, true>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+      // TODO Cannot do blending effects if the underlying buffer is u16 (bitmap)
+      if (is_trans && sizeof(stype) > 2) {
+        if (affp->dy == 0) {   // No rotation happening (just scale)
+          if (is_8bpp)
+            render_affine_object<stype, STCKCOLORF, true, false>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
+          else
+            render_affine_object<stype, STCKCOLORF, false, false>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+        } else {               // Full rotation and scaling
+          if (is_8bpp)
+            render_affine_object<stype, STCKCOLORF, true, true>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
+          else
+            render_affine_object<stype, STCKCOLORF, false, true>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+        }
+      } else {
+        if (affp->dy == 0) {   // No rotation happening (just scale)
+          if (is_8bpp)
+            render_affine_object<stype, rdtype, true, false>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
+          else
+            render_affine_object<stype, rdtype, false, false>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+        } else {               // Full rotation and scaling
+          if (is_8bpp)
+            render_affine_object<stype, rdtype, true, true>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
+          else
+            render_affine_object<stype, rdtype, false, true>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
+        }
       }
     } else {
       // The object could be out of the window, check and skip.
@@ -1475,495 +1057,43 @@ static void render_scanline_objects(
       u32 max_draw = MIN(max_range, clipped_width);
 
       // Render the object scanline using the correct mode.
-      if (is_8bpp) {
-        if (hflip)
-          render_object<stype, rdtype, true, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
-        else
-          render_object<stype, rdtype, true, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
-      } else {
-        // In 4bpp mode calculate the palette number
-        u16 palette = (obj_attr2 >> 8) & 0xF0;
+      if (is_trans && sizeof(stype) > 2) {
+        if (is_8bpp) {
+          if (hflip)
+            render_object<stype, STCKCOLORF, true, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+          else
+            render_object<stype, STCKCOLORF, true, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+        } else {
+          // In 4bpp mode calculate the palette number
+          u16 palette = (obj_attr2 >> 8) & 0xF0;
 
-        if (hflip)
-          render_object<stype, rdtype, false, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
-        else
-          render_object<stype, rdtype, false, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+          if (hflip)
+            render_object<stype, STCKCOLORF, false, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+          else
+            render_object<stype, STCKCOLORF, false, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+        }
+      } else {
+        if (is_8bpp) {
+          if (hflip)
+            render_object<stype, rdtype, true, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+          else
+            render_object<stype, rdtype, true, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+        } else {
+          // In 4bpp mode calculate the palette number
+          u16 palette = (obj_attr2 >> 8) & 0xF0;
+
+          if (hflip)
+            render_object<stype, rdtype, false, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+          else
+            render_object<stype, rdtype, false, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+        }
       }
     }
   }
 }
 
 
-
-// Adjust a flipped obj's starting position
-
-#define obj_tile_offset_noflip(color_depth)                                   \
-
-#define obj_tile_offset_flip(color_depth)                                     \
-  + (tile_size_##color_depth * ((obj_width - 8) / 8))                         \
-
-
-// Adjust the obj's starting point if it goes too far off the left edge of
-// the screen.
-
-#define obj_tile_right_offset_noflip(color_depth)                             \
-  tile_ptr += (partial_tile_offset / 8) * tile_size_##color_depth             \
-
-#define obj_tile_right_offset_flip(color_depth)                               \
-  tile_ptr -= (partial_tile_offset / 8) * tile_size_##color_depth             \
-
-// Get the current row offset into an obj in 1D map space
-
-#define obj_tile_offset_1D(color_depth, flip_op)                              \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
-   + ((vertical_offset / 8) * (obj_width / 8) * tile_size_##color_depth)      \
-   + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-   obj_tile_offset_##flip_op(color_depth)                                     \
-
-// Get the current row offset into an obj in 2D map space
-
-#define obj_tile_offset_2D(color_depth, flip_op)                              \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
-   + ((vertical_offset / 8) * 1024)                                           \
-   + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-   obj_tile_offset_##flip_op(color_depth)                                     \
-
-
-// Get the palette for 4bpp obj.
-
-#define obj_get_palette_4bpp()                                                \
-  current_palette = (obj_attribute_2 >> 8) & 0xF0                             \
-
-#define obj_get_palette_8bpp()                                                \
-
-
-// Render the current row of an obj.
-
-#define obj_render(combine_op, color_depth, alpha_op, map_space, flip_op)     \
-{                                                                             \
-  obj_get_palette_##color_depth();                                            \
-  obj_tile_offset_##map_space(color_depth, flip_op);                          \
-                                                                              \
-  if(obj_x < (s32)start)                                                      \
-  {                                                                           \
-    dest_ptr = scanline + start;                                              \
-    pixel_run = obj_width - (start - obj_x);                                  \
-    if((s32)pixel_run > 0)                                                    \
-    {                                                                         \
-      if((obj_x + obj_width) >= end)                                          \
-      {                                                                       \
-        pixel_run = end - start;                                              \
-        partial_tile_offset = start - obj_x;                                  \
-        obj_tile_right_offset_##flip_op(color_depth);                         \
-        partial_tile_offset %= 8;                                             \
-                                                                              \
-        if(partial_tile_offset)                                               \
-        {                                                                     \
-          partial_tile_run = 8 - partial_tile_offset;                         \
-          if((s32)pixel_run < (s32)partial_tile_run)                          \
-          {                                                                   \
-            if((s32)pixel_run > 0)                                            \
-            {                                                                 \
-              partial_tile_run = pixel_run;                                   \
-              partial_tile_mid_obj(combine_op, color_depth, alpha_op,         \
-               flip_op);                                                      \
-            }                                                                 \
-            continue;                                                         \
-          }                                                                   \
-          else                                                                \
-          {                                                                   \
-            pixel_run -= partial_tile_run;                                    \
-            partial_tile_right_obj(combine_op, color_depth, alpha_op,         \
-             flip_op);                                                        \
-          }                                                                   \
-        }                                                                     \
-        tile_run = pixel_run / 8;                                             \
-        multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);        \
-        partial_tile_run = pixel_run % 8;                                     \
-        if(partial_tile_run)                                                  \
-        {                                                                     \
-          partial_tile_left_obj(combine_op, color_depth, alpha_op,            \
-           flip_op);                                                          \
-        }                                                                     \
-      }                                                                       \
-      else                                                                    \
-      {                                                                       \
-        partial_tile_offset = start - obj_x;                                  \
-        obj_tile_right_offset_##flip_op(color_depth);                         \
-        partial_tile_offset %= 8;                                             \
-        if(partial_tile_offset)                                               \
-        {                                                                     \
-          partial_tile_run = 8 - partial_tile_offset;                         \
-          partial_tile_right_obj(combine_op, color_depth, alpha_op,           \
-           flip_op);                                                          \
-        }                                                                     \
-        tile_run = pixel_run / 8;                                             \
-        multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);        \
-      }                                                                       \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-                                                                              \
-  if((obj_x + obj_width) >= end)                                              \
-  {                                                                           \
-    pixel_run = end - obj_x;                                                  \
-    if((s32)pixel_run > 0)                                                    \
-    {                                                                         \
-      dest_ptr = scanline + obj_x;                                            \
-      tile_run = pixel_run / 8;                                               \
-      multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);          \
-      partial_tile_run = pixel_run % 8;                                       \
-      if(partial_tile_run)                                                    \
-      {                                                                       \
-        partial_tile_left_obj(combine_op, color_depth, alpha_op, flip_op);    \
-      }                                                                       \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    dest_ptr = scanline + obj_x;                                              \
-    tile_run = obj_width / 8;                                                 \
-    multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op);            \
-  }                                                                           \
-}                                                                             \
-
-#define obj_scale_offset_1D(color_depth)                                      \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
-   + ((vertical_offset / 8) * (max_x / 8) * tile_size_##color_depth)          \
-   + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-
-// Get the current row offset into an obj in 2D map space
-
-#define obj_scale_offset_2D(color_depth)                                      \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
-   + ((vertical_offset / 8) * 1024)                                           \
-   + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-
-#define obj_render_scale_pixel_4bpp(combine_op, alpha_op)                     \
-  current_pixel =                                                             \
-     tile_ptr[tile_map_offset + ((tile_x >> 1) & 0x03)];                      \
-  if(tile_x & 0x01)                                                           \
-    current_pixel >>= 4;                                                      \
-  else                                                                        \
-    current_pixel &= 0x0F;                                                    \
-                                                                              \
-  tile_4bpp_draw_##combine_op(0, none, 0, alpha_op)                           \
-
-
-#define obj_render_scale_pixel_8bpp(combine_op, alpha_op)                     \
-  current_pixel = tile_ptr[tile_map_offset + (tile_x & 0x07)];                \
-  tile_8bpp_draw_##combine_op(0, none, 0, alpha_op);                          \
-
-#define obj_render_scale(combine_op, color_depth, alpha_op, map_space)        \
-{                                                                             \
-  u32 vertical_offset;                                                        \
-  source_y += (y_delta * dmy);                                                \
-  vertical_offset = (source_y >> 8);                                          \
-  if((u32)vertical_offset < (u32)max_y)                                       \
-  {                                                                           \
-    obj_scale_offset_##map_space(color_depth);                                \
-    source_x += (y_delta * dmx) - (middle_x * dx);                            \
-                                                                              \
-    for(i = 0; i < obj_width; i++)                                            \
-    {                                                                         \
-      tile_x = (source_x >> 8);                                               \
-                                                                              \
-      if((u32)tile_x < (u32)max_x)                                            \
-        break;                                                                \
-                                                                              \
-      source_x += dx;                                                         \
-      advance_dest_ptr_##combine_op(1);                                       \
-    }                                                                         \
-                                                                              \
-    for(; i < obj_width; i++)                                                 \
-    {                                                                         \
-      tile_x = (source_x >> 8);                                               \
-                                                                              \
-      if((u32)tile_x >= (u32)max_x)                                           \
-        break;                                                                \
-                                                                              \
-      tile_map_offset = (tile_x >> 3) * tile_size_##color_depth;              \
-      obj_render_scale_pixel_##color_depth(combine_op, alpha_op);             \
-                                                                              \
-      source_x += dx;                                                         \
-      advance_dest_ptr_##combine_op(1);                                       \
-    }                                                                         \
-  }                                                                           \
-}                                                                             \
-
-
-#define obj_rotate_offset_1D(color_depth)                                     \
-  obj_tile_pitch = (max_x / 8) * tile_size_##color_depth                      \
-
-#define obj_rotate_offset_2D(color_depth)                                     \
-  obj_tile_pitch = 1024                                                       \
-
-#define obj_render_rotate_pixel_4bpp(combine_op, alpha_op)                    \
-   current_pixel = tile_ptr[tile_map_offset +                                 \
-((tile_x >> 1) & 0x03) + ((tile_y & 0x07) * obj_pitch)];                      \
-  if(tile_x & 0x01)                                                           \
-    current_pixel >>= 4;                                                      \
-  else                                                                        \
-    current_pixel &= 0x0F;                                                    \
-                                                                              \
-  tile_4bpp_draw_##combine_op(0, none, 0, alpha_op)                           \
-
-#define obj_render_rotate_pixel_8bpp(combine_op, alpha_op)                    \
-  current_pixel = tile_ptr[tile_map_offset +                                  \
-   (tile_x & 0x07) + ((tile_y & 0x07) * obj_pitch)];                          \
-                                                                              \
-  tile_8bpp_draw_##combine_op(0, none, 0, alpha_op)                           \
-
-#define obj_render_rotate(combine_op, color_depth, alpha_op, map_space)       \
-{                                                                             \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32);                    \
-  obj_rotate_offset_##map_space(color_depth);                                 \
-                                                                              \
-  source_x += (y_delta * dmx) - (middle_x * dx);                              \
-  source_y += (y_delta * dmy) - (middle_x * dy);                              \
-                                                                              \
-  for(i = 0; i < obj_width; i++)                                              \
-  {                                                                           \
-    tile_x = (source_x >> 8);                                                 \
-    tile_y = (source_y >> 8);                                                 \
-                                                                              \
-    if(((u32)tile_x < (u32)max_x) && ((u32)tile_y < (u32)max_y))              \
-      break;                                                                  \
-                                                                              \
-    source_x += dx;                                                           \
-    source_y += dy;                                                           \
-    advance_dest_ptr_##combine_op(1);                                         \
-  }                                                                           \
-                                                                              \
-  for(; i < obj_width; i++)                                                   \
-  {                                                                           \
-    tile_x = (source_x >> 8);                                                 \
-    tile_y = (source_y >> 8);                                                 \
-                                                                              \
-    if(((u32)tile_x >= (u32)max_x) || ((u32)tile_y >= (u32)max_y))            \
-      break;                                                                  \
-                                                                              \
-    tile_map_offset = ((tile_x >> 3) * tile_size_##color_depth) +             \
-    ((tile_y >> 3) * obj_tile_pitch);                                         \
-    obj_render_rotate_pixel_##color_depth(combine_op, alpha_op);              \
-                                                                              \
-    source_x += dx;                                                           \
-    source_y += dy;                                                           \
-    advance_dest_ptr_##combine_op(1);                                         \
-  }                                                                           \
-}                                                                             \
-
-// Render the current row of an affine transformed OBJ.
-
-#define obj_render_affine(combine_op, color_depth, alpha_op, map_space)       \
-{                                                                             \
-  u16 *params = (u16 *)oam_ram + (((obj_attribute_1 >> 9) & 0x1F) * 16);      \
-  s32 dx = (s16)eswap16(params[3]);                                           \
-  s32 dmx = (s16)eswap16(params[7]);                                          \
-  s32 dy = (s16)eswap16(params[11]);                                          \
-  s32 dmy = (s16)eswap16(params[15]);                                         \
-  s32 source_x, source_y;                                                     \
-  s32 tile_x, tile_y;                                                         \
-  u32 tile_map_offset;                                                        \
-  s32 middle_x;                                                               \
-  s32 middle_y;                                                               \
-  s32 max_x = obj_width;                                                      \
-  s32 max_y = obj_height;                                                     \
-  s32 y_delta;                                                                \
-  u32 obj_pitch = tile_width_##color_depth;                                   \
-  u32 obj_tile_pitch;                                                         \
-                                                                              \
-  middle_x = (obj_width / 2);                                                 \
-  middle_y = (obj_height / 2);                                                \
-                                                                              \
-  source_x = (middle_x << 8);                                                 \
-  source_y = (middle_y << 8);                                                 \
-                                                                              \
-                                                                              \
-  if(obj_attribute_0 & 0x200)                                                 \
-  {                                                                           \
-    obj_width *= 2;                                                           \
-    obj_height *= 2;                                                          \
-    middle_x *= 2;                                                            \
-    middle_y *= 2;                                                            \
-  }                                                                           \
-                                                                              \
-  if((s32)obj_x < (s32)start)                                                 \
-  {                                                                           \
-    u32 x_delta = start - obj_x;                                              \
-    middle_x -= x_delta;                                                      \
-    obj_width -= x_delta;                                                     \
-    obj_x = start;                                                            \
-                                                                              \
-    if((s32)obj_width <= 0)                                                   \
-      continue;                                                               \
-  }                                                                           \
-                                                                              \
-  if((s32)(obj_x + obj_width) >= (s32)end)                                    \
-  {                                                                           \
-    obj_width = end - obj_x;                                                  \
-                                                                              \
-    if((s32)obj_width <= 0)                                                   \
-      continue;                                                               \
-  }                                                                           \
-  dest_ptr = scanline + obj_x;                                                \
-                                                                              \
-  y_delta = vcount - (obj_y + middle_y);                                      \
-                                                                              \
-  obj_get_palette_##color_depth();                                            \
-                                                                              \
-  if(dy == 0)                                                                 \
-  {                                                                           \
-    obj_render_scale(combine_op, color_depth, alpha_op, map_space);           \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    obj_render_rotate(combine_op, color_depth, alpha_op, map_space);          \
-  }                                                                           \
-}                                                                             \
-
-
-// Build obj rendering functions
-
-
-#define render_scanline_obj_extra_variables_normal(bg_type)                   \
-  u16 *palette = palette_ram_converted + 256                                  \
-
-#define render_scanline_obj_extra_variables_color()                           \
-  u32 pixel_combine = color_combine_mask(4) | (1 << 8)                        \
-
-#define render_scanline_obj_extra_variables_alpha_obj(map_space)              \
-  render_scanline_obj_extra_variables_color();                                \
-  u32 dest;                                                                   \
-  if((pixel_combine & 0x00000200) == 0)                                       \
-  {                                                                           \
-    render_scanline_obj_color32_##map_space(priority, start, end, scanline);  \
-    return;                                                                   \
-  }                                                                           \
-
-#define render_scanline_obj_extra_variables_partial_alpha(map_space)          \
-  render_scanline_obj_extra_variables_color();                                \
-  u32 base_pixel_combine = pixel_combine;                                     \
-  u32 dest                                                                    \
-
-
-#define render_scanline_obj_main(combine_op, alpha_op, map_space)             \
-  if(obj_attribute_0 & 0x100)                                                 \
-  {                                                                           \
-    if((obj_attribute_0 >> 13) & 0x01)                                        \
-    {                                                                         \
-      obj_render_affine(combine_op, 8bpp, alpha_op, map_space);               \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      obj_render_affine(combine_op, 4bpp, alpha_op, map_space);               \
-    }                                                                         \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    vertical_offset = vcount - obj_y;                                         \
-                                                                              \
-    if((obj_attribute_1 >> 13) & 0x01)                                        \
-      vertical_offset = obj_height - vertical_offset - 1;                     \
-                                                                              \
-    switch(((obj_attribute_0 >> 12) & 0x02) |                                 \
-     ((obj_attribute_1 >> 12) & 0x01))                                        \
-    {                                                                         \
-      case 0x0:                                                               \
-        obj_render(combine_op, 4bpp, alpha_op, map_space, noflip);            \
-        break;                                                                \
-                                                                              \
-      case 0x1:                                                               \
-        obj_render(combine_op, 4bpp, alpha_op, map_space, flip);              \
-        break;                                                                \
-                                                                              \
-      case 0x2:                                                               \
-        obj_render(combine_op, 8bpp, alpha_op, map_space, noflip);            \
-        break;                                                                \
-                                                                              \
-      case 0x3:                                                               \
-        obj_render(combine_op, 8bpp, alpha_op, map_space, flip);              \
-        break;                                                                \
-    }                                                                         \
-  }                                                                           \
-
-#define render_scanline_obj_no_partial_alpha(combine_op, alpha_op, map_space) \
-  render_scanline_obj_main(combine_op, alpha_op, map_space)                   \
-
-#define render_scanline_obj_partial_alpha(combine_op, alpha_op, map_space)    \
-  if((obj_attribute_0 >> 10) & 0x03)                                          \
-  {                                                                           \
-    pixel_combine = 0x00000300;    /* 1st target and palette 256 */           \
-    render_scanline_obj_main(combine_op, alpha_obj, map_space);               \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    pixel_combine = base_pixel_combine;                                       \
-    render_scanline_obj_main(combine_op, color32, map_space);                 \
-  }                                                                           \
-
-#define render_scanline_obj_prologue_transparent(alpha_op)                    \
-
-#define render_scanline_obj_builder(combine_op, alpha_op, map_space,          \
- partial_alpha_op)                                                            \
-static void render_scanline_obj_##alpha_op##_##map_space(u32 priority,        \
- u32 start, u32 end, void *raw_dst)                                           \
-{                                                                             \
-  render_scanline_dest_##alpha_op *scanline =                                 \
-                                  (render_scanline_dest_##alpha_op*)raw_dst;  \
-  render_scanline_obj_extra_variables_##alpha_op(map_space);                  \
-  u32 obj_num, i;                                                             \
-  s32 obj_x, obj_y;                                                           \
-  u32 obj_size;                                                               \
-  u32 obj_width, obj_height;                                                  \
-  u32 obj_attribute_0, obj_attribute_1, obj_attribute_2;                      \
-  s32 vcount = read_ioreg(REG_VCOUNT);                                        \
-  u32 tile_run;                                                               \
-  u32 current_pixels;                                                         \
-  u32 current_pixel;                                                          \
-  u32 current_palette;                                                        \
-  u32 vertical_offset;                                                        \
-  u32 partial_tile_run, partial_tile_offset;                                  \
-  u32 pixel_run;                                                              \
-  u16 *oam_ptr;                                                               \
-  render_scanline_dest_##alpha_op *dest_ptr;                                  \
-  u8 *tile_base = vram + 0x10000;                                             \
-  u8 *tile_ptr;                                                               \
-  u32 obj_count = obj_priority_count[priority][vcount];                       \
-  u8 *obj_list = obj_priority_list[priority][vcount];                         \
-                                                                              \
-  for(obj_num = 0; obj_num < obj_count; obj_num++)                            \
-  {                                                                           \
-    oam_ptr = oam_ram + (obj_list[obj_num] * 4);                              \
-    obj_attribute_0 = eswap16(oam_ptr[0]);                                    \
-    obj_attribute_1 = eswap16(oam_ptr[1]);                                    \
-    obj_attribute_2 = eswap16(oam_ptr[2]);                                    \
-    obj_size = ((obj_attribute_0 >> 12) & 0x0C) | (obj_attribute_1 >> 14);    \
-                                                                              \
-    obj_x = (s32)(obj_attribute_1 << 23) >> 23;                               \
-    obj_width = obj_width_table[obj_size];                                    \
-                                                                              \
-    render_scanline_obj_prologue_##combine_op(alpha_op);                      \
-                                                                              \
-    obj_y = obj_attribute_0 & 0xFF;                                           \
-                                                                              \
-    if(obj_y > 160)                                                           \
-      obj_y -= 256;                                                           \
-                                                                              \
-    obj_height = obj_height_table[obj_size];                                  \
-    render_scanline_obj_##partial_alpha_op(combine_op, alpha_op, map_space);  \
-  }                                                                           \
-}                                                                             \
-
 // There are actually used to render sprites to the scanline
-// render_scanline_obj_builder(transparent, normal, 1D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, normal, 2D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, color16, 1D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, color16, 2D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, color32, 1D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, color32, 2D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, alpha_obj, 1D, no_partial_alpha);
-// render_scanline_obj_builder(transparent, alpha_obj, 2D, no_partial_alpha);
 
 // WIP: Remove these once we merge things with partial alpha and copy mode.
 void render_scanline_obj_normal_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
@@ -1994,27 +1124,13 @@ void render_scanline_obj_alpha_obj_2D(u32 priority,  u32 start, u32 end, void *r
   render_scanline_objects<u32, STCKCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
 }
 
-render_scanline_obj_builder(transparent, partial_alpha, 1D, partial_alpha);
-render_scanline_obj_builder(transparent, partial_alpha, 2D, partial_alpha);
-
-static const tile_render_function obj_mode_renderers[5][2] = {
+static const tile_render_function obj_mode_renderers[4][2] = {
   { render_scanline_obj_normal_2D,        render_scanline_obj_normal_1D        },
   { render_scanline_obj_color16_2D,       render_scanline_obj_color16_1D       },
   { render_scanline_obj_color32_2D,       render_scanline_obj_color32_1D       },
   { render_scanline_obj_alpha_obj_2D,     render_scanline_obj_alpha_obj_1D     },
-  { render_scanline_obj_partial_alpha_2D, render_scanline_obj_partial_alpha_1D },
 };
 
-// These are used for winobj rendering
-// render_scanline_obj_builder(copy, copy_tile, 1D, no_partial_alpha);
-// render_scanline_obj_builder(copy, copy_tile, 2D, no_partial_alpha);
-// render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
-// render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
-
-#define OBJ_MOD_NORMAL     0
-#define OBJ_MOD_SEMITRAN   1
-#define OBJ_MOD_WINDOW     2
-#define OBJ_MOD_INVALID    3
 
 // Goes through the object list in the OAM (from #127 to #0) and adds objects
 // into a sorted list by priority for the current row.
@@ -2327,16 +1443,17 @@ static void render_backdrop(u32 start, u32 end, u16 *scanline) {
     scanline[start++] = pixcol;
 }
 
+// Background render modes
 #define RENDER_NORMAL   0
 #define RENDER_COL16    1
 #define RENDER_COL32    2
 #define RENDER_ALPHA    3
 
-#define OBJ_NORMAL   0
-#define OBJ_COL16    1
-#define OBJ_COL32    2
-#define OBJ_ALPHA    3
-#define OBJ_PALPHA   4
+// Obj/Sprite render modes
+#define OBJ_NORMAL      0
+#define OBJ_COL16       1
+#define OBJ_COL32       2
+#define OBJ_ALPHA       3
 
 void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
                    u32 rend_mode, u32 obj_mode) {
@@ -2402,7 +1519,7 @@ static void render_color_no_effect(
   // Default rendering mode, without layer effects (except perhaps sprites).
   if (obj_blend) {
     u32 screen_buffer[240];
-    render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
+    render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_COL32);
     merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
   } else {
     render_layers(start, end, scanline, enable_flags, RENDER_NORMAL, OBJ_NORMAL);
@@ -2436,7 +1553,7 @@ static void render_color_effect(
       if (some_1st_tgt && non_zero_blend) {
         if (obj_blend) {
           u32 screen_buffer[240];
-          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
+          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_COL32);
           merge_blend<BLEND_BRIGHT>(start, end, scanline, screen_buffer);
         } else {
           render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
@@ -2456,7 +1573,7 @@ static void render_color_effect(
       if (some_1st_tgt && non_zero_blend) {
         if (obj_blend) {
           u32 screen_buffer[240];
-          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_PALPHA);
+          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_COL32);
           merge_blend<BLEND_DARK>(start, end, scanline, screen_buffer);
         } else {
           render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
