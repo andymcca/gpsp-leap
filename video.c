@@ -732,60 +732,59 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define partial_tile_left_map(combine_op, color_depth, alpha_op)              \
   single_tile_map(partial_tile_left, combine_op, color_depth, alpha_op)       \
 
+// Byte lengths of complete tiles and tile rows in 4bpp and 8bpp.
+#define tile_size_4bpp 32
+#define tile_size_8bpp 64
+#define tile_width_4bpp 4
+#define tile_width_8bpp 8
 
 // Advances a non-flipped 4bpp obj to the next tile.
-
 #define obj_advance_noflip_4bpp()                                             \
-  tile_ptr += 32                                                              \
-
+  obj_tile_offset += tile_size_4bpp                                           \
 
 // Advances a non-flipped 8bpp obj to the next tile.
-
 #define obj_advance_noflip_8bpp()                                             \
-  tile_ptr += 64                                                              \
-
+  obj_tile_offset += tile_size_8bpp                                           \
 
 // Advances a flipped 4bpp obj to the next tile.
-
 #define obj_advance_flip_4bpp()                                               \
-  tile_ptr -= 32                                                              \
-
+  obj_tile_offset -= tile_size_4bpp                                           \
 
 // Advances a flipped 8bpp obj to the next tile.
-
 #define obj_advance_flip_8bpp()                                               \
-  tile_ptr -= 64                                                              \
-
-
+  obj_tile_offset -= tile_size_8bpp                                           \
 
 // Draws multiple sequential tiles from an obj, flip_op determines if it should
 // be flipped or not (set to flip or noflip)
 
 #define multiple_tile_obj(combine_op, color_depth, alpha_op, flip_op)         \
-  for(i = 0; i < tile_run; i++)                                               \
+  for (i = 0; i < tile_run; i++)                                              \
   {                                                                           \
+    obj_tile_offset &= 0x7FFF;                                                \
+    tile_ptr = tile_base + obj_tile_offset;                                   \
     tile_##flip_op##_##color_depth(combine_op, alpha_op);                     \
     obj_advance_##flip_op##_##color_depth();                                  \
     advance_dest_ptr_##combine_op(8);                                         \
   }                                                                           \
 
-
 // Draws an obj's tile clipped against the left side of the screen
-
 #define partial_tile_right_obj(combine_op, color_depth, alpha_op, flip_op)    \
+  obj_tile_offset &= 0x7FFF;                                                  \
+  tile_ptr = tile_base + obj_tile_offset;                                     \
   partial_tile_right_##flip_op##_##color_depth(combine_op, alpha_op);         \
-  obj_advance_##flip_op##_##color_depth()                                     \
+  obj_advance_##flip_op##_##color_depth();                                    \
 
 // Draws an obj's tile clipped against both sides of the screen
-
 #define partial_tile_mid_obj(combine_op, color_depth, alpha_op, flip_op)      \
-  partial_tile_mid_##flip_op##_##color_depth(combine_op, alpha_op)            \
+  obj_tile_offset &= 0x7FFF;                                                  \
+  tile_ptr = tile_base + obj_tile_offset;                                     \
+  partial_tile_mid_##flip_op##_##color_depth(combine_op, alpha_op);           \
 
 // Draws an obj's tile clipped against the right side of the screen
-
 #define partial_tile_left_obj(combine_op, color_depth, alpha_op, flip_op)     \
-  partial_tile_left_##flip_op##_##color_depth(combine_op, alpha_op)           \
-
+  obj_tile_offset &= 0x7FFF;                                                  \
+  tile_ptr = tile_base + obj_tile_offset;                                     \
+  partial_tile_left_##flip_op##_##color_depth(combine_op, alpha_op);          \
 
 // Extra variables specific for 8bpp/4bpp tile renderers.
 
@@ -794,13 +793,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define tile_extra_variables_4bpp()                                           \
   u32 current_palette                                                         \
 
-
-// Byte lengths of complete tiles and tile rows in 4bpp and 8bpp.
-
-#define tile_width_4bpp 4
-#define tile_size_4bpp 32
-#define tile_width_8bpp 8
-#define tile_size_8bpp 64
 
 #define render_scanline_dest_normal         u16
 #define render_scanline_dest_alpha          u32
@@ -2812,40 +2804,50 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
   const bitmap_layer_render_struct *layer_renderers =                         \
    bitmap_mode_renderers + ((dispcnt & 0x07) - 3)                             \
 
+#define obj_tile_number_1D_4bpp                                               \
+  ((obj_attribute_2 & 0x3FF) * 32)                                            \
+
+#define obj_tile_number_2D_4bpp                                               \
+  obj_tile_number_1D_4bpp                                                     \
+
+#define obj_tile_number_1D_8bpp                                               \
+  obj_tile_number_1D_4bpp                                                     \
+
+#define obj_tile_number_2D_8bpp                                               \
+  ((obj_attribute_2 & 0x3FE) * 32)                                            \
 
 // Adjust a flipped obj's starting position
-
 #define obj_tile_offset_noflip(color_depth)                                   \
+  0                                                                           \
 
 #define obj_tile_offset_flip(color_depth)                                     \
-  + (tile_size_##color_depth * ((obj_width - 8) / 8))                         \
-
+  (tile_size_##color_depth * ((obj_width - 8) / 8))                           \
 
 // Adjust the obj's starting point if it goes too far off the left edge of
 // the screen.
 
 #define obj_tile_right_offset_noflip(color_depth)                             \
-  tile_ptr += (partial_tile_offset / 8) * tile_size_##color_depth             \
+  obj_tile_offset += (partial_tile_offset / 8) * tile_size_##color_depth      \
 
 #define obj_tile_right_offset_flip(color_depth)                               \
-  tile_ptr -= (partial_tile_offset / 8) * tile_size_##color_depth             \
+  obj_tile_offset -= (partial_tile_offset / 8) * tile_size_##color_depth      \
 
 // Get the current row offset into an obj in 1D map space
 
 #define obj_tile_offset_1D(color_depth, flip_op)                              \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
-   + ((vertical_offset / 8) * (obj_width / 8) * tile_size_##color_depth)      \
-   + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-   obj_tile_offset_##flip_op(color_depth)                                     \
+  obj_tile_offset =                                                           \
+       obj_tile_number_1D_##color_depth +                                     \
+       ((vertical_offset / 8) * (obj_width / 8) * tile_size_##color_depth) +  \
+       ((vertical_offset % 8) * tile_width_##color_depth) +                   \
+       obj_tile_offset_##flip_op(color_depth)                                 \
 
 // Get the current row offset into an obj in 2D map space
 
 #define obj_tile_offset_2D(color_depth, flip_op)                              \
-  tile_ptr = tile_base + ((obj_attribute_2 & 0x3FF) * 32)                     \
-   + ((vertical_offset / 8) * 1024)                                           \
-   + ((vertical_offset % 8) * tile_width_##color_depth)                       \
-   obj_tile_offset_##flip_op(color_depth)                                     \
-
+  obj_tile_offset = obj_tile_number_2D_##color_depth +                        \
+                    ((vertical_offset / 8) * 1024) +                          \
+                    ((vertical_offset % 8) * tile_width_##color_depth) +      \
+                    obj_tile_offset_##flip_op(color_depth)                    \
 
 // Get the palette for 4bpp obj.
 
@@ -2859,6 +2861,7 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
 
 #define obj_render(combine_op, color_depth, alpha_op, map_space, flip_op)     \
 {                                                                             \
+  u32 obj_tile_offset;                                                        \
   obj_get_palette_##color_depth();                                            \
   obj_tile_offset_##map_space(color_depth, flip_op);                          \
                                                                               \
