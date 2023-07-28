@@ -1,6 +1,7 @@
 /* gameplaySP
  *
  * Copyright (C) 2006 Exophase <exophase@gmail.com>
+ * Copyright (C) 2023 David Guillen Fandos <david@davidgf.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -670,11 +671,6 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
 
 
 // Object/Sprite rendering logic
-
-static const u32 obj_width_table[] =
-  { 8, 16, 32, 64, 16, 32, 32, 64, 8, 8, 16, 32 };
-static const u32 obj_height_table[] =
-  { 8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64 };
 
 static const u8 obj_dim_table[3][4][2] = {
   { {8, 8}, {16, 16}, {32, 32}, {64, 64} },
