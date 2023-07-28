@@ -45,6 +45,10 @@ typedef void (* tile_render_function)(u32 layer_number, u32 start, u32 end,
  void *dest_ptr);
 typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
 
+typedef void (*conditional_render_function)(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags);
+
+
 typedef struct
 {
   tile_render_function base[4];
@@ -58,16 +62,11 @@ typedef struct
   bitmap_render_function affine_render;
 } bitmap_layer_render_struct;
 
-static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, const tile_layer_render_struct
- *layer_renderers);
-static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, const bitmap_layer_render_struct
- *layer_renderers);
+static void render_scanline_conditional_tile(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags);
+static void render_scanline_conditional_bitmap(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags);
 
-
-#define tile_expand_copy(index)                                               \
-  dest_ptr[index] = copy_ptr[index]                                           \
 
 
 #define advance_dest_ptr_base(delta)                                          \
@@ -75,10 +74,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 
 #define advance_dest_ptr_transparent(delta)                                   \
   advance_dest_ptr_base(delta)                                                \
-
-#define advance_dest_ptr_copy(delta)                                          \
-  advance_dest_ptr_base(delta);                                               \
-  copy_ptr += delta                                                           \
 
 
 #define color_combine_mask_a(layer)                                           \
@@ -111,9 +106,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define tile_expand_transparent_color16(index)                                \
   tile_expand_base_color16(index)                                             \
 
-#define tile_expand_base_color32(index)                                       \
-  tile_expand_base_color16(index)                                             \
-
 #define tile_expand_transparent_color32(index)                                \
   tile_expand_base_color16(index)                                             \
 
@@ -141,12 +133,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
     tile_expand_transparent_##alpha_op(index);                                \
   }                                                                           \
 
-#define tile_8bpp_draw_copy(index, op, op_param, alpha_op)                    \
-  tile_8bpp_pixel_op_##op(op_param);                                          \
-  if(current_pixel)                                                           \
-  {                                                                           \
-    tile_expand_copy(index);                                                  \
-  }                                                                           \
 
 // Get the current tile from the map in 8bpp mode
 
@@ -182,12 +168,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
   if(current_pixels != 0)                                                     \
   {                                                                           \
     tile_8bpp_draw_four_##flip_op(index, transparent, alpha_op);              \
-  }                                                                           \
-
-#define tile_8bpp_draw_four_copy(index, alpha_op, flip_op)                    \
-  if(current_pixels != 0)                                                     \
-  {                                                                           \
-    tile_8bpp_draw_four_##flip_op(index, copy, alpha_op);                     \
   }                                                                           \
 
 // Helper macro for drawing 8bpp tiles clipped against the edge of the screen
@@ -365,14 +345,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
     tile_expand_transparent_##alpha_op(index);                                \
   }                                                                           \
 
-#define tile_4bpp_draw_copy(index, op, op_param, alpha_op)                    \
-  tile_4bpp_pixel_op_##op(op_param);                                          \
-  if(current_pixel)                                                           \
-  {                                                                           \
-    current_pixel |= current_palette;                                         \
-    tile_expand_copy(index);                                                  \
-  }                                                                           \
-
 // Draws eight 4bpp pixels.
 
 #define tile_4bpp_draw_eight_noflip(combine_op, alpha_op)                     \
@@ -408,12 +380,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
     tile_4bpp_draw_eight_##flip_op(transparent, alpha_op);                    \
   }                                                                           \
 
-
-#define tile_4bpp_draw_eight_copy(alpha_op, flip_op)                          \
-  if(current_pixels != 0)                                                     \
-  {                                                                           \
-    tile_4bpp_draw_eight_##flip_op(copy, alpha_op);                           \
-  }                                                                           \
 
 // Gets the current tile in 4bpp mode, also getting the current palette and
 // the pixel block.
@@ -558,8 +524,6 @@ static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline
 #define tile_size_8bpp 64
 
 #define render_scanline_dest_partial_alpha  u32
-#define render_scanline_dest_copy_tile      u16
-#define render_scanline_dest_copy_bitmap    u16
 
 
 static const u32 map_widths[] = { 256, 512, 256, 512 };
@@ -568,7 +532,8 @@ typedef enum
 {
   FULLCOLOR,  // Regular rendering, output a 16 bit color
   INDXCOLOR,  // Rendering to indexed color, so we can later apply dark/bright
-  STCKCOLOR   // Stacks two indexed pixels (+flags) to apply blending
+  STCKCOLOR,  // Stacks two indexed pixels (+flags) to apply blending
+  PIXCOPY     // Special mode used for sprites, to allow for obj-window drawing
 } rendtype;
 
 // Renders non-affine tiled background layer.
@@ -1193,6 +1158,8 @@ static inline void render_obj_tile_Nbpp(
           else
             *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) << 16);
         }
+        else if (rdtype == PIXCOPY)
+          *dest_ptr = dest_ptr[240];
         // TODO implement partial alpha blending
       }
     }
@@ -1214,6 +1181,8 @@ static inline void render_obj_tile_Nbpp(
           else
             *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) << 16);  // Stack pixels
         }
+        else if (rdtype == PIXCOPY)
+          *dest_ptr = dest_ptr[240];
       }
     }
   }
@@ -1379,6 +1348,8 @@ static void render_affine_object(
           *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) << 16);  // Stack pixels
         // TODO partial alpha
       }
+      else if (rdtype == PIXCOPY)
+        *dst_ptr = dst_ptr[240];
     }
 
     // Move to the next pixel, update coords accordingly
@@ -1391,14 +1362,15 @@ static void render_affine_object(
 }
 
 // Renders objects on a scanline for a given priority.
-template <typename stype, rendtype rdtype>
+template <typename stype, rendtype rdtype, conditional_render_function copyfn>
 static void render_scanline_objects(
   u32 start, u32 end, stype *scanline, u32 priority
 ) {
   // TODO move this to another place?
   // Skip alpha pass if you can do a regular color32 pass
   if (rdtype == STCKCOLOR && ((read_ioreg(REG_BLDCNT) >> 4) & 1) == 0) {
-    render_scanline_objects<stype, INDXCOLOR>(start, end, scanline, priority);
+    // We cannot skip if there's some object being rendered TODO TODO
+    render_scanline_objects<stype, INDXCOLOR, copyfn>(start, end, scanline, priority);
     return;
   }
 
@@ -1421,6 +1393,7 @@ static void render_scanline_objects(
     u16 obj_size = (obj_attr1 >> 14);
     bool is_affine = obj_attr0 & 0x100;
     bool is_8bpp = obj_attr0 & 0x2000;
+    bool is_double = obj_attr0 & 0x200;
 
     t_sprite obji = {
       .obj_x = (s32)(obj_attr1 << 23) >> 23,
@@ -1429,6 +1402,12 @@ static void render_scanline_objects(
       .obj_h = obj_dim_table[obj_shape][obj_size][1]
     };
 
+    s32 obj_maxw = (is_affine && is_double) ? obji.obj_w * 2 : obji.obj_w;
+
+    // The object could be out of the window, check and skip.
+    if (obji.obj_x >= (signed)end || obji.obj_x + obj_maxw <= (signed)start)
+      continue;
+
     const u8 *base_tile = &vram[
       0x10000 +                      // VRAM base for OBJ tile data
       (obj_attr2 & 0x3FF) * 32];     // Selected character block
@@ -1436,17 +1415,23 @@ static void render_scanline_objects(
     if (obji.obj_y > 160)
       obji.obj_y -= 256;
 
+    // In PIXCOPY mode, we have already some stuff rendered (winout) and now
+    // we render the "win-in" area for this object. The PIXCOPY function will
+    // copy (merge) the two pixels depending on the result of the sprite render
+    // The temporary buffer is rendered on the next scanline area.
+    if (copyfn) {
+      u32 sec_start = MAX((signed)start, obji.obj_x);
+      u32 sec_end   = MIN((signed)end, obji.obj_x + obj_maxw);
+      u32 obj_enable = read_ioreg(REG_WINOUT) >> 8;
+      u16 *tmp_ptr = (u16*)&scanline[GBA_SCREEN_PITCH];
+      copyfn(sec_start, sec_end, tmp_ptr, obj_enable);
+    }
+
     if (is_affine) {
-      bool is_double = obj_attr0 & 0x200;
       u32 pnum = (obj_attr1 >> 9) & 0x1f;
       const t_affp *affp_base = (t_affp*)oam_ram;
       const t_affp *affp = &affp_base[pnum];
       u16 palette = (obj_attr2 >> 8) & 0xF0;
-
-      // The object could be out of the window, check and skip.
-      if (obji.obj_x >= (signed)end ||
-          obji.obj_x + obji.obj_w * (is_double ? 2 : 1) <= (signed)start)
-        continue;
 
       if (affp->dy == 0) {   // No rotation happening (just scale)
         if (is_8bpp)
@@ -1508,15 +1493,6 @@ static void render_scanline_objects(
   }
 }
 
-
-
-#define render_scanline_layer_functions_tile()                                \
-  const tile_layer_render_struct *layer_renderers =                           \
-   tile_mode_renderers[dispcnt & 0x07]                                        \
-
-#define render_scanline_layer_functions_bitmap()                              \
-  const bitmap_layer_render_struct *layer_renderers =                         \
-   bitmap_mode_renderers + ((dispcnt & 0x07) - 3)                             \
 
 
 // Adjust a flipped obj's starting position
@@ -1870,20 +1846,6 @@ static void render_scanline_objects(
   u32 base_pixel_combine = pixel_combine;                                     \
   u32 dest                                                                    \
 
-#define render_scanline_obj_extra_variables_copy(type)                        \
-  u32 dispcnt = read_ioreg(REG_DISPCNT);                                      \
-  u32 obj_enable = read_ioreg(REG_WINOUT) >> 8;                               \
-  render_scanline_layer_functions_##type();                                   \
-  u32 copy_start, copy_end;                                                   \
-  u16 copy_buffer[240];                                                       \
-  u16 *copy_ptr                                                               \
-
-#define render_scanline_obj_extra_variables_copy_tile(map_space)              \
-  render_scanline_obj_extra_variables_copy(tile)                              \
-
-#define render_scanline_obj_extra_variables_copy_bitmap(map_space)            \
-  render_scanline_obj_extra_variables_copy(bitmap)                            \
-
 
 #define render_scanline_obj_main(combine_op, alpha_op, map_space)             \
   if(obj_attribute_0 & 0x100)                                                 \
@@ -1941,38 +1903,6 @@ static void render_scanline_objects(
   }                                                                           \
 
 #define render_scanline_obj_prologue_transparent(alpha_op)                    \
-
-#define render_scanline_obj_prologue_copy_body(type)                          \
-  copy_start = obj_x;                                                         \
-  copy_end = obj_x + obj_width;                                               \
-  if(obj_attribute_0 & 0x200)                                                 \
-    copy_end += obj_width;                                                    \
-                                                                              \
-  if(copy_start < start)                                                      \
-    copy_start = start;                                                       \
-  if(copy_end > end)                                                          \
-    copy_end = end;                                                           \
-                                                                              \
-  if((copy_start < end) && (copy_end > start))                                \
-  {                                                                           \
-    render_scanline_conditional_##type(copy_start, copy_end, copy_buffer,     \
-                                       obj_enable, layer_renderers);          \
-    copy_ptr = copy_buffer + copy_start;                                      \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    continue;                                                                 \
-  }                                                                           \
-
-#define render_scanline_obj_prologue_copy_tile()                              \
-  render_scanline_obj_prologue_copy_body(tile)                                \
-
-#define render_scanline_obj_prologue_copy_bitmap()                            \
-  render_scanline_obj_prologue_copy_body(bitmap)                              \
-
-#define render_scanline_obj_prologue_copy(alpha_op)                           \
-  render_scanline_obj_prologue_##alpha_op()                                   \
-
 
 #define render_scanline_obj_builder(combine_op, alpha_op, map_space,          \
  partial_alpha_op)                                                            \
@@ -2037,31 +1967,31 @@ static void render_scanline_obj_##alpha_op##_##map_space(u32 priority,        \
 
 // WIP: Remove these once we merge things with partial alpha and copy mode.
 void render_scanline_obj_normal_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, FULLCOLOR>(start, end, (u16*)raw_dst, priority);
+  render_scanline_objects<u16, FULLCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
 }
 void render_scanline_obj_normal_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, FULLCOLOR>(start, end, (u16*)raw_dst, priority);
+  render_scanline_objects<u16, FULLCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
 }
 
 void render_scanline_obj_color16_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, INDXCOLOR>(start, end, (u16*)raw_dst, priority);
+  render_scanline_objects<u16, INDXCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
 }
 void render_scanline_obj_color16_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u16, INDXCOLOR>(start, end, (u16*)raw_dst, priority);
+  render_scanline_objects<u16, INDXCOLOR, nullptr>(start, end, (u16*)raw_dst, priority);
 }
 
 void render_scanline_obj_color32_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, INDXCOLOR>(start, end, (u32*)raw_dst, priority);
+  render_scanline_objects<u32, INDXCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
 }
 void render_scanline_obj_color32_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, INDXCOLOR>(start, end, (u32*)raw_dst, priority);
+  render_scanline_objects<u32, INDXCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
 }
 
 void render_scanline_obj_alpha_obj_1D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, STCKCOLOR>(start, end, (u32*)raw_dst, priority);
+  render_scanline_objects<u32, STCKCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
 }
 void render_scanline_obj_alpha_obj_2D(u32 priority,  u32 start, u32 end, void *raw_dst) {
-  render_scanline_objects<u32, STCKCOLOR>(start, end, (u32*)raw_dst, priority);
+  render_scanline_objects<u32, STCKCOLOR, nullptr>(start, end, (u32*)raw_dst, priority);
 }
 
 render_scanline_obj_builder(transparent, partial_alpha, 1D, partial_alpha);
@@ -2076,10 +2006,10 @@ static const tile_render_function obj_mode_renderers[5][2] = {
 };
 
 // These are used for winobj rendering
-render_scanline_obj_builder(copy, copy_tile, 1D, no_partial_alpha);
-render_scanline_obj_builder(copy, copy_tile, 2D, no_partial_alpha);
-render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
-render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
+// render_scanline_obj_builder(copy, copy_tile, 1D, no_partial_alpha);
+// render_scanline_obj_builder(copy, copy_tile, 2D, no_partial_alpha);
+// render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
+// render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
 
 #define OBJ_MOD_NORMAL     0
 #define OBJ_MOD_SEMITRAN   1
@@ -2607,7 +2537,7 @@ static void render_scanline(u16 *scanline)
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
 static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, const tile_layer_render_struct *layer_renderers)
+ u32 enable_flags)
 {
   if (layer_count && (enable_flags & 0x1F)) {
     bool effects_enabled = enable_flags & 0x20;   // Window bit for effects.
@@ -2625,9 +2555,12 @@ static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
 static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline,
- u32 enable_flags, const bitmap_layer_render_struct *layer_renderers)
+ u32 enable_flags)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
+  const bitmap_layer_render_struct *layer_renderers =
+                                    &bitmap_mode_renderers[(dispcnt & 0x07) - 3];
+
   u32 current_layer;
   u32 layer_order_pos;
 
@@ -2682,15 +2615,10 @@ template <bool tiled>
 static inline void render_scanline_conditional(u32 start, u32 end,
   u16 *scanline, u32 enable_flags)
 {
-  u16 dispcnt = read_ioreg(REG_DISPCNT);
-  if (tiled) {
-    const tile_layer_render_struct *layer_renderers = tile_mode_renderers[dispcnt & 0x07];
-    render_scanline_conditional_tile(start, end, scanline, enable_flags, layer_renderers);
-  }
-  else {
-    const bitmap_layer_render_struct *layer_renderers = &bitmap_mode_renderers[(dispcnt & 0x07) - 3];
-    render_scanline_conditional_bitmap(start, end, scanline, enable_flags, layer_renderers);
-  }
+  if (tiled)
+    render_scanline_conditional_tile(start, end, scanline, enable_flags);
+  else
+    render_scanline_conditional_bitmap(start, end, scanline, enable_flags);
 }
 
 // Renders window1 (low priority window) and outside/obj areas for a given range.
@@ -2711,15 +2639,10 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
   if (dispcnt >> 15) {
     // Perform the actual object rendering in copy mode
     if (tiled) {
-      if (dispcnt & 0x40)
-        render_scanline_obj_copy_tile_1D(4, start, end, scanline);
-      else
-        render_scanline_obj_copy_tile_2D(4, start, end, scanline);
+      // TODO: Make version 1D/2D?   if (dispcnt & 0x40)
+      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_tile>(start, end, scanline, 4);
     } else {
-      if (dispcnt & 0x40)
-        render_scanline_obj_copy_bitmap_1D(4, start, end, scanline);
-      else
-        render_scanline_obj_copy_bitmap_2D(4, start, end, scanline);
+      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_bitmap>(start, end, scanline, 4);
     }
   }
 }
