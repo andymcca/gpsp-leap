@@ -972,9 +972,10 @@ static void render_scanline_objects(
     if (obji.obj_x >= (signed)end || obji.obj_x + obj_maxw <= (signed)start)
       continue;
 
+    const u32 msk = is_8bpp && !obj1dmap ? 0x3FE : 0x3FF;
     const u8 *base_tile = &vram[
       0x10000 +                      // VRAM base for OBJ tile data
-      (obj_attr2 & 0x3FF) * 32];     // Selected character block
+      (obj_attr2 & msk) * 32];       // Selected character block
 
     if (obji.obj_y > 160)
       obji.obj_y -= 256;
