@@ -106,6 +106,7 @@ typedef enum
   REG_WIN1V = 0x23,
   REG_WININ = 0x24,
   REG_WINOUT = 0x25,
+  REG_MOSAIC = 0x26,
   REG_BLDCNT = 0x28,
   REG_BLDALPHA = 0x29,
   REG_BLDY = 0x2A,
