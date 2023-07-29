@@ -1911,10 +1911,13 @@ void update_scanline(void)
       render_scanline_window<false>(screen_offset);
   }
 
-  affine_reference_x[0] += (s16)read_ioreg(REG_BG2PB);
-  affine_reference_y[0] += (s16)read_ioreg(REG_BG2PD);
-  affine_reference_x[1] += (s16)read_ioreg(REG_BG3PB);
-  affine_reference_y[1] += (s16)read_ioreg(REG_BG3PD);
+  // Mode 0 does not use any affine params at all.
+  if (video_mode) {
+    affine_reference_x[0] += (s16)read_ioreg(REG_BG2PB);
+    affine_reference_y[0] += (s16)read_ioreg(REG_BG2PD);
+    affine_reference_x[1] += (s16)read_ioreg(REG_BG3PB);
+    affine_reference_y[1] += (s16)read_ioreg(REG_BG3PD);
+  }
 }
 
 
