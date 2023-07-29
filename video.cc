@@ -49,6 +49,7 @@ typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
 typedef void (*conditional_render_function)(
   u32 start, u32 end, u16 *scanline, u32 enable_flags);
 
+typedef void (*window_render_function)(u16 *scanline, u32 start, u32 end);
 
 typedef struct
 {
@@ -1655,7 +1656,18 @@ static inline void render_scanline_conditional(
     render_scanline_conditional_bitmap(start, end, scanline, enable_flags);
 }
 
-// Renders window1 (low priority window) and outside/obj areas for a given range.
+// Renders the are outside of all active windows
+static void render_windowout_pass(u16 *scanline, u32 start, u32 end)
+{
+  u32 winout = read_ioreg(REG_WINOUT);
+  u32 wndout_enable = winout & 0x3F;
+
+  render_scanline_conditional(start, end, scanline, wndout_enable);
+}
+
+// Renders window-obj. This is a pixel-level windowing effect, based on sprites
+// (objects) with a special rendering mode (the sprites are not themselves
+// visible but rather "enable" other pixels to be rendered conditionally).
 static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
@@ -1681,111 +1693,52 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
   }
 }
 
-// Renders window1 (low priority window) and outside/obj areas for a given range.
-static void render_window1_pass(u16 *scanline, u32 start, u32 end)
-{
-  u16 dispcnt = read_ioreg(REG_DISPCNT);
-  u32 winout = read_ioreg(REG_WINOUT);
-  u32 wndout_enable = winout & 0x3F;
-
-  switch (dispcnt >> 14) {
-  case 0x0:    // No Win1 nor WinObj
-    render_scanline_conditional(start, end, scanline, wndout_enable);
-    break;
-  case 0x2:    // Only winobj enabled, render it.
-    render_windowobj_pass(scanline, start, end);
-    break;
-  case 0x1: case 0x3:   // Win1 is enabled (and perhaps WinObj too)
-    {
-      // Attempt to render window 1
-      u32 vcount = read_ioreg(REG_VCOUNT);
-      // Check the Y coordinates to check if they fall in the right row
-      u32 win_top = read_ioreg(REG_WINxV(1)) >> 8;
-      u32 win_bot = read_ioreg(REG_WINxV(1)) & 0xFF;
-      // Check the X coordinates and generate up to three segments
-      // Clip the coordinates to the [start, end) range.
-      u32 win_l = MAX(start, MIN(end, read_ioreg(REG_WINxH(1)) >> 8));
-      u32 win_r = MAX(start, MIN(end, read_ioreg(REG_WINxH(1)) & 0xFF));
-
-      if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
-        // Window1 is completely out, just render all out.
-        render_windowobj_pass(scanline, start, end);
-      else {
-        // Render win1 withtin the clipped range
-        // Enable bits for stuff inside the window (and outside)
-        u32 winin  = read_ioreg(REG_WININ);
-        u32 wnd1_enable = (winin >> 8) & 0x3F;
-
-        // If the window is defined upside down, the areas are inverted.
-        if (win_l < win_r) {
-          // Render [start, win_l) range (which is outside the window)
-          if (win_l != start)
-            render_windowobj_pass(scanline, start, win_l);
-          // Render the actual window0 pixels
-          render_scanline_conditional(win_l, win_r, scanline, wnd1_enable);
-          // Render the [win_l, end] range (outside)
-          if (win_r != end)
-            render_windowobj_pass(scanline, win_r, end);
-        } else {
-          // Render [0, win_r) range (which is "inside" window0)
-          if (win_r != start)
-            render_scanline_conditional(start, win_r, scanline, wnd1_enable);
-          // The actual window is now outside, render recursively
-          render_windowobj_pass(scanline, win_r, win_l);
-          // Render the [win_l, 240] range ("inside")
-          if (win_l != end)
-            render_scanline_conditional(win_l, end, scanline, wnd1_enable);
-        }
-      }
-    }
-    break;
-  };
-}
-
-// Renders window0 (high priority window) and renders window1 or out
-// on the area that falls outside. It will call the above function for
-// outside areas to "recursively" render segments.
-static void render_window0_pass(u16 *scanline)
+// Renders window 0/1. Checks boundaries and divides the segment into
+// subsegments (if necessary) rendering each one in their right mode.
+// outfn is called for "out-of-window" rendering.
+template<window_render_function outfn, unsigned winnum>
+static void render_window_n_pass(u16 *scanline, u32 start, u32 end)
 {
   u32 vcount = read_ioreg(REG_VCOUNT);
   // Check the Y coordinates to check if they fall in the right row
-  u32 win_top = read_ioreg(REG_WINxV(0)) >> 8;
-  u32 win_bot = read_ioreg(REG_WINxV(0)) & 0xFF;
+  u32 win_top = read_ioreg(REG_WINxV(winnum)) >> 8;
+  u32 win_bot = read_ioreg(REG_WINxV(winnum)) & 0xFF;
   // Check the X coordinates and generate up to three segments
-  u32 win_l = MIN(240, read_ioreg(REG_WINxH(0)) >> 8);
-  u32 win_r = MIN(240, read_ioreg(REG_WINxH(0)) & 0xFF);
+  // Clip the coordinates to the [start, end) range.
+  u32 win_l = MAX(start, MIN(end, read_ioreg(REG_WINxH(winnum)) >> 8));
+  u32 win_r = MAX(start, MIN(end, read_ioreg(REG_WINxH(winnum)) & 0xFF));
 
   if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
-    // No windowing, everything is "outside", just render win1.
-    render_window1_pass(scanline, 0, 240);
+    // WindowN is completely out, just render all out.
+    outfn(scanline, start, end);
   else {
-    u32 winin  = read_ioreg(REG_WININ);
-    // Enable bits for stuff inside the window
-    u32 wnd0_enable = (winin) & 0x3F;
+    // Render window withtin the clipped range
+    // Enable bits for stuff inside the window (and outside)
+    u32 winin = read_ioreg(REG_WININ);
+    u32 wndn_enable = (winin >> (8 * winnum)) & 0x3F;
 
     // If the window is defined upside down, the areas are inverted.
     if (win_l < win_r) {
-      // Render [0, win_l) range (which is outside the window)
-      if (win_l)
-        render_window1_pass(scanline, 0, win_l);
+      // Render [start, win_l) range (which is outside the window)
+      if (win_l != start)
+        outfn(scanline, start, win_l);
       // Render the actual window0 pixels
-      render_scanline_conditional(win_l, win_r, scanline, wnd0_enable);
-      // Render the [win_l, 240] range (outside)
-      if (win_r != 240)
-        render_window1_pass(scanline, win_r, 240);
+      render_scanline_conditional(win_l, win_r, scanline, wndn_enable);
+      // Render the [win_l, end] range (outside)
+      if (win_r != end)
+        outfn(scanline, win_r, end);
     } else {
       // Render [0, win_r) range (which is "inside" window0)
-      if (win_r)
-        render_scanline_conditional(0, win_r, scanline, wnd0_enable);
+      if (win_r != start)
+        render_scanline_conditional(start, win_r, scanline, wndn_enable);
       // The actual window is now outside, render recursively
-      render_window1_pass(scanline, win_r, win_l);
+      outfn(scanline, win_r, win_l);
       // Render the [win_l, 240] range ("inside")
-      if (win_l != 240)
-        render_scanline_conditional(win_l, 240, scanline, wnd0_enable);
+      if (win_l != end)
+        render_scanline_conditional(win_l, end, scanline, wndn_enable);
     }
   }
 }
-
 
 // Renders a full scaleline, taking into consideration windowing effects.
 // Breaks the rendering step into N steps, for each windowed region.
@@ -1796,22 +1749,36 @@ static void render_scanline_window(u16 *scanline)
 
   // Priority decoding for windows
   switch (win_ctrl) {
-  case 0x1: case 0x3: case 0x5: case 0x7:
-    // Window 0 is enabled, call the win0 render function. It does recursively
-    // check for window 1 and Obj, so no worries.
-    render_window0_pass(scanline);
+  case 0x0: // No windows are active.
+    render_scanline_conditional(0, 240, scanline);
     break;
-  case 0x2: case 0x6:
-    // Window 1 is active, call the window1 renderer.
-    render_window1_pass(scanline, 0, 240);
+
+  case 0x1: // Window 0
+    render_window_n_pass<render_windowout_pass, 0>(scanline, 0, 240);
     break;
-  case 0x4:
-    // Only winobj seems active
+
+  case 0x2: // Window 1
+    render_window_n_pass<render_windowout_pass, 1>(scanline, 0, 240);
+    break;
+
+  case 0x3: // Window 0 & 1
+    render_window_n_pass<render_window_n_pass<render_windowout_pass, 1>, 0>(scanline, 0, 240);
+    break;
+
+  case 0x4: // Window Obj
     render_windowobj_pass(scanline, 0, 240);
     break;
-  case 0x0:
-    // No windows are active?
-    render_scanline_conditional(0, 240, scanline);
+
+  case 0x5: // Window 0 & Obj
+    render_window_n_pass<render_windowobj_pass, 0>(scanline, 0, 240);
+    break;
+
+  case 0x6: // Window 1 & Obj
+    render_window_n_pass<render_windowobj_pass, 1>(scanline, 0, 240);
+    break;
+
+  case 0x7: // Window 0, 1 & Obj
+    render_window_n_pass<render_window_n_pass<render_windowobj_pass, 1>, 0>(scanline, 0, 240);
     break;
   }
 }
