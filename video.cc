@@ -935,8 +935,9 @@ static void render_scanline_objects(
 ) {
   // TODO move this to another place?
   // Skip alpha pass if you can do a regular color32 pass
-  if (rdtype == STCKCOLOR && ((read_ioreg(REG_BLDCNT) >> 4) & 1) == 0) {
-    // We cannot skip if there's some object being rendered TODO TODO
+  bool layer_has_blending = ((read_ioreg(REG_BLDCNT) >> 4) & 1) != 0;
+  bool has_trans_obj = obj_alpha_count[read_ioreg(REG_VCOUNT)];
+  if (rdtype == STCKCOLOR && (!has_trans_obj && !layer_has_blending)) {
     render_scanline_objects<stype, INDXCOLOR, copyfn>(priority, start, end, raw_ptr);
     return;
   }
