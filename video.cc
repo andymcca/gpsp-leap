@@ -690,10 +690,13 @@ typedef struct {
 // Renders a tile row (8 pixels) for a regular (non-affine) object/sprite.
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
 static inline void render_obj_tile_Nbpp(
-  dsttype *dest_ptr, u32 start, u32 end, const u8 *tile_ptr, u16 palette
+  dsttype *dest_ptr, u32 start, u32 end, u32 tile_offset, u16 palette
 ) {
   // tile_ptr points to the tile row (32 or 64 bits depending on bpp).
   // renders the tile honoring hflip and start/end constraints
+
+  // Note that the last VRAM bank wrap around, hence the offset aliasing
+  const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
 
   // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
   // If set, the current pixel belongs to a layer that is 1st or 2nd target.
@@ -755,7 +758,7 @@ static inline void render_obj_tile_Nbpp(
 // cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
 template <typename stype, rendtype rdtype, bool is8bpp, bool hflip>
 static void render_object(
-  s32 delta_x, u32 cnt, stype *dst_ptr, const u8* tile_ptr, u16 palette
+  s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u16 palette
 ) {
   // Tile size in bytes for each mode
   u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -768,16 +771,16 @@ static void render_object(
     u32 tile_off = offx % 8;
 
     // Skip the first object tiles (skips in the flip direction)
-    tile_ptr += block_off * tile_size_off;
+    tile_offset += block_off * tile_size_off;
 
     // Render a partial tile to the left
     if (tile_off) {
       u32 residual = 8 - tile_off;   // Pixel count to complete the first tile
       u32 maxpix = MIN(residual, cnt);
-      render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, tile_off, tile_off + maxpix, tile_ptr, palette);
+      render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette);
 
       // Move to the next tile
-      tile_ptr += tile_size_off;
+      tile_offset += tile_size_off;
       // Account for drawn pixels
       cnt -= maxpix;
       dst_ptr += maxpix;
@@ -791,15 +794,15 @@ static void render_object(
   s32 num_tiles = cnt / 8;
   while (num_tiles--) {
     // Render full tiles
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, 8, tile_ptr, palette);
-    tile_ptr += tile_size_off;
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, 8, tile_offset, palette);
+    tile_offset += tile_size_off;
     dst_ptr += 8;
   }
 
   // Render any partial tile on the end
   cnt = cnt % 8;
   if (cnt)
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, cnt, tile_ptr, palette);
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, cnt, tile_offset, palette);
 }
 
 
@@ -807,7 +810,7 @@ static void render_object(
 template <typename stype, rendtype rdtype, bool is8bpp, bool rotate>
 static void render_affine_object(
   const t_sprite *obji, const t_affp *affp, bool is_double, u32 start, u32 end, stype *dst_ptr,
-  const u8 *base_tile, u16 palette
+  u32 base_tile, u16 palette
 ) {
   // Tile size in bytes for each mode
   const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -878,20 +881,22 @@ static void render_affine_object(
     if (is8bpp) {
       // We lookup the byte directly and render it.
       const u32 tile_off =
+        base_tile +                        // Character base
         ((pixel_y >> 3) * tile_pitch) +    // Skip vertical blocks
         ((pixel_x >> 3) * tile_bsize) +    // Skip horizontal blocks
         ((pixel_y & 0x7) * tile_bwidth) +  // Skip vertical rows to the pixel
         (pixel_x & 0x7);                   // Skip the horizontal offset
 
-      pixval = base_tile[tile_off];     // Read pixel value!
+      pixval = vram[0x10000 + (tile_off & 0x7FFF)];   // Read pixel value!
     } else {
       const u32 tile_off =
+        base_tile +                        // Character base
         ((pixel_y >> 3) * tile_pitch) +    // Skip vertical blocks
         ((pixel_x >> 3) * tile_bsize) +    // Skip horizontal blocks
         ((pixel_y & 0x7) * tile_bwidth) +  // Skip vertical rows to the pixel
         ((pixel_x >> 1) & 0x3);            // Skip the horizontal offset
 
-      u8 pixpair = base_tile[tile_off];     // Read two pixels (4bit each)
+      u8 pixpair = vram[0x10000 + (tile_off & 0x7FFF)];  // Read two pixels (4bit each)
       pixval = ((pixel_x & 1) ? pixpair >> 4 : pixpair & 0xF);
     }
 
@@ -973,9 +978,7 @@ static void render_scanline_objects(
       continue;
 
     const u32 msk = is_8bpp && !obj1dmap ? 0x3FE : 0x3FF;
-    const u8 *base_tile = &vram[
-      0x10000 +                      // VRAM base for OBJ tile data
-      (obj_attr2 & msk) * 32];       // Selected character block
+    const u32 base_tile =  (obj_attr2 & msk) * 32;
 
     if (obji.obj_y > 160)
       obji.obj_y -= 256;
@@ -1043,10 +1046,11 @@ static void render_scanline_objects(
       u32 hflip_off = hflip ? ((obji.obj_w / 8) - 1) * tile_bsize : 0;
 
       // Calculate the pointer to the tile.
-      const u8 *tile_ptr = &base_tile[
+      const u32 tile_offset =
+        base_tile +                    // Char offset
         (voffset / 8) * obj_pitch +    // Select tile row offset
         (voffset % 8) * tile_bwidth +  // Skip tile rows
-        hflip_off];                     // Account for horizontal flip
+        hflip_off;                     // Account for horizontal flip
 
       // Make everything relative to start
       s32 obj_x_offset  = obji.obj_x - start;
@@ -1058,32 +1062,32 @@ static void render_scanline_objects(
       if (is_trans && sizeof(stype) > 2) {
         if (is_8bpp) {
           if (hflip)
-            render_object<stype, STCKCOLORF, true, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+            render_object<stype, STCKCOLORF, true, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
           else
-            render_object<stype, STCKCOLORF, true, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+            render_object<stype, STCKCOLORF, true, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
         } else {
           // In 4bpp mode calculate the palette number
           u16 palette = (obj_attr2 >> 8) & 0xF0;
 
           if (hflip)
-            render_object<stype, STCKCOLORF, false, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+            render_object<stype, STCKCOLORF, false, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
           else
-            render_object<stype, STCKCOLORF, false, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+            render_object<stype, STCKCOLORF, false, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
         }
       } else {
         if (is_8bpp) {
           if (hflip)
-            render_object<stype, rdtype, true, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+            render_object<stype, rdtype, true, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
           else
-            render_object<stype, rdtype, true, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, 0);
+            render_object<stype, rdtype, true, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
         } else {
           // In 4bpp mode calculate the palette number
           u16 palette = (obj_attr2 >> 8) & 0xF0;
 
           if (hflip)
-            render_object<stype, rdtype, false, true>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+            render_object<stype, rdtype, false, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
           else
-            render_object<stype, rdtype, false, false>(obj_x_offset, max_draw, &scanline[start], tile_ptr, palette);
+            render_object<stype, rdtype, false, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
         }
       }
     }
