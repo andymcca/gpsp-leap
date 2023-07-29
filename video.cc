@@ -53,12 +53,6 @@ typedef void (*window_render_function)(u16 *scanline, u32 start, u32 end);
 
 typedef struct
 {
-  tile_render_function base[4];
-  tile_render_function trans[4];
-} tile_layer_render_struct;
-
-typedef struct
-{
   bitmap_render_function blit_render;
   bitmap_render_function scale_render;
   bitmap_render_function affine_render;
@@ -75,6 +69,12 @@ typedef struct
 #define COL_EFFECT_BLEND  0x1
 #define COL_EFFECT_BRIGHT 0x2
 #define COL_EFFECT_DARK   0x3
+
+// Background render modes
+#define RENDER_NORMAL   0
+#define RENDER_COL16    1
+#define RENDER_COL32    2
+#define RENDER_ALPHA    3
 
 
 // Byte lengths of complete tiles and tile rows in 4bpp and 8bpp.
@@ -391,8 +391,7 @@ static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr) {
     *dest_ptr = pval | bg_comb;  // Add combine flags
   else if (rdtype == STCKCOLOR)
     // Stack pixels on top of the pixel value and combine flags
-    *dest_ptr = pval | bg_comb | (bg_comb << 16);
-  // FIXME: Do we need double bg_comb? I do not think so!
+    *dest_ptr = pval | bg_comb;
 }
 
 // Affine background rendering logic.
@@ -623,45 +622,12 @@ static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
 
 // Fill in the renderers for a layer based on the mode type,
 
-#define tile_layer_render_functions(type)                                     \
-{                                                                             \
-  {                                                                           \
-    render_scanline_##type<u16, FULLCOLOR, false>,                            \
-    render_scanline_##type<u16, INDXCOLOR, false>,   /* former color16 */     \
-    render_scanline_##type<u32, INDXCOLOR, false>,   /* former color32 */     \
-    render_scanline_##type<u32, STCKCOLOR, false>,   /* for alpha blending */ \
-  },{                                                                         \
-    render_scanline_##type<u16, FULLCOLOR, true>,                             \
-    render_scanline_##type<u16, INDXCOLOR, true>,                             \
-    render_scanline_##type<u32, INDXCOLOR, true>,                             \
-    render_scanline_##type<u32, STCKCOLOR, true>,                             \
-  }                                                                           \
-}                                                                             \
-
 #define bitmap_layer_render_functions(mode, ttype, w, h)                      \
 {                                                                             \
   render_scanline_bitmap<mode, ttype, w, h, false, false>,                    \
   render_scanline_bitmap<mode, ttype, w, h, true, false>,                     \
   render_scanline_bitmap<mode, ttype, w, h, true, true>,                      \
 }                                                                             \
-
-// Structs containing functions to render the layers for each mode, for
-// each render type.
-static const tile_layer_render_struct tile_mode_renderers[3][4] =
-{
-  {
-    tile_layer_render_functions(text), tile_layer_render_functions(text),
-    tile_layer_render_functions(text), tile_layer_render_functions(text)
-  },
-  {
-    tile_layer_render_functions(text), tile_layer_render_functions(text),
-    tile_layer_render_functions(affine), tile_layer_render_functions(text)
-  },
-  {
-    tile_layer_render_functions(text), tile_layer_render_functions(text),
-    tile_layer_render_functions(affine), tile_layer_render_functions(affine)
-  }
-};
 
 static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
 {
@@ -929,18 +895,9 @@ static void render_affine_object(
 
 // Renders objects on a scanline for a given priority.
 template <typename stype, rendtype rdtype, conditional_render_function copyfn>
-static void render_scanline_objects(
+static void render_scanline_objs(
   u32 priority, u32 start, u32 end, void *raw_ptr
 ) {
-  // TODO move this to another place?
-  // Skip alpha pass if you can do a regular color32 pass
-  bool layer_has_blending = ((read_ioreg(REG_BLDCNT) >> 4) & 1) != 0;
-  bool has_trans_obj = obj_alpha_count[read_ioreg(REG_VCOUNT)];
-  if (rdtype == STCKCOLOR && (!has_trans_obj && !layer_has_blending)) {
-    render_scanline_objects<stype, INDXCOLOR, copyfn>(priority, start, end, raw_ptr);
-    return;
-  }
-
   stype *scanline = (stype*)raw_ptr;
   s32 vcount = read_ioreg(REG_VCOUNT);
   bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
@@ -1093,15 +1050,6 @@ static void render_scanline_objects(
     }
   }
 }
-
-
-// There are actually used to render sprites to the scanline
-static const tile_render_function obj_mode_renderers[4] = {
-  render_scanline_objects<u16, FULLCOLOR, nullptr>,
-  render_scanline_objects<u16, INDXCOLOR, nullptr>,
-  render_scanline_objects<u32, INDXCOLOR, nullptr>,
-  render_scanline_objects<u32, STCKCOLOR, nullptr>,
-};
 
 
 // Goes through the object list in the OAM (from #127 to #0) and adds objects
@@ -1356,17 +1304,14 @@ static void merge_brightness(u32 start, u32 end, u16 *srcdst) {
   }
 }
 
-// Render a target all the way with the background color as taken from the
-// palette.
-
-template<bool indexed, typename dsttype>
-void fill_line_background(u32 start, u32 end, void *scanline) {
-  dsttype *ptr = (dsttype*)scanline;
+// Fills a segment using the backdrop color (in the right mode).
+template<rendtype rdmode, typename dsttype>
+void fill_line_background(u32 start, u32 end, dsttype *scanline) {
   while (start < end)
-    if (indexed)
-      ptr[start++] = 0;
+    if (rdmode == FULLCOLOR)
+      scanline[start++] = palette_ram_converted[0];
     else
-      ptr[start++] = palette_ram_converted[0];
+      scanline[start++] = 0;
 }
 
 // Renders the backdrop color (ie. whenever no layer is active) applying
@@ -1399,68 +1344,60 @@ static void render_backdrop(u32 start, u32 end, u16 *scanline) {
     scanline[start++] = pixcol;
 }
 
-// Background render modes
-#define RENDER_NORMAL   0
-#define RENDER_COL16    1
-#define RENDER_COL32    2
-#define RENDER_ALPHA    3
-
-// Obj/Sprite render modes
-#define OBJ_NORMAL      0
-#define OBJ_COL16       1
-#define OBJ_COL32       2
-#define OBJ_ALPHA       3
-
-void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
-                   u32 rend_mode, u32 obj_mode) {
+// Renders all the available and enabled layers (in tiled mode).
+// Walks the list of layers in visibility order and renders them in the
+// specified mode (taking into consideration the first layer, etc).
+template<rendtype rdmode, typename dsttype>
+void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
   u32 lnum;
+  bool base_done = false;
   u16 dispcnt = read_ioreg(REG_DISPCNT);
+  u16 video_mode = dispcnt & 0x07;
   bool obj_enabled = (enabled_layers & 0x10);   // Objects are visible
-  // Renderers for this mode (affine or text pointers)
-  const tile_layer_render_struct * r = tile_mode_renderers[dispcnt & 0x07];
+
+  bool layer_has_blending = ((read_ioreg(REG_BLDCNT) >> 4) & 1) != 0;
+  bool has_trans_obj = obj_alpha_count[read_ioreg(REG_VCOUNT)];
+  bool can_skip_blend = !has_trans_obj && !layer_has_blending;
 
   for (lnum = 0; lnum < layer_count; lnum++) {
     u32 layer = layer_order[lnum];
     bool is_obj = layer & 0x4;
     if (is_obj && obj_enabled) {
-      // Draw an object first-layer, we need to fill backdrop color first!
-      if (rend_mode == RENDER_NORMAL)
-        fill_line_background<false, u16>(start, end, dst_ptr);
-      else if (rend_mode == RENDER_COL16)
-        fill_line_background<true, u16>(start, end, dst_ptr);
-      else
-        fill_line_background<true, u32>(start, end, dst_ptr);
 
-      obj_mode_renderers[obj_mode](layer & 0x3, start, end, dst_ptr);
-      break;
+      // If it's the first layer, make sure to fill with backdrop color.
+      if (!base_done)
+        fill_line_background<rdmode, dsttype>(start, end, dst_ptr);
+
+      // Optimization: skip blending mode if no blending can happen to this layer
+      if (rdmode == STCKCOLOR && can_skip_blend)
+        render_scanline_objs<dsttype, INDXCOLOR, nullptr>(layer & 0x3, start, end, dst_ptr);
+      else
+        render_scanline_objs<dsttype, rdmode, nullptr>(layer & 0x3, start, end, dst_ptr);
+
+      base_done = true;
     }
     else if (!is_obj && ((1 << layer) & enabled_layers)) {
-      // Draw base layer
-      r[layer].base[rend_mode](layer, start, end, dst_ptr);
-      break;
+      bool is_affine = (video_mode >= 1) && (layer >= 2);
+      if (is_affine) {
+        if (base_done)
+          render_scanline_affine<dsttype, rdmode, true>(layer, start, end, dst_ptr);
+        else
+          render_scanline_affine<dsttype, rdmode, false>(layer, start, end, dst_ptr);
+      } else {
+        if (base_done)
+          render_scanline_text<dsttype, rdmode, true>(layer, start, end, dst_ptr);
+        else
+          render_scanline_text<dsttype, rdmode, false>(layer, start, end, dst_ptr);
+      }
+
+      base_done = true;
     }
   }
 
-  if (lnum == layer_count) {
+  if (!base_done) {
     // Render background, no layers are active!
-    // TODO improve this code.
-    if (rend_mode == RENDER_NORMAL)
-      fill_line_background<false, u16>(start, end, dst_ptr);
-    else if (rend_mode == RENDER_COL16)
-      fill_line_background<true, u16>(start, end, dst_ptr);
-    else
-      fill_line_background<true, u32>(start, end, dst_ptr);
-
+    fill_line_background<rdmode, dsttype>(start, end, dst_ptr);
     return;
-  }
-
-  while (++lnum < layer_count) {
-    u32 layer = layer_order[lnum];
-    bool is_obj = layer & 0x4;
-    if (is_obj && obj_enabled)
-      obj_mode_renderers[obj_mode](layer & 0x3, start, end, dst_ptr);
-    else if (!is_obj && ((1 << layer) & enabled_layers))
-      r[layer].trans[rend_mode](layer, start, end, dst_ptr);
   }
 }
 
@@ -1475,10 +1412,10 @@ static void render_color_no_effect(
   // Default rendering mode, without layer effects (except perhaps sprites).
   if (obj_blend) {
     u32 screen_buffer[240];
-    render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_COL32);
+    render_layers<INDXCOLOR, u32>(start, end, screen_buffer, enable_flags);
     merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
   } else {
-    render_layers(start, end, scanline, enable_flags, RENDER_NORMAL, OBJ_NORMAL);
+    render_layers<FULLCOLOR, u16>(start, end, scanline, enable_flags);
   }
 }
 
@@ -1509,10 +1446,10 @@ static void render_color_effect(
       if (some_1st_tgt && non_zero_blend) {
         if (obj_blend) {
           u32 screen_buffer[240];
-          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_COL32);
+          render_layers<INDXCOLOR, u32>(start, end, screen_buffer, enable_flags);
           merge_blend<BLEND_BRIGHT>(start, end, scanline, screen_buffer);
         } else {
-          render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
+          render_layers<INDXCOLOR, u16>(start, end, scanline, enable_flags);
           merge_brightness<BLEND_BRIGHT>(start, end, scanline);
         }
         return;
@@ -1529,10 +1466,10 @@ static void render_color_effect(
       if (some_1st_tgt && non_zero_blend) {
         if (obj_blend) {
           u32 screen_buffer[240];
-          render_layers(start, end, screen_buffer, enable_flags, RENDER_COL32, OBJ_COL32);
+          render_layers<INDXCOLOR, u32>(start, end, screen_buffer, enable_flags);
           merge_blend<BLEND_DARK>(start, end, scanline, screen_buffer);
         } else {
-          render_layers(start, end, scanline, enable_flags, RENDER_COL16, OBJ_COL16);
+          render_layers<INDXCOLOR, u16>(start, end, scanline, enable_flags);
           merge_brightness<BLEND_DARK>(start, end, scanline);
         }
         return;
@@ -1549,7 +1486,7 @@ static void render_color_effect(
       bool non_trns_tgt = (read_ioreg(REG_BLDALPHA) & 0x1F1F) != 0x001F;
       if (some_1st_tgt && some_2nd_tgt && non_trns_tgt) {
         u32 screen_buffer[240];
-        render_layers(start, end, screen_buffer, enable_flags, RENDER_ALPHA, OBJ_ALPHA);
+        render_layers<STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
         merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
         return;
       }
@@ -1569,7 +1506,7 @@ static void render_color_effect(
 // Render all of the BG and OBJ in a tiled scanline from start to end ONLY if
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
-static void render_scanline_conditional_tile(
+static void render_conditional_tile(
   u32 start, u32 end, u16 *scanline, u32 enable_flags)
 {
   if (layer_count && (enable_flags & 0x1F)) {
@@ -1587,7 +1524,7 @@ static void render_scanline_conditional_tile(
 // Render the BG and OBJ in a bitmap scanline from start to end ONLY if
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
-static void render_scanline_conditional_bitmap(
+static void render_conditional_bitmap(
   u32 start, u32 end, u16 *scanline, u32 enable_flags)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
@@ -1597,7 +1534,7 @@ static void render_scanline_conditional_bitmap(
   u32 current_layer;
   u32 layer_order_pos;
 
-  fill_line_background<false, u16>(start, end, scanline);
+  fill_line_background<FULLCOLOR, u16>(start, end, scanline);
 
   for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
   {
@@ -1605,9 +1542,7 @@ static void render_scanline_conditional_bitmap(
     if(current_layer & 0x04)
     {
       if(enable_flags & 0x10)
-      {
-        render_scanline_objects<u16, FULLCOLOR, nullptr>(current_layer & 3, start, end, scanline);
-      }
+        render_scanline_objs<u16, FULLCOLOR, nullptr>(current_layer & 3, start, end, scanline);
     }
     else
     {
@@ -1627,23 +1562,6 @@ static void render_scanline_conditional_bitmap(
 }
 
 
-// If the window Y coordinates are out of the window range we can skip
-// rendering the inside of the window.
-inline bool in_window_y(u32 vcount, u32 top, u32 bottom) {
-  // TODO: check if these are reversed when top-bottom are also reversed.
-  if (top > 227)     // This causes the window to be invisible
-    return false;
-  if (bottom > 227)  // This makes it all visible
-    return true;
-
-  if (top > bottom)  /* Reversed: if not in the "band" */
-    return vcount > top || vcount <= bottom;
-
-  return vcount >= top && vcount < bottom;
-}
-
-// Temporary wrap functions, to be removed once all the plain calls do not exist
-
 static inline void render_scanline_conditional(
   u32 start, u32 end, u16 *scanline, u32 enable_flags = 0x3F)
 {
@@ -1651,9 +1569,9 @@ static inline void render_scanline_conditional(
   u32 video_mode = dispcnt & 0x07;
   // Modes 0..2 are tiled modes, 3..5 are bitmap-based modes.
   if(video_mode < 3)
-    render_scanline_conditional_tile(start, end, scanline, enable_flags);
+    render_conditional_tile(start, end, scanline, enable_flags);
   else
-    render_scanline_conditional_bitmap(start, end, scanline, enable_flags);
+    render_conditional_bitmap(start, end, scanline, enable_flags);
 }
 
 // Renders the are outside of all active windows
@@ -1686,11 +1604,26 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
     // Perform the actual object rendering in copy mode
     if (video_mode < 3) {
       // TODO: Make version 1D/2D?   if (dispcnt & 0x40)
-      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_tile>(4, start, end, scanline);
+      render_scanline_objs<u16, PIXCOPY, render_conditional_tile>(4, start, end, scanline);
     } else {
-      render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_bitmap>(4, start, end, scanline);
+      render_scanline_objs<u16, PIXCOPY, render_conditional_bitmap>(4, start, end, scanline);
     }
   }
+}
+
+// If the window Y coordinates are out of the window range we can skip
+// rendering the inside of the window.
+inline bool in_window_y(u32 vcount, u32 top, u32 bottom) {
+  // TODO: check if these are reversed when top-bottom are also reversed.
+  if (top > 227)     // This causes the window to be invisible
+    return false;
+  if (bottom > 227)  // This makes it all visible
+    return true;
+
+  if (top > bottom)  /* Reversed: if not in the "band" */
+    return vcount > top || vcount <= bottom;
+
+  return vcount >= top && vcount < bottom;
 }
 
 // Renders window 0/1. Checks boundaries and divides the segment into
