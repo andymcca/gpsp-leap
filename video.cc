@@ -63,23 +63,25 @@ typedef struct
   bitmap_render_function affine_render;
 } bitmap_layer_render_struct;
 
-static void render_scanline_conditional_tile(
-  u32 start, u32 end, u16 *scanline, u32 enable_flags);
-static void render_scanline_conditional_bitmap(
-  u32 start, u32 end, u16 *scanline, u32 enable_flags);
-
-
+// Object blending modes
 #define OBJ_MOD_NORMAL     0
 #define OBJ_MOD_SEMITRAN   1
 #define OBJ_MOD_WINDOW     2
 #define OBJ_MOD_INVALID    3
 
+// BLDCNT color effect modes
+#define COL_EFFECT_NONE   0x0
+#define COL_EFFECT_BLEND  0x1
+#define COL_EFFECT_BRIGHT 0x2
+#define COL_EFFECT_DARK   0x3
+
+
 // Byte lengths of complete tiles and tile rows in 4bpp and 8bpp.
 
-#define tile_width_4bpp 4
-#define tile_size_4bpp 32
-#define tile_width_8bpp 8
-#define tile_size_8bpp 64
+#define tile_width_4bpp   4
+#define tile_size_4bpp   32
+#define tile_width_8bpp   8
+#define tile_size_8bpp   64
 
 #define color_combine_mask_a(layer)                                           \
   ((read_ioreg(REG_BLDCNT) >> layer) & 0x01)                                  \
@@ -102,6 +104,24 @@ typedef enum
   STCKCOLORF, // Same as above, but forces 1st target bits for objects
   PIXCOPY     // Special mode used for sprites, to allow for obj-window drawing
 } rendtype;
+
+s32 affine_reference_x[2];
+s32 affine_reference_y[2];
+
+static inline s32 signext28(u32 value)
+{
+  s32 ret = (s32)(value << 4);
+  return ret >> 4;
+}
+
+void video_reload_counters()
+{
+  /* This happens every Vblank */
+  affine_reference_x[0] = signext28(read_ioreg32(REG_BG2X_L));
+  affine_reference_y[0] = signext28(read_ioreg32(REG_BG2Y_L));
+  affine_reference_x[1] = signext28(read_ioreg32(REG_BG3X_L));
+  affine_reference_y[1] = signext28(read_ioreg32(REG_BG3Y_L));
+}
 
 // Renders non-affine tiled background layer.
 // Will process a full or partial tile (start and end within 0..8) and draw
@@ -323,26 +343,6 @@ static void render_scanline_text(u32 layer,
     }
   }
 }
-
-
-s32 affine_reference_x[2];
-s32 affine_reference_y[2];
-
-static inline s32 signext28(u32 value)
-{
-  s32 ret = (s32)(value << 4);
-  return ret >> 4;
-}
-
-void video_reload_counters()
-{
-  /* This happens every Vblank */
-  affine_reference_x[0] = signext28(read_ioreg32(REG_BG2X_L));
-  affine_reference_y[0] = signext28(read_ioreg32(REG_BG2Y_L));
-  affine_reference_x[1] = signext28(read_ioreg32(REG_BG3X_L));
-  affine_reference_y[1] = signext28(read_ioreg32(REG_BG3Y_L));
-}
-
 
 template<typename dsttype, rendtype rdtype, bool transparent>
 static inline void render_pixel_8bpp(u32 layer,
@@ -725,7 +725,6 @@ static inline void render_obj_tile_Nbpp(
         }
         else if (rdtype == PIXCOPY)
           *dest_ptr = dest_ptr[240];
-        // TODO implement partial alpha blending
       }
     }
   } else {
@@ -913,7 +912,6 @@ static void render_affine_object(
           *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) & 0xFFFF0000);
         else
           *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) << 16);  // Stack pixels
-        // TODO partial alpha
       }
       else if (rdtype == PIXCOPY)
         *dst_ptr = dst_ptr[240];
@@ -1370,11 +1368,6 @@ void fill_line_background(u32 start, u32 end, void *scanline) {
       ptr[start++] = palette_ram_converted[0];
 }
 
-#define COL_EFFECT_NONE   0x0
-#define COL_EFFECT_BLEND  0x1
-#define COL_EFFECT_BRIGHT 0x2
-#define COL_EFFECT_DARK   0x3
-
 // Renders the backdrop color (ie. whenever no layer is active) applying
 // any effects that might still apply (usually darken/brighten).
 static void render_backdrop(u32 start, u32 end, u16 *scanline) {
@@ -1432,7 +1425,7 @@ void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
       // Draw an object first-layer, we need to fill backdrop color first!
       if (rend_mode == RENDER_NORMAL)
         fill_line_background<false, u16>(start, end, dst_ptr);
-      else if (rend_mode == OBJ_COL16)
+      else if (rend_mode == RENDER_COL16)
         fill_line_background<true, u16>(start, end, dst_ptr);
       else
         fill_line_background<true, u32>(start, end, dst_ptr);
@@ -1452,7 +1445,7 @@ void render_layers(u32 start, u32 end, void *dst_ptr, u32 enabled_layers,
     // TODO improve this code.
     if (rend_mode == RENDER_NORMAL)
       fill_line_background<false, u16>(start, end, dst_ptr);
-    else if (rend_mode == OBJ_COL16)
+    else if (rend_mode == RENDER_COL16)
       fill_line_background<true, u16>(start, end, dst_ptr);
     else
       fill_line_background<true, u32>(start, end, dst_ptr);
@@ -1572,51 +1565,11 @@ static void render_color_effect(
 }
 
 
-// Renders an entire scanline from 0 to 240, based on current color mode.
-template<bool tiled>
-static void render_scanline(u16 *scanline)
-{
-  u32 current_layer;
-  u32 layer_order_pos;
-
-  if (tiled) {
-    if (layer_count)
-      render_color_effect(0, 240, scanline);
-    else
-      render_backdrop(0, 240, scanline);
-  } else {
-    u16 dispcnt = read_ioreg(REG_DISPCNT);
-    const bitmap_layer_render_struct *lrend = &bitmap_mode_renderers[(dispcnt & 0x07) - 3];
-    fill_line_background<false, u16>(0, 240, scanline);
-
-    for(layer_order_pos = 0; layer_order_pos < layer_count; layer_order_pos++)
-    {
-      current_layer = layer_order[layer_order_pos];
-      if(current_layer & 0x04)
-      {
-        render_scanline_objects<u16, FULLCOLOR, nullptr>(current_layer & 3, 0, 240, scanline);
-      }
-      else
-      {
-        s32 dx = (s16)read_ioreg(REG_BG2PA);
-        s32 dy = (s16)read_ioreg(REG_BG2PC);
-
-        if (dy)
-          lrend->affine_render(0, 240, scanline);
-        else if (dx == 256)
-          lrend->blit_render(0, 240, scanline);
-        else
-          lrend->scale_render(0, 240, scanline);
-      }
-    }
-  }
-}
-
 // Render all of the BG and OBJ in a tiled scanline from start to end ONLY if
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
-static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
- u32 enable_flags)
+static void render_scanline_conditional_tile(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags)
 {
   if (layer_count && (enable_flags & 0x1F)) {
     bool effects_enabled = enable_flags & 0x20;   // Window bit for effects.
@@ -1633,8 +1586,8 @@ static void render_scanline_conditional_tile(u32 start, u32 end, u16 *scanline,
 // Render the BG and OBJ in a bitmap scanline from start to end ONLY if
 // enable_flag allows that layer/OBJ. Also conditionally render color effects.
 
-static void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline,
- u32 enable_flags)
+static void render_scanline_conditional_bitmap(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
   const bitmap_layer_render_struct *layer_renderers =
@@ -1690,18 +1643,19 @@ inline bool in_window_y(u32 vcount, u32 top, u32 bottom) {
 
 // Temporary wrap functions, to be removed once all the plain calls do not exist
 
-template <bool tiled>
-static inline void render_scanline_conditional(u32 start, u32 end,
-  u16 *scanline, u32 enable_flags)
+static inline void render_scanline_conditional(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags = 0x3F)
 {
-  if (tiled)
+  u16 dispcnt = read_ioreg(REG_DISPCNT);
+  u32 video_mode = dispcnt & 0x07;
+  // Modes 0..2 are tiled modes, 3..5 are bitmap-based modes.
+  if(video_mode < 3)
     render_scanline_conditional_tile(start, end, scanline, enable_flags);
   else
     render_scanline_conditional_bitmap(start, end, scanline, enable_flags);
 }
 
 // Renders window1 (low priority window) and outside/obj areas for a given range.
-template <bool tiled>
 static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
@@ -1709,15 +1663,16 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
   u32 wndout_enable = winout & 0x3F;
 
   // First we render the "window-out" segment.
-  render_scanline_conditional<tiled>(start, end, scanline, wndout_enable);
+  render_scanline_conditional(start, end, scanline, wndout_enable);
 
   // Now we render the objects in "copy" mode. This renders the scanline in
   // WinObj-mode to a temporary buffer and performs a "copy-mode" render.
   // In this mode, we copy pixels from the temp buffer to the final buffer
   // whenever an object pixel is rendered.
   if (dispcnt >> 15) {
+    u32 video_mode = dispcnt & 0x07;
     // Perform the actual object rendering in copy mode
-    if (tiled) {
+    if (video_mode < 3) {
       // TODO: Make version 1D/2D?   if (dispcnt & 0x40)
       render_scanline_objects<u16, PIXCOPY, render_scanline_conditional_tile>(4, start, end, scanline);
     } else {
@@ -1727,7 +1682,6 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
 }
 
 // Renders window1 (low priority window) and outside/obj areas for a given range.
-template <bool tiled>
 static void render_window1_pass(u16 *scanline, u32 start, u32 end)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
@@ -1736,11 +1690,10 @@ static void render_window1_pass(u16 *scanline, u32 start, u32 end)
 
   switch (dispcnt >> 14) {
   case 0x0:    // No Win1 nor WinObj
-    render_scanline_conditional<tiled>(
-      start, end, scanline, wndout_enable);
+    render_scanline_conditional(start, end, scanline, wndout_enable);
     break;
   case 0x2:    // Only winobj enabled, render it.
-    render_windowobj_pass<tiled>(scanline, start, end);
+    render_windowobj_pass(scanline, start, end);
     break;
   case 0x1: case 0x3:   // Win1 is enabled (and perhaps WinObj too)
     {
@@ -1756,7 +1709,7 @@ static void render_window1_pass(u16 *scanline, u32 start, u32 end)
 
       if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
         // Window1 is completely out, just render all out.
-        render_windowobj_pass<tiled>(scanline, start, end);
+        render_windowobj_pass(scanline, start, end);
       else {
         // Render win1 withtin the clipped range
         // Enable bits for stuff inside the window (and outside)
@@ -1767,24 +1720,21 @@ static void render_window1_pass(u16 *scanline, u32 start, u32 end)
         if (win_l < win_r) {
           // Render [start, win_l) range (which is outside the window)
           if (win_l != start)
-            render_windowobj_pass<tiled>(scanline, start, win_l);
+            render_windowobj_pass(scanline, start, win_l);
           // Render the actual window0 pixels
-          render_scanline_conditional<tiled>(
-            win_l, win_r, scanline, wnd1_enable);
+          render_scanline_conditional(win_l, win_r, scanline, wnd1_enable);
           // Render the [win_l, end] range (outside)
           if (win_r != end)
-            render_windowobj_pass<tiled>(scanline, win_r, end);
+            render_windowobj_pass(scanline, win_r, end);
         } else {
           // Render [0, win_r) range (which is "inside" window0)
           if (win_r != start)
-            render_scanline_conditional<tiled>(
-              start, win_r, scanline, wnd1_enable);
+            render_scanline_conditional(start, win_r, scanline, wnd1_enable);
           // The actual window is now outside, render recursively
-          render_windowobj_pass<tiled>(scanline, win_r, win_l);
+          render_windowobj_pass(scanline, win_r, win_l);
           // Render the [win_l, 240] range ("inside")
           if (win_l != end)
-            render_scanline_conditional<tiled>(
-              win_l, end, scanline, wnd1_enable);
+            render_scanline_conditional(win_l, end, scanline, wnd1_enable);
         }
       }
     }
@@ -1795,7 +1745,6 @@ static void render_window1_pass(u16 *scanline, u32 start, u32 end)
 // Renders window0 (high priority window) and renders window1 or out
 // on the area that falls outside. It will call the above function for
 // outside areas to "recursively" render segments.
-template <bool tiled>
 static void render_window0_pass(u16 *scanline)
 {
   u32 vcount = read_ioreg(REG_VCOUNT);
@@ -1808,7 +1757,7 @@ static void render_window0_pass(u16 *scanline)
 
   if (!in_window_y(vcount, win_top, win_bot) || (win_l == win_r))
     // No windowing, everything is "outside", just render win1.
-    render_window1_pass<tiled>(scanline, 0, 240);
+    render_window1_pass(scanline, 0, 240);
   else {
     u32 winin  = read_ioreg(REG_WININ);
     // Enable bits for stuff inside the window
@@ -1818,24 +1767,21 @@ static void render_window0_pass(u16 *scanline)
     if (win_l < win_r) {
       // Render [0, win_l) range (which is outside the window)
       if (win_l)
-        render_window1_pass<tiled>(scanline, 0, win_l);
+        render_window1_pass(scanline, 0, win_l);
       // Render the actual window0 pixels
-      render_scanline_conditional<tiled>(
-        win_l, win_r, scanline, wnd0_enable);
+      render_scanline_conditional(win_l, win_r, scanline, wnd0_enable);
       // Render the [win_l, 240] range (outside)
       if (win_r != 240)
-        render_window1_pass<tiled>(scanline, win_r, 240);
+        render_window1_pass(scanline, win_r, 240);
     } else {
       // Render [0, win_r) range (which is "inside" window0)
       if (win_r)
-        render_scanline_conditional<tiled>(
-          0, win_r, scanline, wnd0_enable);
+        render_scanline_conditional(0, win_r, scanline, wnd0_enable);
       // The actual window is now outside, render recursively
-      render_window1_pass<tiled>(scanline, win_r, win_l);
+      render_window1_pass(scanline, win_r, win_l);
       // Render the [win_l, 240] range ("inside")
       if (win_l != 240)
-        render_scanline_conditional<tiled>(
-          win_l, 240, scanline, wnd0_enable);
+        render_scanline_conditional(win_l, 240, scanline, wnd0_enable);
     }
   }
 }
@@ -1843,7 +1789,6 @@ static void render_window0_pass(u16 *scanline)
 
 // Renders a full scaleline, taking into consideration windowing effects.
 // Breaks the rendering step into N steps, for each windowed region.
-template <bool tiled>
 static void render_scanline_window(u16 *scanline)
 {
   u16 dispcnt = read_ioreg(REG_DISPCNT);
@@ -1854,19 +1799,19 @@ static void render_scanline_window(u16 *scanline)
   case 0x1: case 0x3: case 0x5: case 0x7:
     // Window 0 is enabled, call the win0 render function. It does recursively
     // check for window 1 and Obj, so no worries.
-    render_window0_pass<tiled>(scanline);
+    render_window0_pass(scanline);
     break;
   case 0x2: case 0x6:
     // Window 1 is active, call the window1 renderer.
-    render_window1_pass<tiled>(scanline, 0, 240);
+    render_window1_pass(scanline, 0, 240);
     break;
   case 0x4:
     // Only winobj seems active
-    render_windowobj_pass<tiled>(scanline, 0, 240);
+    render_windowobj_pass(scanline, 0, 240);
     break;
   case 0x0:
     // No windows are active?
-    render_scanline<tiled>(scanline);
+    render_scanline_conditional(0, 240, scanline);
     break;
   }
 }
@@ -1890,6 +1835,9 @@ void update_scanline(void)
   u16 *screen_offset = get_screen_pixels() + (vcount * pitch);
   u32 video_mode = dispcnt & 0x07;
 
+  if(skip_next_frame)
+    return;
+
   // If OAM has been modified since the last scanline has been updated then
   // reorder and reprofile the OBJ lists.
   if(reg[OAM_UPDATED])
@@ -1900,22 +1848,11 @@ void update_scanline(void)
 
   order_layers((dispcnt >> 8) & active_layers[video_mode], vcount);
 
-  if(skip_next_frame)
-    return;
-
+  // If the screen is in in forced blank draw pure white.
   if(dispcnt & 0x80)
-  {
-    // If the screen is in in forced blank draw pure white.
     memset(screen_offset, 0xff, 240*sizeof(u16));
-  }
   else
-  {
-    // Modes 0..2 are tiled modes, 3..5 are bitmap-based modes.
-    if(video_mode < 3)
-      render_scanline_window<true>(screen_offset);
-    else
-      render_scanline_window<false>(screen_offset);
-  }
+    render_scanline_window(screen_offset);
 
   // Mode 0 does not use any affine params at all.
   if (video_mode) {
