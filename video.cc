@@ -638,6 +638,8 @@ static u8 obj_alpha_count[160];
 typedef struct {
   s32 obj_x, obj_y;
   s32 obj_w, obj_h;
+  u32 attr1, attr2;
+  bool is_double;
 } t_sprite;
 
 // Renders a tile row (8 pixels) for a regular (non-affine) object/sprite.
@@ -708,8 +710,8 @@ static inline void render_obj_tile_Nbpp(bool forcebld,
 // Renders a regular sprite (non-affine) row to screen.
 // delta_x is the object X coordinate referenced from the window start.
 // cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
-template <typename stype, rendtype rdtype, bool is8bpp, bool hflip>
-static void render_object(bool forcebld,
+template <typename stype, rendtype rdtype, bool forcebld, bool is8bpp, bool hflip>
+static void render_object(
   s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u16 palette
 ) {
   // Tile size in bytes for each mode
@@ -759,9 +761,9 @@ static void render_object(bool forcebld,
 
 
 // Renders an affine sprite row to screen.
-template <typename stype, rendtype rdtype, bool is8bpp, bool rotate>
+template <typename stype, rendtype rdtype, bool forcebld, bool is8bpp, bool rotate>
 static void render_affine_object(
-  const t_sprite *obji, bool forcebld, const t_affp *affp, bool is_double,
+  const t_sprite *obji, const t_affp *affp, bool is_double,
   u32 start, u32 end, stype *dst_ptr, u32 base_tile, u16 palette
 ) {
   // Tile size in bytes for each mode
@@ -879,6 +881,68 @@ static void render_affine_object(
   }
 }
 
+// Renders a single sprite on the current scanline
+template <typename stype, rendtype rdtype, bool forcebld, bool is8bpp>
+inline static void render_sprite(
+  const t_sprite *obji, bool is_affine, u32 start, u32 end, stype *scanline
+) {
+  s32 vcount = read_ioreg(REG_VCOUNT);
+  bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
+  const u32 msk = is8bpp && !obj1dmap ? 0x3FE : 0x3FF;
+  const u32 base_tile = (obji->attr2 & msk) * 32;
+
+  if (is_affine) {
+    u32 pnum = (obji->attr1 >> 9) & 0x1f;
+    const t_affp *affp_base = (t_affp*)oam_ram;
+    const t_affp *affp = &affp_base[pnum];
+    u16 pal = is8bpp ? 0 : ((obji->attr2 >> 8) & 0xF0);
+
+    if (affp->dy == 0)     // No rotation happening (just scale)
+      render_affine_object<stype, rdtype, forcebld, is8bpp, false>(obji, affp, obji->is_double, start, end, scanline, base_tile, pal);
+    else                   // Full rotation and scaling
+      render_affine_object<stype, rdtype, forcebld, is8bpp, true>(obji, affp, obji->is_double, start, end, scanline, base_tile, pal);
+  } else {
+    // The object could be out of the window, check and skip.
+    if (obji->obj_x >= (signed)end || obji->obj_x + obji->obj_w <= (signed)start)
+      return;
+
+    // Non-affine objects can be flipped on both edges.
+    bool hflip = obji->attr1 & 0x1000;
+    bool vflip = obji->attr1 & 0x2000;
+
+    // Calulate the vertical offset (row) to be displayed. Account for vflip.
+    u32 voffset = vflip ? obji->obj_y + obji->obj_h - vcount - 1 : vcount - obji->obj_y;
+
+    // Calculate base tile for the object (points to the row to be drawn).
+    u32 tile_bsize  = is8bpp ? tile_size_8bpp : tile_size_4bpp;
+    u32 tile_bwidth = is8bpp ? tile_width_8bpp : tile_width_4bpp;
+    u32 obj_pitch = obj1dmap ? (obji->obj_w / 8) * tile_bsize : 1024;
+    u32 hflip_off = hflip ? ((obji->obj_w / 8) - 1) * tile_bsize : 0;
+
+    // Calculate the pointer to the tile.
+    const u32 tile_offset =
+      base_tile +                    // Char offset
+      (voffset / 8) * obj_pitch +    // Select tile row offset
+      (voffset % 8) * tile_bwidth +  // Skip tile rows
+      hflip_off;                     // Account for horizontal flip
+
+    // Make everything relative to start
+    s32 obj_x_offset  = obji->obj_x - start;
+    u32 clipped_width = obj_x_offset >= 0 ? obji->obj_w : obji->obj_w + obj_x_offset;
+    u32 max_range = obj_x_offset >= 0 ? end - obji->obj_x : end - start;
+    u32 max_draw = MIN(max_range, clipped_width);
+
+    // Render the object scanline using the correct mode.
+    // (in 4bpp mode calculate the palette number)
+    u16 pal = is8bpp ? 0 : ((obji->attr2 >> 8) & 0xF0);
+
+    if (hflip)
+      render_object<stype, rdtype, forcebld, is8bpp, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, pal);
+    else
+      render_object<stype, rdtype, forcebld, is8bpp, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, pal);
+  }
+}
+
 // Renders objects on a scanline for a given priority.
 template <typename stype, rendtype rdtype, conditional_render_function copyfn>
 static void render_scanline_objs(
@@ -886,7 +950,6 @@ static void render_scanline_objs(
 ) {
   stype *scanline = (stype*)raw_ptr;
   s32 vcount = read_ioreg(REG_VCOUNT);
-  bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
   u32 objn;
   u32 objcnt = obj_priority_count[priority][vcount];
   u8 *objlist = obj_priority_list[priority][vcount];
@@ -899,29 +962,27 @@ static void render_scanline_objs(
 
     u16 obj_attr0 = eswap16(oamentry->attr0);
     u16 obj_attr1 = eswap16(oamentry->attr1);
-    u16 obj_attr2 = eswap16(oamentry->attr2);
     u16 obj_shape = obj_attr0 >> 14;
     u16 obj_size = (obj_attr1 >> 14);
     bool is_affine = obj_attr0 & 0x100;
-    bool is_8bpp = obj_attr0 & 0x2000;
-    bool is_double = obj_attr0 & 0x200;
     bool is_trans = ((obj_attr0 >> 10) & 0x3) == OBJ_MOD_SEMITRAN;
+    bool is_8bpp = (obj_attr0 & 0x2000) != 0;
 
     t_sprite obji = {
       .obj_x = (s32)(obj_attr1 << 23) >> 23,
       .obj_y = obj_attr0 & 0xFF,
       .obj_w = obj_dim_table[obj_shape][obj_size][0],
-      .obj_h = obj_dim_table[obj_shape][obj_size][1]
+      .obj_h = obj_dim_table[obj_shape][obj_size][1],
+      .attr1 = obj_attr1,
+      .attr2 = eswap16(oamentry->attr2),
+      .is_double = (obj_attr0 & 0x200) != 0,
     };
 
-    s32 obj_maxw = (is_affine && is_double) ? obji.obj_w * 2 : obji.obj_w;
+    s32 obj_maxw = (is_affine && obji.is_double) ? obji.obj_w * 2 : obji.obj_w;
 
     // The object could be out of the window, check and skip.
     if (obji.obj_x >= (signed)end || obji.obj_x + obj_maxw <= (signed)start)
       continue;
-
-    const u32 msk = is_8bpp && !obj1dmap ? 0x3FE : 0x3FF;
-    const u32 base_tile =  (obj_attr2 & msk) * 32;
 
     // ST-OBJs force 1st target bit (forced blending)
     bool forcebld = is_trans && rdtype != FULLCOLOR;
@@ -941,69 +1002,16 @@ static void render_scanline_objs(
       copyfn(sec_start, sec_end, tmp_ptr, obj_enable);
     }
 
-    if (is_affine) {
-      u32 pnum = (obj_attr1 >> 9) & 0x1f;
-      const t_affp *affp_base = (t_affp*)oam_ram;
-      const t_affp *affp = &affp_base[pnum];
-      u16 palette = (obj_attr2 >> 8) & 0xF0;
-
-      if (affp->dy == 0) {   // No rotation happening (just scale)
-        if (is_8bpp)
-          render_affine_object<stype, rdtype, true, false>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, 0);
-        else
-          render_affine_object<stype, rdtype, false, false>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, palette);
-      } else {               // Full rotation and scaling
-        if (is_8bpp)
-          render_affine_object<stype, rdtype, true, true>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, 0);
-        else
-          render_affine_object<stype, rdtype, false, true>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, palette);
-      }
+    if (is_8bpp) {
+      if (forcebld)
+        render_sprite<stype, rdtype, true, true>(&obji, is_affine, start, end, scanline);
+      else
+        render_sprite<stype, rdtype, false, true>(&obji, is_affine, start, end, scanline);
     } else {
-      // The object could be out of the window, check and skip.
-      if (obji.obj_x >= (signed)end || obji.obj_x + obji.obj_w <= (signed)start)
-        continue;
-
-      // Non-affine objects can be flipped on both edges.
-      bool hflip = obj_attr1 & 0x1000;
-      bool vflip = obj_attr1 & 0x2000;
-
-      // Calulate the vertical offset (row) to be displayed. Account for vflip.
-      u32 voffset = vflip ? obji.obj_y + obji.obj_h - vcount - 1 : vcount - obji.obj_y;
-
-      // Calculate base tile for the object (points to the row to be drawn).
-      u32 tile_bsize  = is_8bpp ? tile_size_8bpp : tile_size_4bpp;
-      u32 tile_bwidth = is_8bpp ? tile_width_8bpp : tile_width_4bpp;
-      u32 obj_pitch = obj1dmap ? (obji.obj_w / 8) * tile_bsize : 1024;
-      u32 hflip_off = hflip ? ((obji.obj_w / 8) - 1) * tile_bsize : 0;
-
-      // Calculate the pointer to the tile.
-      const u32 tile_offset =
-        base_tile +                    // Char offset
-        (voffset / 8) * obj_pitch +    // Select tile row offset
-        (voffset % 8) * tile_bwidth +  // Skip tile rows
-        hflip_off;                     // Account for horizontal flip
-
-      // Make everything relative to start
-      s32 obj_x_offset  = obji.obj_x - start;
-      u32 clipped_width = obj_x_offset >= 0 ? obji.obj_w : obji.obj_w + obj_x_offset;
-      u32 max_range = obj_x_offset >= 0 ? end - obji.obj_x : end - start;
-      u32 max_draw = MIN(max_range, clipped_width);
-
-      // Render the object scanline using the correct mode.
-      if (is_8bpp) {
-        if (hflip)
-          render_object<stype, rdtype, true, true>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
-        else
-          render_object<stype, rdtype, true, false>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
-      } else {
-        // In 4bpp mode calculate the palette number
-        u16 palette = (obj_attr2 >> 8) & 0xF0;
-
-        if (hflip)
-          render_object<stype, rdtype, false, true>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
-        else
-          render_object<stype, rdtype, false, false>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
-      }
+      if (forcebld)
+        render_sprite<stype, rdtype, true, false>(&obji, is_affine, start, end, scanline);
+      else
+        render_sprite<stype, rdtype, false, false>(&obji, is_affine, start, end, scanline);
     }
   }
 }
