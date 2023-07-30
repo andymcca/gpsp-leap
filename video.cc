@@ -1181,7 +1181,7 @@ typedef enum
 // Bit 9 is set if the pixel belongs to a 1st target layer
 // Bit 10 is set if the pixel belongs to a 2nd target layer
 // Bit 11 is set if the pixel belongs to a ST-object
-template <blendtype bldtype>
+template <blendtype bldtype, bool st_objs>
 static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
   u32 bldalpha = read_ioreg(REG_BLDALPHA);
   u32 brightf = MIN(16, read_ioreg(REG_BLDY) & 0x1F);
@@ -1197,9 +1197,9 @@ static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
       // If ST-OBJ, force blending mode (has priority over other effects).
       // If regular blending mode, blend if 1st/2nd bits are set respectively.
       // Otherwise, apply other color effects if 1st bit is set.
-      bool do_blend    = (pixpair & 0x04000200) == 0x04000200;
       bool force_blend = (pixpair & 0x04000800) == 0x04000800;
-      if (force_blend || (do_blend && bldtype == BLEND_ONLY)) {
+      bool do_blend    = (pixpair & 0x04000200) == 0x04000200;
+      if ((st_objs && force_blend) || (do_blend && bldtype == BLEND_ONLY)) {
         // Top pixel is 1st target, pixel below is 2nd target. Blend!
         u16 p1 = palette_ram_converted[(pixpair >>  0) & 0x1FF];
         u16 p2 = palette_ram_converted[(pixpair >> 16) & 0x1FF];
@@ -1238,7 +1238,7 @@ static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
       u32 pixpair = src[start];
       bool do_blend    = (pixpair & 0x04000200) == 0x04000200;
       bool force_blend = (pixpair & 0x04000800) == 0x04000800;
-      if (force_blend || (do_blend && bldtype == BLEND_ONLY)) {
+      if ((st_objs && force_blend) || (do_blend && bldtype == BLEND_ONLY)) {
         // Top pixel is 1st target, pixel below is 2nd target. Blend!
         u16 p1 = palette_ram_converted[(pixpair >>  0) & 0x1FF];
         u16 p2 = palette_ram_converted[(pixpair >> 16) & 0x1FF];
@@ -1395,7 +1395,7 @@ static void render_color_no_effect(
   if (obj_blend) {
     u32 screen_buffer[240];
     render_layers<INDXCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
-    merge_blend<OBJ_BLEND>(start, end, scanline, screen_buffer);
+    merge_blend<OBJ_BLEND, true>(start, end, scanline, screen_buffer);
   } else {
     render_layers<FULLCOLOR, FULLCOLOR, u16>(start, end, scanline, enable_flags);
   }
@@ -1429,7 +1429,7 @@ static void render_color_effect(
         if (obj_blend) {
           u32 screen_buffer[240];
           render_layers<INDXCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
-          merge_blend<BLEND_BRIGHT>(start, end, scanline, screen_buffer);
+          merge_blend<BLEND_BRIGHT, true>(start, end, scanline, screen_buffer);
         } else {
           render_layers<INDXCOLOR, INDXCOLOR, u16>(start, end, scanline, enable_flags);
           merge_brightness<BLEND_BRIGHT>(start, end, scanline);
@@ -1449,7 +1449,7 @@ static void render_color_effect(
         if (obj_blend) {
           u32 screen_buffer[240];
           render_layers<INDXCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
-          merge_blend<BLEND_DARK>(start, end, scanline, screen_buffer);
+          merge_blend<BLEND_DARK, true>(start, end, scanline, screen_buffer);
         } else {
           render_layers<INDXCOLOR, INDXCOLOR, u16>(start, end, scanline, enable_flags);
           merge_brightness<BLEND_DARK>(start, end, scanline);
@@ -1469,7 +1469,10 @@ static void render_color_effect(
       if (some_1st_tgt && some_2nd_tgt && non_trns_tgt) {
         u32 screen_buffer[240];
         render_layers<STCKCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
-        merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
+        if (obj_blend)
+          merge_blend<BLEND_ONLY, true>(start, end, scanline, screen_buffer);
+        else
+          merge_blend<BLEND_ONLY, false>(start, end, scanline, screen_buffer);
         return;
       }
     }
