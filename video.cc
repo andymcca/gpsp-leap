@@ -42,8 +42,6 @@ typedef struct {
   u16 dmy;
 } t_affp;
 
-typedef void (* tile_render_function)(u32 layer_number, u32 start, u32 end,
- void *dest_ptr);
 typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
 
 typedef void (*conditional_render_function)(
@@ -102,7 +100,6 @@ typedef enum
   FULLCOLOR,  // Regular rendering, output a 16 bit color
   INDXCOLOR,  // Rendering to indexed color, so we can later apply dark/bright
   STCKCOLOR,  // Stacks two indexed pixels (+flags) to apply blending
-  STCKCOLORF, // Same as above, but forces 1st target bits for objects
   PIXCOPY     // Special mode used for sprites, to allow for obj-window drawing
 } rendtype;
 
@@ -656,7 +653,7 @@ typedef struct {
 
 // Renders a tile row (8 pixels) for a regular (non-affine) object/sprite.
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
-static inline void render_obj_tile_Nbpp(
+static inline void render_obj_tile_Nbpp(bool forcebld,
   dsttype *dest_ptr, u32 start, u32 end, u32 tile_offset, u16 palette
 ) {
   // tile_ptr points to the tile row (32 or 64 bits depending on bpp).
@@ -667,7 +664,7 @@ static inline void render_obj_tile_Nbpp(
 
   // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
   // If set, the current pixel belongs to a layer that is 1st or 2nd target.
-  u32 px_comb = (rdtype == STCKCOLORF ? 0x200 : color_combine_mask(4));
+  u32 px_comb = (forcebld ? 0x800 : 0) | color_combine_mask(4);
 
   if (is8bpp) {
     // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
@@ -682,7 +679,7 @@ static inline void render_obj_tile_Nbpp(
           *dest_ptr = palette_ram_converted[pval | 0x100];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
-        else if (rdtype == STCKCOLOR || rdtype == STCKCOLORF) {
+        else if (rdtype == STCKCOLOR) {
           // Stack pixels on top of the pixel value and combine flags
           // We do not stack OBJ on OBJ, rather overwrite the previous object
           if (*dest_ptr & 0x100)
@@ -706,7 +703,7 @@ static inline void render_obj_tile_Nbpp(
           *dest_ptr = palette_ram_converted[colidx | 0x100];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = colidx | px_comb | 0x100;
-        else if (rdtype == STCKCOLOR || rdtype == STCKCOLORF) {
+        else if (rdtype == STCKCOLOR) {
           if (*dest_ptr & 0x100)
             *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
           else
@@ -723,7 +720,7 @@ static inline void render_obj_tile_Nbpp(
 // delta_x is the object X coordinate referenced from the window start.
 // cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
 template <typename stype, rendtype rdtype, bool is8bpp, bool hflip>
-static void render_object(
+static void render_object(bool forcebld,
   s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u16 palette
 ) {
   // Tile size in bytes for each mode
@@ -743,7 +740,7 @@ static void render_object(
     if (tile_off) {
       u32 residual = 8 - tile_off;   // Pixel count to complete the first tile
       u32 maxpix = MIN(residual, cnt);
-      render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette);
+      render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(forcebld, dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette);
 
       // Move to the next tile
       tile_offset += tile_size_off;
@@ -760,7 +757,7 @@ static void render_object(
   s32 num_tiles = cnt / 8;
   while (num_tiles--) {
     // Render full tiles
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, 8, tile_offset, palette);
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(forcebld, dst_ptr, 0, 8, tile_offset, palette);
     tile_offset += tile_size_off;
     dst_ptr += 8;
   }
@@ -768,15 +765,15 @@ static void render_object(
   // Render any partial tile on the end
   cnt = cnt % 8;
   if (cnt)
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(dst_ptr, 0, cnt, tile_offset, palette);
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(forcebld, dst_ptr, 0, cnt, tile_offset, palette);
 }
 
 
 // Renders an affine sprite row to screen.
 template <typename stype, rendtype rdtype, bool is8bpp, bool rotate>
 static void render_affine_object(
-  const t_sprite *obji, const t_affp *affp, bool is_double, u32 start, u32 end, stype *dst_ptr,
-  u32 base_tile, u16 palette
+  const t_sprite *obji, bool forcebld, const t_affp *affp, bool is_double,
+  u32 start, u32 end, stype *dst_ptr, u32 base_tile, u16 palette
 ) {
   // Tile size in bytes for each mode
   const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -867,13 +864,13 @@ static void render_affine_object(
     }
 
     // Render the pixel value
-    u32 comb = (rdtype == STCKCOLORF ? 0x200 : color_combine_mask(4));
+    u32 comb = (forcebld ? 0x800 : 0) | color_combine_mask(4);
     if (pixval) {
       if (rdtype == FULLCOLOR)
         *dst_ptr = palette_ram_converted[pixval | palette | 0x100];
       else if (rdtype == INDXCOLOR)
         *dst_ptr = pixval | palette | 0x100 | comb;  // Add combine flags
-      else if (rdtype == STCKCOLOR || rdtype == STCKCOLORF) {
+      else if (rdtype == STCKCOLOR) {
         // Stack pixels on top of the pixel value and combine flags
         if (*dst_ptr & 0x100)
           *dst_ptr = pixval | palette | 0x100 | comb | ((*dst_ptr) & 0xFFFF0000);
@@ -937,6 +934,9 @@ static void render_scanline_objs(
     const u32 msk = is_8bpp && !obj1dmap ? 0x3FE : 0x3FF;
     const u32 base_tile =  (obj_attr2 & msk) * 32;
 
+    // ST-OBJs force 1st target bit (forced blending)
+    bool forcebld = is_trans && rdtype != FULLCOLOR;
+
     if (obji.obj_y > 160)
       obji.obj_y -= 256;
 
@@ -958,31 +958,16 @@ static void render_scanline_objs(
       const t_affp *affp = &affp_base[pnum];
       u16 palette = (obj_attr2 >> 8) & 0xF0;
 
-      // TODO Cannot do blending effects if the underlying buffer is u16 (bitmap)
-      if (is_trans && sizeof(stype) > 2) {
-        if (affp->dy == 0) {   // No rotation happening (just scale)
-          if (is_8bpp)
-            render_affine_object<stype, STCKCOLORF, true, false>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
-          else
-            render_affine_object<stype, STCKCOLORF, false, false>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
-        } else {               // Full rotation and scaling
-          if (is_8bpp)
-            render_affine_object<stype, STCKCOLORF, true, true>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
-          else
-            render_affine_object<stype, STCKCOLORF, false, true>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
-        }
-      } else {
-        if (affp->dy == 0) {   // No rotation happening (just scale)
-          if (is_8bpp)
-            render_affine_object<stype, rdtype, true, false>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
-          else
-            render_affine_object<stype, rdtype, false, false>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
-        } else {               // Full rotation and scaling
-          if (is_8bpp)
-            render_affine_object<stype, rdtype, true, true>(&obji, affp, is_double, start, end, scanline, base_tile, 0);
-          else
-            render_affine_object<stype, rdtype, false, true>(&obji, affp, is_double, start, end, scanline, base_tile, palette);
-        }
+      if (affp->dy == 0) {   // No rotation happening (just scale)
+        if (is_8bpp)
+          render_affine_object<stype, rdtype, true, false>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, 0);
+        else
+          render_affine_object<stype, rdtype, false, false>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, palette);
+      } else {               // Full rotation and scaling
+        if (is_8bpp)
+          render_affine_object<stype, rdtype, true, true>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, 0);
+        else
+          render_affine_object<stype, rdtype, false, true>(&obji, forcebld, affp, is_double, start, end, scanline, base_tile, palette);
       }
     } else {
       // The object could be out of the window, check and skip.
@@ -1016,36 +1001,19 @@ static void render_scanline_objs(
       u32 max_draw = MIN(max_range, clipped_width);
 
       // Render the object scanline using the correct mode.
-      if (is_trans && sizeof(stype) > 2) {
-        if (is_8bpp) {
-          if (hflip)
-            render_object<stype, STCKCOLORF, true, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
-          else
-            render_object<stype, STCKCOLORF, true, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
-        } else {
-          // In 4bpp mode calculate the palette number
-          u16 palette = (obj_attr2 >> 8) & 0xF0;
-
-          if (hflip)
-            render_object<stype, STCKCOLORF, false, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
-          else
-            render_object<stype, STCKCOLORF, false, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
-        }
+      if (is_8bpp) {
+        if (hflip)
+          render_object<stype, rdtype, true, true>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
+        else
+          render_object<stype, rdtype, true, false>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
       } else {
-        if (is_8bpp) {
-          if (hflip)
-            render_object<stype, rdtype, true, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
-          else
-            render_object<stype, rdtype, true, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, 0);
-        } else {
-          // In 4bpp mode calculate the palette number
-          u16 palette = (obj_attr2 >> 8) & 0xF0;
+        // In 4bpp mode calculate the palette number
+        u16 palette = (obj_attr2 >> 8) & 0xF0;
 
-          if (hflip)
-            render_object<stype, rdtype, false, true>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
-          else
-            render_object<stype, rdtype, false, false>(obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
-        }
+        if (hflip)
+          render_object<stype, rdtype, false, true>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
+        else
+          render_object<stype, rdtype, false, false>(forcebld, obj_x_offset, max_draw, &scanline[start], tile_offset, palette);
       }
     }
   }
@@ -1200,6 +1168,7 @@ static void order_layers(u32 layer_flags, u32 vcnt)
 
 typedef enum
 {
+  OBJ_BLEND,    // No effects, just blend forced-blend pixels (ie. ST objects)
   BLEND_ONLY,   // Just alpha blending (if the pixels are 1st and 2nd target)
   BLEND_BRIGHT, // Perform alpha blending if appropiate, and brighten otherwise
   BLEND_DARK,   // Same but with darken effecg
@@ -1208,6 +1177,10 @@ typedef enum
 // Applies blending (and optional brighten/darken) effect to a bunch of
 // color-indexed pixel pairs. Depending on the mode and the pixel target
 // number, blending, darken/brighten or no effect will be applied.
+// Bits 0-8 encode the color index (paletted colors)
+// Bit 9 is set if the pixel belongs to a 1st target layer
+// Bit 10 is set if the pixel belongs to a 2nd target layer
+// Bit 11 is set if the pixel belongs to a ST-object
 template <blendtype bldtype>
 static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
   u32 bldalpha = read_ioreg(REG_BLDALPHA);
@@ -1221,7 +1194,12 @@ static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
     // If blending can result in saturation, we need to clamp output values.
     while (start < end) {
       u32 pixpair = src[start];
-      if ((pixpair & 0x04000200) == 0x04000200) {
+      // If ST-OBJ, force blending mode (has priority over other effects).
+      // If regular blending mode, blend if 1st/2nd bits are set respectively.
+      // Otherwise, apply other color effects if 1st bit is set.
+      bool do_blend    = (pixpair & 0x04000200) == 0x04000200;
+      bool force_blend = (pixpair & 0x04000800) == 0x04000800;
+      if (force_blend || (do_blend && bldtype == BLEND_ONLY)) {
         // Top pixel is 1st target, pixel below is 2nd target. Blend!
         u16 p1 = palette_ram_converted[(pixpair >>  0) & 0x1FF];
         u16 p2 = palette_ram_converted[(pixpair >> 16) & 0x1FF];
@@ -1241,7 +1219,8 @@ static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
         pfe &= BLND_MSK;
         dst[start++] = (pfe >> 16) | pfe;
       }
-      else if ((bldtype != BLEND_ONLY) && (pixpair & 0x200) == 0x200) {
+      else if ((bldtype == BLEND_DARK || bldtype == BLEND_BRIGHT) &&
+               (pixpair & 0x200) == 0x200) {
         // Top pixel is 1st-target, can still apply bright/dark effect.
         u16 pidx = palette_ram_converted[pixpair & 0x1FF];
         u32 epixel = (pidx | (pidx << 16)) & BLND_MSK;
@@ -1257,7 +1236,9 @@ static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
   } else {
     while (start < end) {
       u32 pixpair = src[start];
-      if ((pixpair & 0x04000200) == 0x04000200) {
+      bool do_blend    = (pixpair & 0x04000200) == 0x04000200;
+      bool force_blend = (pixpair & 0x04000800) == 0x04000800;
+      if (force_blend || (do_blend && bldtype == BLEND_ONLY)) {
         // Top pixel is 1st target, pixel below is 2nd target. Blend!
         u16 p1 = palette_ram_converted[(pixpair >>  0) & 0x1FF];
         u16 p2 = palette_ram_converted[(pixpair >> 16) & 0x1FF];
@@ -1266,7 +1247,8 @@ static void merge_blend(u32 start, u32 end, u16 *dst, u32 *src) {
         u32 pfe = (((p1e * blend_a) + (p2e * blend_b)) >> 4) & BLND_MSK;
         dst[start++] = (pfe >> 16) | pfe;
       }
-      else if ((bldtype != BLEND_ONLY) && (pixpair & 0x200) == 0x200) {
+      else if ((bldtype == BLEND_DARK || bldtype == BLEND_BRIGHT) &&
+               (pixpair & 0x200) == 0x200) {
         // Top pixel is 1st-target, can still apply bright/dark effect.
         u16 pidx = palette_ram_converted[pixpair & 0x1FF];
         u32 epixel = (pidx | (pidx << 16)) & BLND_MSK;
@@ -1347,7 +1329,7 @@ static void render_backdrop(u32 start, u32 end, u16 *scanline) {
 // Renders all the available and enabled layers (in tiled mode).
 // Walks the list of layers in visibility order and renders them in the
 // specified mode (taking into consideration the first layer, etc).
-template<rendtype rdmode, typename dsttype>
+template<rendtype bgmode, rendtype objmode, typename dsttype>
 void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
   u32 lnum;
   bool base_done = false;
@@ -1366,13 +1348,13 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
 
       // If it's the first layer, make sure to fill with backdrop color.
       if (!base_done)
-        fill_line_background<rdmode, dsttype>(start, end, dst_ptr);
+        fill_line_background<bgmode, dsttype>(start, end, dst_ptr);
 
       // Optimization: skip blending mode if no blending can happen to this layer
-      if (rdmode == STCKCOLOR && can_skip_blend)
+      if (objmode == STCKCOLOR && can_skip_blend)
         render_scanline_objs<dsttype, INDXCOLOR, nullptr>(layer & 0x3, start, end, dst_ptr);
       else
-        render_scanline_objs<dsttype, rdmode, nullptr>(layer & 0x3, start, end, dst_ptr);
+        render_scanline_objs<dsttype, objmode, nullptr>(layer & 0x3, start, end, dst_ptr);
 
       base_done = true;
     }
@@ -1380,14 +1362,14 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
       bool is_affine = (video_mode >= 1) && (layer >= 2);
       if (is_affine) {
         if (base_done)
-          render_scanline_affine<dsttype, rdmode, true>(layer, start, end, dst_ptr);
+          render_scanline_affine<dsttype, bgmode, true>(layer, start, end, dst_ptr);
         else
-          render_scanline_affine<dsttype, rdmode, false>(layer, start, end, dst_ptr);
+          render_scanline_affine<dsttype, bgmode, false>(layer, start, end, dst_ptr);
       } else {
         if (base_done)
-          render_scanline_text<dsttype, rdmode, true>(layer, start, end, dst_ptr);
+          render_scanline_text<dsttype, bgmode, true>(layer, start, end, dst_ptr);
         else
-          render_scanline_text<dsttype, rdmode, false>(layer, start, end, dst_ptr);
+          render_scanline_text<dsttype, bgmode, false>(layer, start, end, dst_ptr);
       }
 
       base_done = true;
@@ -1396,7 +1378,7 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
 
   if (!base_done) {
     // Render background, no layers are active!
-    fill_line_background<rdmode, dsttype>(start, end, dst_ptr);
+    fill_line_background<bgmode, dsttype>(start, end, dst_ptr);
     return;
   }
 }
@@ -1412,10 +1394,10 @@ static void render_color_no_effect(
   // Default rendering mode, without layer effects (except perhaps sprites).
   if (obj_blend) {
     u32 screen_buffer[240];
-    render_layers<INDXCOLOR, u32>(start, end, screen_buffer, enable_flags);
-    merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
+    render_layers<INDXCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
+    merge_blend<OBJ_BLEND>(start, end, scanline, screen_buffer);
   } else {
-    render_layers<FULLCOLOR, u16>(start, end, scanline, enable_flags);
+    render_layers<FULLCOLOR, FULLCOLOR, u16>(start, end, scanline, enable_flags);
   }
 }
 
@@ -1446,10 +1428,10 @@ static void render_color_effect(
       if (some_1st_tgt && non_zero_blend) {
         if (obj_blend) {
           u32 screen_buffer[240];
-          render_layers<INDXCOLOR, u32>(start, end, screen_buffer, enable_flags);
+          render_layers<INDXCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
           merge_blend<BLEND_BRIGHT>(start, end, scanline, screen_buffer);
         } else {
-          render_layers<INDXCOLOR, u16>(start, end, scanline, enable_flags);
+          render_layers<INDXCOLOR, INDXCOLOR, u16>(start, end, scanline, enable_flags);
           merge_brightness<BLEND_BRIGHT>(start, end, scanline);
         }
         return;
@@ -1466,10 +1448,10 @@ static void render_color_effect(
       if (some_1st_tgt && non_zero_blend) {
         if (obj_blend) {
           u32 screen_buffer[240];
-          render_layers<INDXCOLOR, u32>(start, end, screen_buffer, enable_flags);
+          render_layers<INDXCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
           merge_blend<BLEND_DARK>(start, end, scanline, screen_buffer);
         } else {
-          render_layers<INDXCOLOR, u16>(start, end, scanline, enable_flags);
+          render_layers<INDXCOLOR, INDXCOLOR, u16>(start, end, scanline, enable_flags);
           merge_brightness<BLEND_DARK>(start, end, scanline);
         }
         return;
@@ -1486,7 +1468,7 @@ static void render_color_effect(
       bool non_trns_tgt = (read_ioreg(REG_BLDALPHA) & 0x1F1F) != 0x001F;
       if (some_1st_tgt && some_2nd_tgt && non_trns_tgt) {
         u32 screen_buffer[240];
-        render_layers<STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
+        render_layers<STCKCOLOR, STCKCOLOR, u32>(start, end, screen_buffer, enable_flags);
         merge_blend<BLEND_ONLY>(start, end, scanline, screen_buffer);
         return;
       }
