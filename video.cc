@@ -129,9 +129,9 @@ void video_reload_counters()
 // Will process a full or partial tile (start and end within 0..8) and draw
 // it in either 8 or 4 bpp mode. Honors vertical and horizontal flip.
 
-template<typename dsttype, rendtype rdtype, bool isbase, bool hflip>
+template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
 static inline void render_tile_Nbpp(u32 layer,
-  dsttype *dest_ptr, bool is8bpp, u32 start, u32 end, u16 tile,
+  dsttype *dest_ptr, u32 start, u32 end, u16 tile,
   const u8 *tile_base, int vertical_pixel_flip
 ) {
   // tile contains the tile info (contains tile index, flip bits, pal info)
@@ -194,7 +194,7 @@ static inline void render_tile_Nbpp(u32 layer,
   }
 }
 
-template<typename stype, rendtype rdtype, bool isbase>
+template<typename stype, rendtype rdtype, bool isbase, bool is8bpp>
 static void render_scanline_text(u32 layer,
  u32 start, u32 end, void *scanline)
 {
@@ -248,14 +248,12 @@ static void render_scanline_text(u32 layer,
   map_ptr += hoffset / 8;
 
   {
-    bool mode8bpp = (bg_control & 0x80);   // Color depth 8bpp when set
-
     // Render a single scanline of text tiles
-    u32 tilewidth = mode8bpp ? tile_width_8bpp : tile_width_4bpp;
+    u32 tilewidth = is8bpp ? tile_width_8bpp : tile_width_4bpp;
     u32 vert_pix_offset = (voffset % 8) * tilewidth;
     // Calculate the pixel offset between a line and its "flipped" mirror.
     // The values can be {56, 40, 24, 8, -8, -24, -40, -56}
-    s32 vflip_off = mode8bpp ?
+    s32 vflip_off = is8bpp ?
          tile_size_8bpp - 2*vert_pix_offset - tile_width_8bpp :
          tile_size_4bpp - 2*vert_pix_offset - tile_width_4bpp;
 
@@ -276,9 +274,9 @@ static void render_scanline_text(u32 layer,
 
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
-        render_tile_Nbpp<stype, rdtype, isbase, true>(layer, dest_ptr, mode8bpp, tile_hoff, stop, tile, tile_base, vflip_off);
+        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(layer, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off);
       else
-        render_tile_Nbpp<stype, rdtype, isbase, false>(layer, dest_ptr, mode8bpp, tile_hoff, stop, tile, tile_base, vflip_off);
+        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(layer, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off);
 
       dest_ptr += todraw;
       end -= todraw;
@@ -294,9 +292,9 @@ static void render_scanline_text(u32 layer,
     for (i = 0; i < todraw; i++) {
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
-        render_tile_Nbpp<stype, rdtype, isbase, true>(layer, &dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(layer, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
       else
-        render_tile_Nbpp<stype, rdtype, isbase, false>(layer, &dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(layer, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
     }
 
     end -= todraw * 8;
@@ -315,9 +313,9 @@ static void render_scanline_text(u32 layer,
       for (i = 0; i < todraw; i++) {
         u16 tile = eswap16(*map_ptr++);
         if (tile & 0x400)   // Tile horizontal flip
-          render_tile_Nbpp<stype, rdtype, isbase, true>(layer, &dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+          render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(layer, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
         else
-          render_tile_Nbpp<stype, rdtype, isbase, false>(layer, &dest_ptr[i * 8], mode8bpp, 0, 8, tile, tile_base, vflip_off);
+          render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(layer, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
       }
 
       end -= todraw * 8;
@@ -328,9 +326,9 @@ static void render_scanline_text(u32 layer,
     if (end) {
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
-        render_tile_Nbpp<stype, rdtype, isbase, true>(layer, dest_ptr, mode8bpp, 0, end, tile, tile_base, vflip_off);
+        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(layer, dest_ptr, 0, end, tile, tile_base, vflip_off);
       else
-        render_tile_Nbpp<stype, rdtype, isbase, false>(layer, dest_ptr, mode8bpp, 0, end, tile, tile_base, vflip_off);
+        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(layer, dest_ptr, 0, end, tile, tile_base, vflip_off);
     }
   }
 }
@@ -1375,23 +1373,32 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
       bool layer_is_1st_tgt = ((read_ioreg(REG_BLDCNT) >> layer) & 1) != 0;
       bool can_skip_blend = !has_trans_obj && !layer_is_1st_tgt;
 
+      bool is8bpp = (read_ioreg(REG_BGxCNT(layer)) & 0x80);   // 8 vs 4bpp
       bool is_affine = (video_mode >= 1) && (layer >= 2);
-      u32 fnidx = (base_done) | (is_affine ? 2 : 0);
+      u32 fnidx = (base_done) | (is_affine ? 2 : 0) | (is8bpp ? 4 : 0);
 
       // Can optimize rendering if no blending can really happen.
       // If stack mode, no blending and not base layer, we might speed up a bit
       if (bgmode == STCKCOLOR && can_skip_blend) {
-        static const tile_render_function rdfns[4] = {
-          render_scanline_text<dsttype, INDXCOLOR, true>,
-          render_scanline_text<dsttype, INDXCOLOR, false>,
+        static const tile_render_function rdfns[8] = {
+          render_scanline_text<dsttype, INDXCOLOR, true, false>,
+          render_scanline_text<dsttype, INDXCOLOR, false, false>,
+          render_scanline_affine<dsttype, INDXCOLOR, true>,
+          render_scanline_affine<dsttype, INDXCOLOR, false>,
+          render_scanline_text<dsttype, INDXCOLOR, true, true>,
+          render_scanline_text<dsttype, INDXCOLOR, false, true>,
           render_scanline_affine<dsttype, INDXCOLOR, true>,
           render_scanline_affine<dsttype, INDXCOLOR, false>,
         };
         rdfns[fnidx](layer, start, end, dst_ptr);
       } else {
-        static const tile_render_function rdfns[4] = {
-          render_scanline_text<dsttype, bgmode, true>,
-          render_scanline_text<dsttype, bgmode, false>,
+        static const tile_render_function rdfns[8] = {
+          render_scanline_text<dsttype, bgmode, true, false>,
+          render_scanline_text<dsttype, bgmode, false, false>,
+          render_scanline_affine<dsttype, bgmode, true>,
+          render_scanline_affine<dsttype, bgmode, false>,
+          render_scanline_text<dsttype, bgmode, true, true>,
+          render_scanline_text<dsttype, bgmode, false, true>,
           render_scanline_affine<dsttype, bgmode, true>,
           render_scanline_affine<dsttype, bgmode, false>,
         };
