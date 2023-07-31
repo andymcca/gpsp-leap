@@ -83,6 +83,10 @@ typedef struct
 #define tile_width_8bpp   8
 #define tile_size_8bpp   64
 
+// Sprite rendering cycles
+#define REND_CYC_SCANLINE      1210
+#define REND_CYC_REDUCED        954
+
 // Generate bit mask (bits 9th and 10th) with information about the pixel
 // status (1st and/or 2nd target) for later blending.
 static inline u16 color_flags(u32 layer) {
@@ -950,12 +954,12 @@ static void render_scanline_objs(
 ) {
   stype *scanline = (stype*)raw_ptr;
   s32 vcount = read_ioreg(REG_VCOUNT);
-  u32 objn;
+  s32 objn;
   u32 objcnt = obj_priority_count[priority][vcount];
   u8 *objlist = obj_priority_list[priority][vcount];
 
-  // Render all the visible objects for this priority.
-  for (objn = 0; objn < objcnt; objn++) {
+  // Render all the visible objects for this priority (back to front)
+  for (objn = objcnt-1; objn >= 0; objn--) {
     // Objects in the list are pre-filtered and sorted in the appropriate order
     u32 objoff = objlist[objn];
     const t_oam *oamentry = &((t_oam*)oam_ram)[objoff];
@@ -1022,14 +1026,16 @@ static void render_scanline_objs(
 // Invisible objects are discarded.
 static void order_obj(u32 video_mode)
 {
-  s32 obj_num;
+  u32 obj_num;
   u32 row;
   t_oam *oam_base = (t_oam*)oam_ram;
+  u16 rend_cycles[160];
 
   memset(obj_priority_count, 0, sizeof(obj_priority_count));
   memset(obj_alpha_count, 0, sizeof(obj_alpha_count));
+  memset(rend_cycles, 0, sizeof(rend_cycles));
 
-  for(obj_num = 127; obj_num >= 0; obj_num--)
+  for(obj_num = 0; obj_num < 128; obj_num++)
   {
     t_oam *oam_ptr = &oam_base[obj_num];
     u16 obj_attr0 = eswap16(oam_ptr->attr0);
@@ -1070,19 +1076,26 @@ static void order_obj(u32 video_mode)
 
             if(((obj_x + obj_width) > 0) && (obj_x < 240))
             {
+              bool is_affine = obj_attr0 & 0x100;
               // Clip Y coord and height to the 0..159 interval
               u32 starty = MAX(obj_y, 0);
               u32 endy   = MIN(obj_y + obj_height, 160);
+
+              // Calculate needed cycles to render the sprite
+              u16 cyccnt = is_affine ? (10 + obj_width * 2) : obj_width;
 
               switch (obj_mode) {
               case OBJ_MOD_SEMITRAN:
                 for(row = starty; row < endy; row++)
                 {
-                  u32 cur_cnt = obj_priority_count[obj_priority][row];
-                  obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
-                  obj_priority_count[obj_priority][row] = cur_cnt + 1;
-                  // Mark the row as having semi-transparent objects
-                  obj_alpha_count[row] = 1;
+                  if (rend_cycles[row] < REND_CYC_SCANLINE) {
+                    u32 cur_cnt = obj_priority_count[obj_priority][row];
+                    obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+                    obj_priority_count[obj_priority][row] = cur_cnt + 1;
+                    rend_cycles[row] += cyccnt;
+                    // Mark the row as having semi-transparent objects
+                    obj_alpha_count[row] = 1;
+                  }
                 }
                 break;
               case OBJ_MOD_WINDOW:
@@ -1092,9 +1105,12 @@ static void order_obj(u32 video_mode)
                 // Add the object to the list.
                 for(row = starty; row < endy; row++)
                 {
-                  u32 cur_cnt = obj_priority_count[obj_priority][row];
-                  obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
-                  obj_priority_count[obj_priority][row] = cur_cnt + 1;
+                  if (rend_cycles[row] < REND_CYC_SCANLINE) {
+                    u32 cur_cnt = obj_priority_count[obj_priority][row];
+                    obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+                    obj_priority_count[obj_priority][row] = cur_cnt + 1;
+                    rend_cycles[row] += cyccnt;
+                  }
                 }
                 break;
               };
