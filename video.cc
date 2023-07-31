@@ -154,11 +154,10 @@ static inline void render_tile_Nbpp(u32 bg_comb, u32 px_comb,
 
   if (is8bpp) {
     // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
-    u64 tilepix = eswap64(*(u64*)tile_ptr);
     for (u32 i = start; i < end; i++, dest_ptr++) {
       // Honor hflip by selecting bytes in the correct order
       u32 sel = hflip ? (7-i) : i;
-      u8 pval = (tilepix >> (sel*8)) & 0xFF;
+      u8 pval = tile_ptr[sel];
       // Alhpa mode stacks previous value (unless rendering the first layer)
       if (pval) {
         if (rdtype == FULLCOLOR)
@@ -180,18 +179,17 @@ static inline void render_tile_Nbpp(u32 bg_comb, u32 px_comb,
     // In 4bpp mode, the tile[15..12] bits contain the sub-palette number.
     u16 tilepal = (tile >> 12) << 4;
     // Only 32 bits (8 pixels * 4 bits)
-    u32 tilepix = eswap32(*(u32*)tile_ptr);
     for (u32 i = start; i < end; i++, dest_ptr++) {
-      u32 sel = hflip ? (7-i) : i;
-      u8 pval = (tilepix >> (sel*4)) & 0xF;
+      u32 selb = hflip ? (3-i/2) : i/2;
+      u32 seln = hflip ? ((i & 1) ^ 1) : (i & 1);
+      u8 pval = (tile_ptr[selb] >> (seln * 4)) & 0xF;
       if (pval) {
-        u8 colidx = pval | tilepal;
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[colidx];
+          *dest_ptr = palette_ram_converted[tilepal | pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = colidx | px_comb;
+          *dest_ptr = px_comb | tilepal | pval;
         else if (rdtype == STCKCOLOR)
-          *dest_ptr = colidx | px_comb | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+          *dest_ptr = px_comb | tilepal | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
@@ -677,12 +675,11 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
 
   if (is8bpp) {
-    // Each byte is a color, mapped to a palete. 8 bytes can be read as 64bit
-    u64 tilepix = eswap64(*(u64*)tile_ptr);
+    // Each byte is a color, mapped to a palete.
     for (u32 i = start; i < end; i++, dest_ptr++) {
       // Honor hflip by selecting bytes in the correct order
       u32 sel = hflip ? (7-i) : i;
-      u8 pval = (tilepix >> (sel*8)) & 0xFF;
+      u8 pval = tile_ptr[sel];
       // Alhpa mode stacks previous value
       if (pval) {
         if (rdtype == FULLCOLOR)
@@ -703,10 +700,10 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
     }
   } else {
     // Only 32 bits (8 pixels * 4 bits)
-    u32 tilepix = eswap32(*(u32*)tile_ptr);
     for (u32 i = start; i < end; i++, dest_ptr++) {
-      u32 sel = hflip ? (7-i) : i;
-      u8 pval = (tilepix >> (sel*4)) & 0xF;
+      u32 selb = hflip ? (3-i/2) : i/2;
+      u32 seln = hflip ? ((i & 1) ^ 1) : (i & 1);
+      u8 pval = (tile_ptr[selb] >> (seln * 4)) & 0xF;
       if (pval) {
         u8 colidx = pval | palette;
         if (rdtype == FULLCOLOR)
