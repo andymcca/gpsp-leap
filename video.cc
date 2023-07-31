@@ -50,6 +50,11 @@ typedef void (*conditional_render_function)(
 
 typedef void (*window_render_function)(u16 *scanline, u32 start, u32 end);
 
+static void render_conditional_tile(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags);
+static void render_conditional_bitmap(
+  u32 start, u32 end, u16 *scanline, u32 enable_flags);
+
 typedef struct
 {
   bitmap_render_function blit_render;
@@ -946,7 +951,7 @@ inline static void render_sprite(
 }
 
 // Renders objects on a scanline for a given priority.
-template <typename stype, rendtype rdtype, conditional_render_function copyfn>
+template <typename stype, rendtype rdtype>
 static void render_scanline_objs(
   u32 priority, u32 start, u32 end, void *raw_ptr
 ) {
@@ -996,12 +1001,17 @@ static void render_scanline_objs(
     // we render the "win-in" area for this object. The PIXCOPY function will
     // copy (merge) the two pixels depending on the result of the sprite render
     // The temporary buffer is rendered on the next scanline area.
-    if (copyfn) {
+    if (rdtype == PIXCOPY) {
       u32 sec_start = MAX((signed)start, obji.obj_x);
       u32 sec_end   = MIN((signed)end, obji.obj_x + obj_maxw);
       u32 obj_enable = read_ioreg(REG_WINOUT) >> 8;
+
+      // Render at the next scanline!
       u16 *tmp_ptr = (u16*)&scanline[GBA_SCREEN_PITCH];
-      copyfn(sec_start, sec_end, tmp_ptr, obj_enable);
+      if((read_ioreg(REG_DISPCNT) & 0x07) < 3)
+        render_conditional_tile(sec_start, sec_end, tmp_ptr, obj_enable);
+      else
+        render_conditional_bitmap(sec_start, sec_end, tmp_ptr, obj_enable);
     }
 
     if (is_8bpp) {
@@ -1363,9 +1373,9 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
 
       // Optimization: skip blending mode if no blending can happen to this layer
       if (objmode == STCKCOLOR && can_skip_blend)
-        render_scanline_objs<dsttype, INDXCOLOR, nullptr>(layer & 0x3, start, end, dst_ptr);
+        render_scanline_objs<dsttype, INDXCOLOR>(layer & 0x3, start, end, dst_ptr);
       else
-        render_scanline_objs<dsttype, objmode, nullptr>(layer & 0x3, start, end, dst_ptr);
+        render_scanline_objs<dsttype, objmode>(layer & 0x3, start, end, dst_ptr);
 
       base_done = 1;
     }
@@ -1558,7 +1568,7 @@ static void render_conditional_bitmap(
     if(current_layer & 0x04)
     {
       if(enable_flags & 0x10)
-        render_scanline_objs<u16, FULLCOLOR, nullptr>(current_layer & 3, start, end, scanline);
+        render_scanline_objs<u16, FULLCOLOR>(current_layer & 3, start, end, scanline);
     }
     else
     {
@@ -1604,7 +1614,6 @@ static void render_windowout_pass(u16 *scanline, u32 start, u32 end)
 // visible but rather "enable" other pixels to be rendered conditionally).
 static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
 {
-  u16 dispcnt = read_ioreg(REG_DISPCNT);
   u32 winout = read_ioreg(REG_WINOUT);
   u32 wndout_enable = winout & 0x3F;
 
@@ -1615,16 +1624,10 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
   // WinObj-mode to a temporary buffer and performs a "copy-mode" render.
   // In this mode, we copy pixels from the temp buffer to the final buffer
   // whenever an object pixel is rendered.
-  if (dispcnt >> 15) {
-    u32 video_mode = dispcnt & 0x07;
-    // Perform the actual object rendering in copy mode
-    if (video_mode < 3) {
-      // TODO: Make version 1D/2D?   if (dispcnt & 0x40)
-      render_scanline_objs<u16, PIXCOPY, render_conditional_tile>(4, start, end, scanline);
-    } else {
-      render_scanline_objs<u16, PIXCOPY, render_conditional_bitmap>(4, start, end, scanline);
-    }
-  }
+  render_scanline_objs<u16, PIXCOPY>(4, start, end, scanline);
+
+  // TODO: Evaluate whether it's better to render the whole line and copy,
+  // or render subsegments and copy as we go (depends on the pixel/obj count)
 }
 
 // If the window Y coordinates are out of the window range we can skip

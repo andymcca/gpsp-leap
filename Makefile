@@ -556,7 +556,7 @@ CFLAGS  += -I$(CTRULIB)/include
 endif
 endif
 
-CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
+CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11
 
 ifeq ($(platform), theos_ios)
 COMMON_FLAGS := -DIOS $(COMMON_DEFINES) $(INCFLAGS) -I$(THEOS_INCLUDE_PATH) -Wno-error
