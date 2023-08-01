@@ -720,13 +720,11 @@ typedef struct {
 } t_sprite;
 
 // Renders a tile row (8 pixels) for a regular (non-affine) object/sprite.
+// tile_offset points to the VRAM offset where the data lives.
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
-static inline void render_obj_tile_Nbpp(u32 px_comb,
+static inline void render_obj_part_tile_Nbpp(u32 px_comb,
   dsttype *dest_ptr, u32 start, u32 end, u32 tile_offset, u16 palette
 ) {
-  // tile_ptr points to the tile row (32 or 64 bits depending on bpp).
-  // renders the tile honoring hflip and start/end constraints
-
   // Note that the last VRAM bank wrap around, hence the offset aliasing
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
 
@@ -779,6 +777,57 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
   }
 }
 
+// Same as above but optimized for full tiles
+template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
+static inline void render_obj_tile_Nbpp(u32 px_comb,
+  dsttype *dest_ptr, u32 tile_offset, u16 palette
+) {
+  const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
+
+  if (is8bpp) {
+    for (u32 j = 0; j < 2; j++) {
+      u32 tilepix = eswap32(((u32*)tile_ptr)[hflip ? 1-j : j]);
+      for (u32 i = 0; i < 4; i++, dest_ptr++) {
+        u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
+        if (pval) {
+          if (rdtype == FULLCOLOR)
+            *dest_ptr = palette_ram_converted[pval | 0x100];
+          else if (rdtype == INDXCOLOR)
+            *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
+          else if (rdtype == STCKCOLOR) {
+            if (*dest_ptr & 0x100)
+              *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+            else
+              *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) << 16);
+          }
+          else if (rdtype == PIXCOPY)
+            *dest_ptr = dest_ptr[240];
+        }
+      }
+    }
+  } else {
+    u32 tilepix = eswap32(*(u32*)tile_ptr);
+    for (u32 i = 0; i < 8; i++, dest_ptr++) {
+      u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
+      if (pval) {
+        u8 colidx = pval | palette;
+        if (rdtype == FULLCOLOR)
+          *dest_ptr = palette_ram_converted[colidx | 0x100];
+        else if (rdtype == INDXCOLOR)
+          *dest_ptr = colidx | px_comb | 0x100;
+        else if (rdtype == STCKCOLOR) {
+          if (*dest_ptr & 0x100)
+            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+          else
+            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) << 16);  // Stack pixels
+        }
+        else if (rdtype == PIXCOPY)
+          *dest_ptr = dest_ptr[240];
+      }
+    }
+  }
+}
+
 // Renders a regular sprite (non-affine) row to screen.
 // delta_x is the object X coordinate referenced from the window start.
 // cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
@@ -787,9 +836,9 @@ static void render_object(
   s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u32 px_comb, u16 palette
 ) {
   // Tile size in bytes for each mode
-  u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
+  const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
   // Number of bytes to advance (or rewind) on the tile map
-  s32 tile_size_off = hflip ? -tile_bsize : tile_bsize;
+  const s32 tile_size_off = hflip ? -tile_bsize : tile_bsize;
 
   if (delta_x < 0) {      // Left part is outside of the screen/window.
     u32 offx = -delta_x;  // How many pixels did we skip from the object?
@@ -803,7 +852,8 @@ static void render_object(
     if (tile_off) {
       u32 residual = 8 - tile_off;   // Pixel count to complete the first tile
       u32 maxpix = MIN(residual, cnt);
-      render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette);
+      render_obj_part_tile_Nbpp<stype, rdtype, is8bpp, hflip>(
+        px_comb, dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette);
 
       // Move to the next tile
       tile_offset += tile_size_off;
@@ -820,7 +870,7 @@ static void render_object(
   s32 num_tiles = cnt / 8;
   while (num_tiles--) {
     // Render full tiles
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, 0, 8, tile_offset, palette);
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, tile_offset, palette);
     tile_offset += tile_size_off;
     dst_ptr += 8;
   }
@@ -828,7 +878,8 @@ static void render_object(
   // Render any partial tile on the end
   cnt = cnt % 8;
   if (cnt)
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, 0, cnt, tile_offset, palette);
+    render_obj_part_tile_Nbpp<stype, rdtype, is8bpp, hflip>(
+      px_comb, dst_ptr, 0, cnt, tile_offset, palette);
 }
 
 
@@ -960,11 +1011,15 @@ inline static void render_sprite(
   const u32 msk = is8bpp && !obj1dmap ? 0x3FE : 0x3FF;
   const u32 base_tile = (obji->attr2 & msk) * 32;
 
+  // Render the object scanline using the correct mode.
+  // (in 4bpp mode calculate the palette number)
+  // Objects use the higher palette part
+  u16 pal = (is8bpp ? 0 : ((obji->attr2 >> 8) & 0xF0));
+
   if (is_affine) {
     u32 pnum = (obji->attr1 >> 9) & 0x1f;
     const t_affp *affp_base = (t_affp*)oam_ram;
     const t_affp *affp = &affp_base[pnum];
-    u16 pal = is8bpp ? 0 : ((obji->attr2 >> 8) & 0xF0);
 
     if (affp->dy == 0)     // No rotation happening (just scale)
       render_affine_object<stype, rdtype, is8bpp, false>(
@@ -1002,10 +1057,6 @@ inline static void render_sprite(
     u32 clipped_width = obj_x_offset >= 0 ? obji->obj_w : obji->obj_w + obj_x_offset;
     u32 max_range = obj_x_offset >= 0 ? end - obji->obj_x : end - start;
     u32 max_draw = MIN(max_range, clipped_width);
-
-    // Render the object scanline using the correct mode.
-    // (in 4bpp mode calculate the palette number)
-    u16 pal = is8bpp ? 0 : ((obji->attr2 >> 8) & 0xF0);
 
     if (hflip)
       render_object<stype, rdtype, is8bpp, true>(
