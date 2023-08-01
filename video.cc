@@ -134,16 +134,16 @@ void video_reload_counters()
 // Will process a full or partial tile (start and end within 0..8) and draw
 // it in either 8 or 4 bpp mode. Honors vertical and horizontal flip.
 
+// tile contains the tile info (contains tile index, flip bits, pal info)
+// hflip causes the tile pixels lookup to be reversed (from MSB to LSB
+// If isbase is not set, color 0 is interpreted as transparent, otherwise
+// we are drawing the base layer, so palette[0] is used (backdrop).
+
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
-static inline void render_tile_Nbpp(u32 bg_comb, u32 px_comb,
+static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
   dsttype *dest_ptr, u32 start, u32 end, u16 tile,
   const u8 *tile_base, int vertical_pixel_flip
 ) {
-  // tile contains the tile info (contains tile index, flip bits, pal info)
-  // hflip causes the tile pixels lookup to be reversed (from MSB to LSB
-  // If isbase is not set, color 0 is interpreted as transparent, otherwise
-  // we are drawing the base layer, so palette[0] is used (backdrop).
-
   // Seek to the specified tile, using the tile number and size.
   // tile_base already points to the right tile-line vertical offset
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
@@ -200,6 +200,62 @@ static inline void render_tile_Nbpp(u32 bg_comb, u32 px_comb,
     }
   }
 }
+
+// Same as above, but optimized for full tiles. Skip comments here.
+template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
+static inline void render_tile_Nbpp(
+  u32 bg_comb, u32 px_comb, dsttype *dest_ptr, u16 tile,
+  const u8 *tile_base, int vertical_pixel_flip
+) {
+  const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
+
+  if (tile & 0x800)
+    tile_ptr += vertical_pixel_flip;
+
+  if (is8bpp) {
+    for (u32 j = 0; j < 2; j++) {
+      u32 tilepix = eswap32(((u32*)tile_ptr)[hflip ? 1-j : j]);
+      for (u32 i = 0; i < 4; i++, dest_ptr++) {
+        u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
+        if (pval) {
+          if (rdtype == FULLCOLOR)
+            *dest_ptr = palette_ram_converted[pval];
+          else if (rdtype == INDXCOLOR)
+            *dest_ptr = pval | px_comb;  // Add combine flags
+          else if (rdtype == STCKCOLOR)
+            *dest_ptr = pval | px_comb | ((isbase ? bg_comb : *dest_ptr) << 16);
+        }
+        else if (isbase) {
+          if (rdtype == FULLCOLOR)
+            *dest_ptr = palette_ram_converted[0];
+          else
+            *dest_ptr = 0 | bg_comb;  // Add combine flags
+        }
+      }
+    }
+  } else {
+    u16 tilepal = (tile >> 12) << 4;
+    u32 tilepix = eswap32(*(u32*)tile_ptr);
+    for (u32 i = 0; i < 8; i++, dest_ptr++) {
+      u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
+      if (pval) {
+        if (rdtype == FULLCOLOR)
+          *dest_ptr = palette_ram_converted[tilepal | pval];
+        else if (rdtype == INDXCOLOR)
+          *dest_ptr = px_comb | tilepal | pval;
+        else if (rdtype == STCKCOLOR)
+          *dest_ptr = px_comb | tilepal | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+      }
+      else if (isbase) {
+        if (rdtype == FULLCOLOR)
+          *dest_ptr = palette_ram_converted[0];
+        else
+          *dest_ptr = 0 | bg_comb;
+      }
+    }
+  }
+}
+
 
 template<typename stype, rendtype rdtype, bool isbase, bool is8bpp>
 static void render_scanline_text(u32 layer,
@@ -286,10 +342,10 @@ static void render_scanline_text(u32 layer,
 
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
-        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
+        render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
           bg_comb, px_comb, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off);
       else
-        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
+        render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
           bg_comb, px_comb, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off);
 
       dest_ptr += todraw;
@@ -307,10 +363,10 @@ static void render_scanline_text(u32 layer,
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
         render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-          bg_comb, px_comb, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
+          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
       else
         render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-          bg_comb, px_comb, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
+          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
     }
 
     end -= todraw * 8;
@@ -330,10 +386,10 @@ static void render_scanline_text(u32 layer,
         u16 tile = eswap16(*map_ptr++);
         if (tile & 0x400)   // Tile horizontal flip
           render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-            bg_comb, px_comb, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
+            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
         else
           render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-            bg_comb, px_comb, &dest_ptr[i * 8], 0, 8, tile, tile_base, vflip_off);
+            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
       }
 
       end -= todraw * 8;
@@ -344,10 +400,10 @@ static void render_scanline_text(u32 layer,
     if (end) {
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
-        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
+        render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
           bg_comb, px_comb, dest_ptr, 0, end, tile, tile_base, vflip_off);
       else
-        render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
+        render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
           bg_comb, px_comb, dest_ptr, 0, end, tile, tile_base, vflip_off);
     }
   }
