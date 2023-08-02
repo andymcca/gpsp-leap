@@ -428,6 +428,26 @@ u8 read_backup(u32 address)
   if(backup_type == BACKUP_NONE)
     backup_type = BACKUP_SRAM;
 
+if(backup_type ==  BACKUP_EEPROM)
+	{
+      // Tilt Sensor
+      switch(address)
+      {
+        case 0x8200:
+          value = 90 & 255;
+          break;
+        case 0x8300:
+          value = (90 >> 8) | 0x80;
+          break;
+        case 0x8400:
+          value = 90 & 255;
+          break;
+        case 0x8500:
+          value = 90 >> 8;
+          break;
+      }
+	}
+
   if(backup_type == BACKUP_SRAM)
     value = gamepak_backup[address];
   else if(flash_mode == FLASH_ID_MODE)
@@ -480,6 +500,13 @@ u32 eeprom_counter = 0;
 
 void function_cc write_eeprom(u32 unused_address, u32 value)
 {
+ // ROM is restricted to 8000000h-9FFFeFFh
+  // (max.1FFFF00h bytes = 32MB minus 256 bytes)
+  if (gamepak_size > 0x1FFFF00)
+  {
+    gamepak_size = 0x1FFFF00;
+  }
+
   switch(eeprom_mode)
   {
     case EEPROM_BASE_MODE:
@@ -1011,6 +1038,14 @@ void function_cc write_backup(u32 address, u32 value)
   if(backup_type == BACKUP_NONE)
     backup_type = BACKUP_SRAM;
 
+  // Try and scupper the protection
+  // Tilt Sensor
+  if (backup_type == BACKUP_EEPROM)
+  {
+    // E008000h (W) Write 55h to start sampling
+    // E008100h (W) Write AAh to start sampling
+    return;
+  }
 
   // gamepak SRAM or Flash ROM
   if((address == 0x5555) && (flash_mode != FLASH_WRITE_MODE))
@@ -1547,6 +1582,8 @@ u32 load_backup(char *name)
 
     filestream_read(fd, gamepak_backup, backup_size);
     filestream_close(fd);
+   
+     printf("%d backup size\n", backup_size); 
 
     // The size might give away what kind of backup it is.
     switch(backup_size)
@@ -1764,6 +1801,10 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
   sprintf(config_path, "%s" PATH_SEPARATOR "%s", main_path, CONFIG_FILENAME);
 
   printf("config_path is : %s\n", config_path);
+  
+  printf("game name is : %s\n", gpinfo->gamepak_title);
+  printf("game code is : %s\n", gpinfo->gamepak_code);
+  printf("vendor code is : %s\n", gpinfo->gamepak_maker);
 
   config_file = filestream_open(config_path, RETRO_VFS_FILE_ACCESS_READ,
                                 RETRO_VFS_FILE_ACCESS_HINT_NONE);
@@ -1820,6 +1861,21 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
             if(!strcmp(current_variable, "flash_rom_type") &&
               !strcmp(current_value, "128KB"))
               flash_device_id = FLASH_DEVICE_MACRONIX_128KB;
+
+	   if(!strcmp(current_variable, "save_type") &&
+              !strcmp(current_value, "sram"))
+              backup_type = BACKUP_SRAM;
+
+ 	   if(!strcmp(current_variable, "save_type") &&
+              !strcmp(current_value, "eeprom"))
+              backup_type = BACKUP_EEPROM;
+ 
+	   if(!strcmp(current_variable, "save_type") &&
+              !strcmp(current_value, "flash"))
+              backup_type = BACKUP_FLASH;
+
+	   printf("save type set to : %d\n", backup_type);
+
           }
         }
 
@@ -2491,7 +2547,7 @@ void init_memory(void)
 
   reload_timing_info();
 
-  backup_type = BACKUP_NONE;
+  // backup_type = BACKUP_NONE;
 
   sram_bankcount = SRAM_SIZE_32KB;
   //flash_size = FLASH_SIZE_64KB;
@@ -2745,5 +2801,3 @@ s32 load_bios(char *name)
   filestream_close(fd);
   return 0;
 }
-
-
