@@ -1745,11 +1745,21 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
         translation_gate_targets++;
      }
 
+     save_type     = gbaover[i].save_type;
+     if (save_type == sram)
+        backup_type = BACKUP_SRAM;
+     if (save_type == eeprom)
+        backup_type = BACKUP_EEPROM;
+     if (save_type == flash)
+        backup_type = BACKUP_FLASH;
+    
      printf("found entry in over ini file.\n");
+     printf("save type set to : %d\n", backup_type);
 
      return 0;
   }
 
+  backup_type = BACKUP_NONE;
   return -1;
 }
 
@@ -1764,6 +1774,10 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
   sprintf(config_path, "%s" PATH_SEPARATOR "%s", main_path, CONFIG_FILENAME);
 
   printf("config_path is : %s\n", config_path);
+  
+  printf("game name is : %s\n", gpinfo->gamepak_title);
+  printf("game code is : %s\n", gpinfo->gamepak_code);
+  printf("vendor code is : %s\n", gpinfo->gamepak_maker);
 
   config_file = filestream_open(config_path, RETRO_VFS_FILE_ACCESS_READ,
                                 RETRO_VFS_FILE_ACCESS_HINT_NONE);
@@ -1820,6 +1834,21 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
             if(!strcmp(current_variable, "flash_rom_type") &&
               !strcmp(current_value, "128KB"))
               flash_device_id = FLASH_DEVICE_MACRONIX_128KB;
+
+            if(!strcmp(current_variable, "save_type") &&
+                    !strcmp(current_value, "sram"))
+                    backup_type = BACKUP_SRAM;
+      
+            if(!strcmp(current_variable, "save_type") &&
+                    !strcmp(current_value, "eeprom"))
+                    backup_type = BACKUP_EEPROM;
+       
+            if(!strcmp(current_variable, "save_type") &&
+                    !strcmp(current_value, "flash"))
+                    backup_type = BACKUP_FLASH;
+      
+            printf("save type set to : %d\n", backup_type);
+
           }
         }
 
@@ -1832,6 +1861,7 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
   }
 
   printf("game config missing\n");
+  backup_type = BACKUP_NONE;
   return -1;
 }
 
@@ -2491,7 +2521,7 @@ void init_memory(void)
 
   reload_timing_info();
 
-  backup_type = BACKUP_NONE;
+  // backup_type = BACKUP_NONE;
 
   sram_bankcount = SRAM_SIZE_32KB;
   //flash_size = FLASH_SIZE_64KB;
@@ -2745,5 +2775,4 @@ s32 load_bios(char *name)
   filestream_close(fd);
   return 0;
 }
-
 
