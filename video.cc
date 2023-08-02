@@ -42,8 +42,10 @@ typedef struct {
   u16 dmy;
 } t_affp;
 
-typedef void (* bitmap_render_function)(u32 start, u32 end, void *dest_ptr);
-typedef void (* tile_render_function)(u32 layer, u32 start, u32 end, void *dest_ptr);
+typedef void (* bitmap_render_function)(
+  u32 start, u32 end, void *dest_ptr, const u16 *pal);
+typedef void (* tile_render_function)(
+  u32 layer, u32 start, u32 end, void *dest_ptr);
 
 typedef void (*conditional_render_function)(
   u32 start, u32 end, u16 *scanline, u32 enable_flags);
@@ -147,6 +149,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
   // Seek to the specified tile, using the tile number and size.
   // tile_base already points to the right tile-line vertical offset
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
+  const u16 *paltbl = &palette_ram_converted[0];
 
   // On vertical flip, apply the mirror offset
   if (tile & 0x800)
@@ -161,7 +164,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
       // Alhpa mode stacks previous value (unless rendering the first layer)
       if (pval) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[pval];
+          *dest_ptr = paltbl[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = pval | px_comb;  // Add combine flags
         else if (rdtype == STCKCOLOR)
@@ -170,7 +173,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[0];
+          *dest_ptr = paltbl[0];
         else
           *dest_ptr = 0 | bg_comb;  // Add combine flags
       }
@@ -185,7 +188,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
       u8 pval = (tile_ptr[selb] >> (seln * 4)) & 0xF;
       if (pval) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[tilepal | pval];
+          *dest_ptr = paltbl[tilepal | pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = px_comb | tilepal | pval;
         else if (rdtype == STCKCOLOR)
@@ -193,7 +196,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[0];
+          *dest_ptr = paltbl[0];
         else
           *dest_ptr = 0 | bg_comb;
       }
@@ -205,7 +208,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
 static inline void render_tile_Nbpp(
   u32 bg_comb, u32 px_comb, dsttype *dest_ptr, u16 tile,
-  const u8 *tile_base, int vertical_pixel_flip
+  const u8 *tile_base, int vertical_pixel_flip, const u16 *paltbl
 ) {
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
 
@@ -219,7 +222,7 @@ static inline void render_tile_Nbpp(
         u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
         if (pval) {
           if (rdtype == FULLCOLOR)
-            *dest_ptr = palette_ram_converted[pval];
+            *dest_ptr = paltbl[pval];
           else if (rdtype == INDXCOLOR)
             *dest_ptr = pval | px_comb;  // Add combine flags
           else if (rdtype == STCKCOLOR)
@@ -227,7 +230,7 @@ static inline void render_tile_Nbpp(
         }
         else if (isbase) {
           if (rdtype == FULLCOLOR)
-            *dest_ptr = palette_ram_converted[0];
+            *dest_ptr = paltbl[0];
           else
             *dest_ptr = 0 | bg_comb;  // Add combine flags
         }
@@ -240,7 +243,7 @@ static inline void render_tile_Nbpp(
       u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
       if (pval) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[tilepal | pval];
+          *dest_ptr = paltbl[tilepal | pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = px_comb | tilepal | pval;
         else if (rdtype == STCKCOLOR)
@@ -248,7 +251,7 @@ static inline void render_tile_Nbpp(
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[0];
+          *dest_ptr = paltbl[0];
         else
           *dest_ptr = 0 | bg_comb;
       }
@@ -268,6 +271,7 @@ static void render_scanline_text(u32 layer,
   u32 hoffset = (start + read_ioreg(REG_BGxHOFS(layer))) % 512;
   u32 voffset = (vcount + read_ioreg(REG_BGxVOFS(layer))) % 512;
   stype *dest_ptr = ((stype*)scanline) + start;
+  const u16 * paltbl = &palette_ram_converted[0];
   u32 i;
 
   // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
@@ -363,10 +367,10 @@ static void render_scanline_text(u32 layer,
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
         render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
+          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
       else
         render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
+          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
     }
 
     end -= todraw * 8;
@@ -386,10 +390,10 @@ static void render_scanline_text(u32 layer,
         u16 tile = eswap16(*map_ptr++);
         if (tile & 0x400)   // Tile horizontal flip
           render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
+            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
         else
           render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off);
+            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
       }
 
       end -= todraw * 8;
@@ -588,75 +592,96 @@ static void render_scanline_affine(u32 layer,
   }
 }
 
+typedef enum
+{
+  BLIT,     // The bitmap has no scaling nor rotation on the X axis
+  SCALED,   // The bitmap features some scaling (on the X axis) but no rotation
+  ROTATED   // Bitmap has rotation (and perhaps scaling too)
+} bm_rendmode;
 
 // Renders a bitmap honoring the pixel mode and any affine transformations.
 // There's optimized versions for bitmaps without scaling / rotation.
-template<unsigned mode, typename pixfmt, unsigned width, unsigned height, bool scale, bool rotate>
-static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
+template<unsigned mode, typename pixfmt, unsigned width, unsigned height, bm_rendmode rdmode>
+static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline, const u16 * palptr) {
+  s32 dx = (s16)read_ioreg(REG_BG2PA);
+  s32 dy = (s16)read_ioreg(REG_BG2PC);
+  s32 source_x = affine_reference_x[0] + (start * dx); // Always BG2
+  s32 source_y = affine_reference_y[0] + (start * dy);
+
+  // Premature abort render optimization if bitmap out of Y coordinate.
+  if ((rdmode != ROTATED) && ((u32)(source_y >> 8)) >= height)
+    return;
 
   // Modes 4 and 5 feature double buffering.
   bool second_frame = (mode >= 4) && (read_ioreg(REG_DISPCNT) & 0x10);
   pixfmt *src_ptr = (pixfmt*)&vram[second_frame ? 0xA000 : 0x0000];
   u16 *dst_ptr = ((u16*)scanline) + start;
 
-  s32 dx = (s16)read_ioreg(REG_BG2PA);
-  s32 dy = (s16)read_ioreg(REG_BG2PC);
-
-  s32 source_x = affine_reference_x[0] + (start * dx); // Always BG2
-  s32 source_y = affine_reference_y[0] + (start * dy);
-
-  // Premature abort render optimization if bitmap out of Y coordinate.
-  bool is_y_out = !rotate && ((u32)(source_y >> 8)) >= height;
-  if (is_y_out)
-    return;
-
-  if (!scale) {
-    // Pretty much a blit onto the output buffer.
-    // Skip to the X pixel (dest) and start copying (drawing really)
+  if (rdmode == BLIT) {
+    // We just blit pixels (copy) from buffer to buffer.
+    const u32 pixel_y = (u32)(source_y >> 8);
     if (source_x < 0) {
-      // TODO: Not sure if the math is OK for non-integer offsets
+      // The bitmap starts somewhere after "start", skip those pixels.
       u32 delta = (-source_x + 255) >> 8;
       dst_ptr += delta;
       start += delta;
-      source_x += delta << 8;
+      source_x = 0;
     }
 
-    u32 pixel_y = (u32)(source_y >> 8);
     u32 pixel_x = (u32)(source_x >> 8);
-    while (start < end && pixel_x < width) {
+    u32 pixcnt = MIN(end - start, width - pixel_x);
+    pixfmt *valptr = &src_ptr[pixel_x + (pixel_y * width)];
+    while (pixcnt--) {
       // Pretty much pixel copier
+      pixfmt val = sizeof(pixfmt) == 2 ? eswap16(*valptr++) : *valptr++;
+      if (mode != 4)
+        *dst_ptr = convert_palette(val); // Direct color
+      else if (val)
+        *dst_ptr = palptr[val];          // Indexed color
+      dst_ptr++;
+    }
+  }
+  else if (rdmode == SCALED) {
+    // Similarly to above, but now we need to sample pixels instead.
+    const u32 pixel_y = (u32)(source_y >> 8);
+
+    // Find the "inside" of the bitmap
+    while (start < end) {
+      u32 pixel_x = (u32)(source_x >> 8);
+      if (pixel_x < width)
+        break;
+      source_x += dx;
+      start++;
+      dst_ptr++;
+    }
+
+    u32 cnt = end - start;
+    while (cnt--) {
+      u32 pixel_x = (u32)(source_x >> 8);
+      if (pixel_x >= width)
+        break;  // We reached the end of the bitmap
+
       pixfmt *valptr = &src_ptr[pixel_x + (pixel_y * width)];
       pixfmt val = sizeof(pixfmt) == 2 ? eswap16(*valptr) : *valptr;
 
       if (mode != 4)
-        *dst_ptr = convert_palette(val);         // Direct color
+        *dst_ptr = convert_palette(val);
       else if (val)
-        *dst_ptr = palette_ram_converted[val];   // Indexed color
-
-      // Move to the next pixel, update coords accordingly
-      start++;
-      dst_ptr++;
-      pixel_x++;
-    }
-  } else {
-
-    // Look for the first pixel to be drawn.
-    // TODO This can be calculated in O(1), at least for non-rotation
-    while (start < end) {
-      u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
-
-      // Stop once we find a pixel that is actually *inside*
-      if (pixel_x < width && pixel_y < height)
-        break;
-
+        *dst_ptr = palptr[val];
       dst_ptr++;
       source_x += dx;
-      if (rotate)
-        source_y += dy;
+    }
+  } else {
+    // Look for the first pixel to be drawn.
+    while (start < end) {
+      u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
+      if (pixel_x < width && pixel_y < height)
+        break;
       start++;
+      dst_ptr++;
+      source_x += dx;  source_y += dy;
     }
 
-    // Draw background pixels by looking them up in the map
     while (start < end) {
       u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
 
@@ -669,16 +694,15 @@ static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
       pixfmt val = sizeof(pixfmt) == 2 ? eswap16(*valptr) : *valptr;
 
       if (mode != 4)
-        *dst_ptr = convert_palette(val);         // Direct color
+        *dst_ptr = convert_palette(val);
       else if (val)
-        *dst_ptr = palette_ram_converted[val];   // Indexed color
+        *dst_ptr = palptr[val];
 
       // Move to the next pixel, update coords accordingly
       start++;
       dst_ptr++;
       source_x += dx;
-      if (rotate)
-        source_y += dy;
+      source_y += dy;
     }
   }
 }
@@ -687,9 +711,9 @@ static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline) {
 
 #define bitmap_layer_render_functions(mode, ttype, w, h)                      \
 {                                                                             \
-  render_scanline_bitmap<mode, ttype, w, h, false, false>,                    \
-  render_scanline_bitmap<mode, ttype, w, h, true, false>,                     \
-  render_scanline_bitmap<mode, ttype, w, h, true, true>,                      \
+  render_scanline_bitmap<mode, ttype, w, h, BLIT>,                            \
+  render_scanline_bitmap<mode, ttype, w, h, SCALED>,                          \
+  render_scanline_bitmap<mode, ttype, w, h, ROTATED>,                         \
 }                                                                             \
 
 static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
@@ -1694,11 +1718,11 @@ static void render_conditional_bitmap(
         s32 dy = (s16)read_ioreg(REG_BG2PC);
 
         if (dy)
-          layer_renderers->affine_render(start, end, scanline);
+          layer_renderers->affine_render(start, end, scanline, palette_ram_converted);
         else if (dx == 256)
-          layer_renderers->blit_render(start, end, scanline);
+          layer_renderers->blit_render(start, end, scanline, palette_ram_converted);
         else
-          layer_renderers->scale_render(start, end, scanline);
+          layer_renderers->scale_render(start, end, scanline, palette_ram_converted);
       }
     }
   }
