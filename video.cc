@@ -150,6 +150,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
   // tile_base already points to the right tile-line vertical offset
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
   const u16 *paltbl = &palette_ram_converted[0];
+  u16 bgcolor = paltbl[0];
 
   // On vertical flip, apply the mirror offset
   if (tile & 0x800)
@@ -173,7 +174,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = paltbl[0];
+          *dest_ptr = bgcolor;
         else
           *dest_ptr = 0 | bg_comb;  // Add combine flags
       }
@@ -196,7 +197,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = paltbl[0];
+          *dest_ptr = bgcolor;
         else
           *dest_ptr = 0 | bg_comb;
       }
@@ -211,6 +212,7 @@ static inline void render_tile_Nbpp(
   const u8 *tile_base, int vertical_pixel_flip, const u16 *paltbl
 ) {
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
+  u16 bgcolor = paltbl[0];
 
   if (tile & 0x800)
     tile_ptr += vertical_pixel_flip;
@@ -230,7 +232,7 @@ static inline void render_tile_Nbpp(
         }
         else if (isbase) {
           if (rdtype == FULLCOLOR)
-            *dest_ptr = paltbl[0];
+            *dest_ptr = bgcolor;
           else
             *dest_ptr = 0 | bg_comb;  // Add combine flags
         }
@@ -251,7 +253,7 @@ static inline void render_tile_Nbpp(
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = paltbl[0];
+          *dest_ptr = bgcolor;
         else
           *dest_ptr = 0 | bg_comb;
       }
@@ -478,29 +480,32 @@ static inline void render_affine_background(
 
   if (wrap) {
     // In wrap mode the entire space is covered, since it "wraps" at the edges
-    while (cnt--) {
-      u32 pixel_x = (u32)(source_x >> 8) & (width_height-1);
-      u32 pixel_y = (u32)(source_y >> 8) & (width_height-1);
+    if (rotate) {
+      while (cnt--) {
+        u32 pixel_x = (u32)(source_x >> 8) & (width_height-1);
+        u32 pixel_y = (u32)(source_y >> 8) & (width_height-1);
 
-      // Lookup pixel and draw it.
-      render_pixel_8bpp<dsttype, rdtype, isbase>(
-        layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
-        tile_base, map_base, map_size);
+        // Lookup pixel and draw it.
+        render_pixel_8bpp<dsttype, rdtype, isbase>(
+          layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
+          tile_base, map_base, map_size);
 
-      // Move to the next pixel, update coords accordingly
-      source_x += dx;
-      if (rotate)
-        source_y += dy;
+        source_x += dx; source_y += dy;  // Move to the next pixel
+      }
+    } else {
+      // Y coordinate stays contant across the walk.
+      const u32 pixel_y = (u32)(source_y >> 8) & (width_height-1);
+      while (cnt--) {
+        u32 pixel_x = (u32)(source_x >> 8) & (width_height-1);
+        render_pixel_8bpp<dsttype, rdtype, isbase>(
+          layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
+          tile_base, map_base, map_size);
+        source_x += dx;  // Only moving in the X direction.
+      }
     }
   } else {
-
-    // Early optimization if Y-coord is out completely for this line.
-    // (if there's no rotation Y coord remains identical throughout the line).
-    bool is_y_out = !rotate && ((u32)(source_y >> 8)) >= width_height;
-
-    if (!is_y_out) {
+    if (rotate) {
       // Draw backdrop pixels if necessary until we reach the background edge.
-      // TODO: on non-base cases this could perhaps be calculated in O(1)?
       while (cnt) {
         // Draw backdrop pixels if they lie outside of the background.
         u32 pixel_x = (u32)(source_x >> 8), pixel_y = (u32)(source_y >> 8);
@@ -514,9 +519,7 @@ static inline void render_affine_background(
           render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb);
 
         dst_ptr++;
-        source_x += dx;
-        if (rotate)
-          source_y += dy;
+        source_x += dx; source_y += dy;
         cnt--;
       }
 
@@ -538,6 +541,37 @@ static inline void render_affine_background(
         source_x += dx;
         if (rotate)
           source_y += dy;
+      }
+    } else {
+      // Specialized version for scaled-only backgrounds
+      const u32 pixel_y = (u32)(source_y >> 8);
+      if (pixel_y < width_height) {  // Check if within Y-coord range
+        // Draw/find till left edge
+        while (cnt) {
+          u32 pixel_x = (u32)(source_x >> 8);
+          if (pixel_x < width_height)
+            break;
+
+          if (isbase)
+            render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb);
+
+          dst_ptr++;
+          source_x += dx;
+          cnt--;
+        }
+        // Draw actual background
+        while (cnt) {
+          u32 pixel_x = (u32)(source_x >> 8);
+          if (pixel_x >= width_height)
+            break;
+
+          render_pixel_8bpp<dsttype, rdtype, isbase>(
+            layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
+            tile_base, map_base, map_size);
+
+          source_x += dx;
+          cnt--;
+        }
       }
     }
 
@@ -1451,9 +1485,10 @@ static void merge_brightness(u32 start, u32 end, u16 *srcdst) {
 // Fills a segment using the backdrop color (in the right mode).
 template<rendtype rdmode, typename dsttype>
 void fill_line_background(u32 start, u32 end, dsttype *scanline) {
+  dsttype bgcol = palette_ram_converted[0];
   while (start < end)
     if (rdmode == FULLCOLOR)
-      scanline[start++] = palette_ram_converted[0];
+      scanline[start++] = bgcol;
     else
       scanline[start++] = 0;
 }
