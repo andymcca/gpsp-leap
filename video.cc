@@ -786,6 +786,7 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
 ) {
   // Note that the last VRAM bank wrap around, hence the offset aliasing
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
+  u32 px_attr = px_comb | 0x100;  // Combine flags + high palette bit
 
   if (is8bpp) {
     // Each byte is a color, mapped to a palete.
@@ -798,14 +799,14 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
         if (rdtype == FULLCOLOR)
           *dest_ptr = pal[pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
+          *dest_ptr = pval | px_attr;  // Add combine flags
         else if (rdtype == STCKCOLOR) {
           // Stack pixels on top of the pixel value and combine flags
           // We do not stack OBJ on OBJ, rather overwrite the previous object
           if (*dest_ptr & 0x100)
-            *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+            *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
           else
-            *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) << 16);
+            *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);
         }
         else if (rdtype == PIXCOPY)
           *dest_ptr = dest_ptr[240];
@@ -823,12 +824,12 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
         if (rdtype == FULLCOLOR)
           *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = colidx | px_comb | 0x100;
+          *dest_ptr = colidx | px_attr;
         else if (rdtype == STCKCOLOR) {
           if (*dest_ptr & 0x100)
-            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+            *dest_ptr = colidx | px_attr | ((*dest_ptr) & 0xFFFF0000);
           else
-            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) << 16);  // Stack pixels
+            *dest_ptr = colidx | px_attr | ((*dest_ptr) << 16);  // Stack pixels
         }
         else if (rdtype == PIXCOPY)
           *dest_ptr = dest_ptr[240];
@@ -843,6 +844,7 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
   dsttype *dest_ptr, u32 tile_offset, u16 palette, const u16 *pal
 ) {
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
+  u32 px_attr = px_comb | 0x100;  // Combine flags + high palette bit
 
   if (is8bpp) {
     for (u32 j = 0; j < 2; j++) {
@@ -853,12 +855,12 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
           if (rdtype == FULLCOLOR)
             *dest_ptr = pal[pval];
           else if (rdtype == INDXCOLOR)
-            *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
+            *dest_ptr = pval | px_attr;  // Add combine flags
           else if (rdtype == STCKCOLOR) {
             if (*dest_ptr & 0x100)
-              *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+              *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
             else
-              *dest_ptr = pval | px_comb | 0x100 | ((*dest_ptr) << 16);
+              *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);
           }
           else if (rdtype == PIXCOPY)
             *dest_ptr = dest_ptr[240];
@@ -875,12 +877,12 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
         if (rdtype == FULLCOLOR)
           *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = colidx | px_comb | 0x100;
+          *dest_ptr = colidx | px_attr;
         else if (rdtype == STCKCOLOR) {
           if (*dest_ptr & 0x100)
-            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) & 0xFFFF0000);
+            *dest_ptr = colidx | px_attr | ((*dest_ptr) & 0xFFFF0000);
           else
-            *dest_ptr = colidx | px_comb | 0x100 | ((*dest_ptr) << 16);  // Stack pixels
+            *dest_ptr = colidx | px_attr | ((*dest_ptr) << 16);  // Stack pixels
         }
         else if (rdtype == PIXCOPY)
           *dest_ptr = dest_ptr[240];
@@ -949,7 +951,8 @@ static void render_object(
 template <typename stype, rendtype rdtype, bool is8bpp, bool rotate>
 static void render_affine_object(
   const t_sprite *obji, const t_affp *affp, bool is_double,
-  u32 start, u32 end, stype *dst_ptr, u32 base_tile, u32 pxcomb, u16 palette
+  u32 start, u32 end, stype *dst_ptr, u32 base_tile, u32 pxcomb,
+  u16 palette, const u16 *palptr
 ) {
   // Tile size in bytes for each mode
   const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -989,6 +992,7 @@ static void render_affine_object(
 
   bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
   const u32 tile_pitch = obj1dmap ? (obj_dimw / 8) * tile_bsize : 1024;
+  u32 px_attr = pxcomb | palette | 0x100;  // Combine flags + high palette bit
 
   // Skip pixels outside of the sprite area, until we reach the sprite "inside"
   while (cnt) {
@@ -1040,15 +1044,15 @@ static void render_affine_object(
     // Render the pixel value
     if (pixval) {
       if (rdtype == FULLCOLOR)
-        *dst_ptr = palette_ram_converted[pixval | palette | 0x100];
+        *dst_ptr = palptr[pixval | palette];
       else if (rdtype == INDXCOLOR)
-        *dst_ptr = pixval | palette | 0x100 | pxcomb;  // Add combine flags
+        *dst_ptr = pixval | px_attr;  // Add combine flags
       else if (rdtype == STCKCOLOR) {
         // Stack pixels on top of the pixel value and combine flags
         if (*dst_ptr & 0x100)
-          *dst_ptr = pixval | palette | 0x100 | pxcomb | ((*dst_ptr) & 0xFFFF0000);
+          *dst_ptr = pixval | px_attr | ((*dst_ptr) & 0xFFFF0000);
         else
-          *dst_ptr = pixval | palette | 0x100 | pxcomb | ((*dst_ptr) << 16);  // Stack pixels
+          *dst_ptr = pixval | px_attr | ((*dst_ptr) << 16);  // Stack pixels
       }
       else if (rdtype == PIXCOPY)
         *dst_ptr = dst_ptr[240];
@@ -1086,10 +1090,10 @@ inline static void render_sprite(
 
     if (affp->dy == 0)     // No rotation happening (just scale)
       render_affine_object<stype, rdtype, is8bpp, false>(
-        obji, affp, obji->is_double, start, end, scanline, base_tile, pxcomb, pal);
+        obji, affp, obji->is_double, start, end, scanline, base_tile, pxcomb, pal, palptr);
     else                   // Full rotation and scaling
       render_affine_object<stype, rdtype, is8bpp, true>(
-        obji, affp, obji->is_double, start, end, scanline, base_tile, pxcomb, pal);
+        obji, affp, obji->is_double, start, end, scanline, base_tile, pxcomb, pal, palptr);
   } else {
     // The object could be out of the window, check and skip.
     if (obji->obj_x >= (signed)end || obji->obj_x + obji->obj_w <= (signed)start)
@@ -1132,7 +1136,7 @@ inline static void render_sprite(
 
 // Renders objects on a scanline for a given priority.
 template <typename stype, rendtype rdtype>
-static void render_scanline_objs(
+void render_scanline_objs(
   u32 priority, u32 start, u32 end, void *raw_ptr, const u16* palptr
 ) {
   stype *scanline = (stype*)raw_ptr;
