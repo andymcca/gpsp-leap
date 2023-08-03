@@ -45,7 +45,7 @@ typedef struct {
 typedef void (* bitmap_render_function)(
   u32 start, u32 end, void *dest_ptr, const u16 *pal);
 typedef void (* tile_render_function)(
-  u32 layer, u32 start, u32 end, void *dest_ptr);
+  u32 layer, u32 start, u32 end, void *dest_ptr, const u16 *pal);
 
 typedef void (*conditional_render_function)(
   u32 start, u32 end, u16 *scanline, u32 enable_flags);
@@ -144,12 +144,11 @@ void video_reload_counters()
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
 static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
   dsttype *dest_ptr, u32 start, u32 end, u16 tile,
-  const u8 *tile_base, int vertical_pixel_flip
+  const u8 *tile_base, int vertical_pixel_flip, const u16 *paltbl
 ) {
   // Seek to the specified tile, using the tile number and size.
   // tile_base already points to the right tile-line vertical offset
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
-  const u16 *paltbl = &palette_ram_converted[0];
   u16 bgcolor = paltbl[0];
 
   // On vertical flip, apply the mirror offset
@@ -240,12 +239,13 @@ static inline void render_tile_Nbpp(
     }
   } else {
     u16 tilepal = (tile >> 12) << 4;
+    const u16 *subpal = &paltbl[tilepal];
     u32 tilepix = eswap32(*(u32*)tile_ptr);
     for (u32 i = 0; i < 8; i++, dest_ptr++) {
       u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
       if (pval) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = paltbl[tilepal | pval];
+          *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = px_comb | tilepal | pval;
         else if (rdtype == STCKCOLOR)
@@ -264,7 +264,7 @@ static inline void render_tile_Nbpp(
 
 template<typename stype, rendtype rdtype, bool isbase, bool is8bpp>
 static void render_scanline_text(u32 layer,
- u32 start, u32 end, void *scanline)
+ u32 start, u32 end, void *scanline, const u16 * paltbl)
 {
   u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u16 vcount = read_ioreg(REG_VCOUNT);
@@ -273,7 +273,6 @@ static void render_scanline_text(u32 layer,
   u32 hoffset = (start + read_ioreg(REG_BGxHOFS(layer))) % 512;
   u32 voffset = (vcount + read_ioreg(REG_BGxVOFS(layer))) % 512;
   stype *dest_ptr = ((stype*)scanline) + start;
-  const u16 * paltbl = &palette_ram_converted[0];
   u32 i;
 
   // Calculate combine masks. These store 2 bits of info: 1st and 2nd target.
@@ -349,10 +348,10 @@ static void render_scanline_text(u32 layer,
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
         render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-          bg_comb, px_comb, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off);
+          bg_comb, px_comb, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off, paltbl);
       else
         render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-          bg_comb, px_comb, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off);
+          bg_comb, px_comb, dest_ptr, tile_hoff, stop, tile, tile_base, vflip_off, paltbl);
 
       dest_ptr += todraw;
       end -= todraw;
@@ -407,10 +406,10 @@ static void render_scanline_text(u32 layer,
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
         render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-          bg_comb, px_comb, dest_ptr, 0, end, tile, tile_base, vflip_off);
+          bg_comb, px_comb, dest_ptr, 0, end, tile, tile_base, vflip_off, paltbl);
       else
         render_part_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-          bg_comb, px_comb, dest_ptr, 0, end, tile, tile_base, vflip_off);
+          bg_comb, px_comb, dest_ptr, 0, end, tile, tile_base, vflip_off, paltbl);
     }
   }
 }
@@ -418,7 +417,7 @@ static void render_scanline_text(u32 layer,
 template<typename dsttype, rendtype rdtype, bool isbase>
 static inline void render_pixel_8bpp(u32 layer,
   dsttype *dest_ptr, u32 px, u32 py, u32 bg_comb, u32 px_comb,
-  const u8 *tile_base, const u8 *map_base, u32 map_size
+  const u8 *tile_base, const u8 *map_base, u32 map_size, const u16 *pal
 ) {
   // Pitch represents the log2(number of tiles per row) (from 16 to 128)
   u32 map_pitch = map_size + 4;
@@ -432,7 +431,7 @@ static inline void render_pixel_8bpp(u32 layer,
   // Alhpa mode stacks previous value (unless rendering the first layer)
   if (pval) {
     if (rdtype == FULLCOLOR)
-      *dest_ptr = palette_ram_converted[pval];
+      *dest_ptr = pal[pval];
     else if (rdtype == INDXCOLOR)
       *dest_ptr = pval | px_comb;  // Add combine flags
     else if (rdtype == STCKCOLOR)
@@ -442,17 +441,17 @@ static inline void render_pixel_8bpp(u32 layer,
   else if (isbase) {
     // Transparent pixel, but we are base layer, so render background.
     if (rdtype == FULLCOLOR)
-      *dest_ptr = palette_ram_converted[0];
+      *dest_ptr = pal[0];
     else
       *dest_ptr = 0 | bg_comb;  // Just backdrop color and combine flags
   }
 }
 
 template<typename dsttype, rendtype rdtype>
-static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr, u32 bg_comb) {
+static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr, u32 bg_comb, u16 bgcol) {
   // Alhpa mode stacks previous value (unless rendering the first layer)
   if (rdtype == FULLCOLOR)
-    *dest_ptr = palette_ram_converted[0];
+    *dest_ptr = bgcol;
   else
     *dest_ptr = 0 | bg_comb;
 }
@@ -463,7 +462,8 @@ static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr, u32 bg_comb) {
 template <typename dsttype, rendtype rdtype, bool isbase, bool wrap, bool rotate>
 static inline void render_affine_background(
   u32 layer, u32 start, u32 cnt, const u8 *map_base,
-  u32 map_size, const u8 *tile_base, dsttype *dst_ptr) {
+  u32 map_size, const u8 *tile_base, dsttype *dst_ptr,
+  const u16* pal) {
 
   // Backdrop and current layer combine bits.
   u32 bg_comb = color_flags(5);
@@ -488,7 +488,7 @@ static inline void render_affine_background(
         // Lookup pixel and draw it.
         render_pixel_8bpp<dsttype, rdtype, isbase>(
           layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
-          tile_base, map_base, map_size);
+          tile_base, map_base, map_size, pal);
 
         source_x += dx; source_y += dy;  // Move to the next pixel
       }
@@ -499,11 +499,12 @@ static inline void render_affine_background(
         u32 pixel_x = (u32)(source_x >> 8) & (width_height-1);
         render_pixel_8bpp<dsttype, rdtype, isbase>(
           layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
-          tile_base, map_base, map_size);
+          tile_base, map_base, map_size, pal);
         source_x += dx;  // Only moving in the X direction.
       }
     }
   } else {
+    u16 bgcol = pal[0];
     if (rotate) {
       // Draw backdrop pixels if necessary until we reach the background edge.
       while (cnt) {
@@ -516,7 +517,7 @@ static inline void render_affine_background(
 
         // Draw a backdrop pixel if we are the base layer.
         if (isbase)
-          render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb);
+          render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb, bgcol);
 
         dst_ptr++;
         source_x += dx; source_y += dy;
@@ -534,7 +535,7 @@ static inline void render_affine_background(
         // Lookup pixel and draw it.
         render_pixel_8bpp<dsttype, rdtype, isbase>(
           layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
-          tile_base, map_base, map_size);
+          tile_base, map_base, map_size, pal);
 
         // Move to the next pixel, update coords accordingly
         cnt--;
@@ -553,7 +554,7 @@ static inline void render_affine_background(
             break;
 
           if (isbase)
-            render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb);
+            render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb, bgcol);
 
           dst_ptr++;
           source_x += dx;
@@ -567,7 +568,7 @@ static inline void render_affine_background(
 
           render_pixel_8bpp<dsttype, rdtype, isbase>(
             layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
-            tile_base, map_base, map_size);
+            tile_base, map_base, map_size, pal);
 
           source_x += dx;
           cnt--;
@@ -579,7 +580,7 @@ static inline void render_affine_background(
     // Only necessary for the base layer, otherwise we can safely finish.
     if (isbase)
       while (cnt--)
-        render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr++, bg_comb);
+        render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr++, bg_comb, bgcol);
   }
 }
 
@@ -590,7 +591,7 @@ static inline void render_affine_background(
 
 template<typename dsttype, rendtype rdtype, bool isbase>
 static void render_scanline_affine(u32 layer,
- u32 start, u32 end, void *scanline)
+ u32 start, u32 end, void *scanline, const u16 *pal)
 {
   u32 bg_control = read_ioreg(REG_BGxCNT(layer));
   u32 map_size = (bg_control >> 14) & 0x03;
@@ -612,17 +613,17 @@ static void render_scanline_affine(u32 layer,
   if (has_wrap) {
     if (has_rotation)
       render_affine_background<dsttype, rdtype, isbase, true, true>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
     else
       render_affine_background<dsttype, rdtype, isbase, true, false>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
   } else {
     if (has_rotation)
       render_affine_background<dsttype, rdtype, isbase, false, true>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
     else
       render_affine_background<dsttype, rdtype, isbase, false, false>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr);
+        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
   }
 }
 
@@ -781,7 +782,7 @@ typedef struct {
 // tile_offset points to the VRAM offset where the data lives.
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
 static inline void render_obj_part_tile_Nbpp(u32 px_comb,
-  dsttype *dest_ptr, u32 start, u32 end, u32 tile_offset, u16 palette
+  dsttype *dest_ptr, u32 start, u32 end, u32 tile_offset, u16 palette, const u16 *pal
 ) {
   // Note that the last VRAM bank wrap around, hence the offset aliasing
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
@@ -795,7 +796,7 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
       // Alhpa mode stacks previous value
       if (pval) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[pval | 0x100];
+          *dest_ptr = pal[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
         else if (rdtype == STCKCOLOR) {
@@ -816,10 +817,11 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
       u32 selb = hflip ? (3-i/2) : i/2;
       u32 seln = hflip ? ((i & 1) ^ 1) : (i & 1);
       u8 pval = (tile_ptr[selb] >> (seln * 4)) & 0xF;
+      const u16 *subpal = &pal[palette];
       if (pval) {
         u8 colidx = pval | palette;
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[colidx | 0x100];
+          *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = colidx | px_comb | 0x100;
         else if (rdtype == STCKCOLOR) {
@@ -838,7 +840,7 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
 // Same as above but optimized for full tiles
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
 static inline void render_obj_tile_Nbpp(u32 px_comb,
-  dsttype *dest_ptr, u32 tile_offset, u16 palette
+  dsttype *dest_ptr, u32 tile_offset, u16 palette, const u16 *pal
 ) {
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
 
@@ -849,7 +851,7 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
         u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
         if (pval) {
           if (rdtype == FULLCOLOR)
-            *dest_ptr = palette_ram_converted[pval | 0x100];
+            *dest_ptr = pal[pval];
           else if (rdtype == INDXCOLOR)
             *dest_ptr = pval | px_comb | 0x100;  // Add combine flags
           else if (rdtype == STCKCOLOR) {
@@ -867,10 +869,11 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
     u32 tilepix = eswap32(*(u32*)tile_ptr);
     for (u32 i = 0; i < 8; i++, dest_ptr++) {
       u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
+      const u16 *subpal = &pal[palette];
       if (pval) {
         u8 colidx = pval | palette;
         if (rdtype == FULLCOLOR)
-          *dest_ptr = palette_ram_converted[colidx | 0x100];
+          *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = colidx | px_comb | 0x100;
         else if (rdtype == STCKCOLOR) {
@@ -891,7 +894,8 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
 // cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
 template <typename stype, rendtype rdtype, bool is8bpp, bool hflip>
 static void render_object(
-  s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u32 px_comb, u16 palette
+  s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u32 px_comb, u16 palette,
+  const u16* palptr
 ) {
   // Tile size in bytes for each mode
   const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -911,7 +915,7 @@ static void render_object(
       u32 residual = 8 - tile_off;   // Pixel count to complete the first tile
       u32 maxpix = MIN(residual, cnt);
       render_obj_part_tile_Nbpp<stype, rdtype, is8bpp, hflip>(
-        px_comb, dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette);
+        px_comb, dst_ptr, tile_off, tile_off + maxpix, tile_offset, palette, palptr);
 
       // Move to the next tile
       tile_offset += tile_size_off;
@@ -928,7 +932,7 @@ static void render_object(
   s32 num_tiles = cnt / 8;
   while (num_tiles--) {
     // Render full tiles
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, tile_offset, palette);
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, tile_offset, palette, palptr);
     tile_offset += tile_size_off;
     dst_ptr += 8;
   }
@@ -937,7 +941,7 @@ static void render_object(
   cnt = cnt % 8;
   if (cnt)
     render_obj_part_tile_Nbpp<stype, rdtype, is8bpp, hflip>(
-      px_comb, dst_ptr, 0, cnt, tile_offset, palette);
+      px_comb, dst_ptr, 0, cnt, tile_offset, palette, palptr);
 }
 
 
@@ -1062,7 +1066,8 @@ static void render_affine_object(
 // Renders a single sprite on the current scanline
 template <typename stype, rendtype rdtype, bool is8bpp>
 inline static void render_sprite(
-  const t_sprite *obji, bool is_affine, u32 start, u32 end, stype *scanline, u32 pxcomb
+  const t_sprite *obji, bool is_affine, u32 start, u32 end, stype *scanline,
+  u32 pxcomb, const u16* palptr
 ) {
   s32 vcount = read_ioreg(REG_VCOUNT);
   bool obj1dmap = read_ioreg(REG_DISPCNT) & 0x40;
@@ -1118,17 +1123,17 @@ inline static void render_sprite(
 
     if (hflip)
       render_object<stype, rdtype, is8bpp, true>(
-        obj_x_offset, max_draw, &scanline[start], tile_offset, pxcomb, pal);
+        obj_x_offset, max_draw, &scanline[start], tile_offset, pxcomb, pal, palptr);
     else
       render_object<stype, rdtype, is8bpp, false>(
-        obj_x_offset, max_draw, &scanline[start], tile_offset, pxcomb, pal);
+        obj_x_offset, max_draw, &scanline[start], tile_offset, pxcomb, pal, palptr);
   }
 }
 
 // Renders objects on a scanline for a given priority.
 template <typename stype, rendtype rdtype>
 static void render_scanline_objs(
-  u32 priority, u32 start, u32 end, void *raw_ptr
+  u32 priority, u32 start, u32 end, void *raw_ptr, const u16* palptr
 ) {
   stype *scanline = (stype*)raw_ptr;
   s32 vcount = read_ioreg(REG_VCOUNT);
@@ -1196,10 +1201,10 @@ static void render_scanline_objs(
 
     if (is_8bpp)
       render_sprite<stype, rdtype, true>(
-        &obji, is_affine, start, end, scanline, pxcomb);
+        &obji, is_affine, start, end, scanline, pxcomb, palptr);
     else
       render_sprite<stype, rdtype, false>(
-        &obji, is_affine, start, end, scanline, pxcomb);
+        &obji, is_affine, start, end, scanline, pxcomb, palptr);
   }
 }
 
@@ -1549,9 +1554,11 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
 
       // Optimization: skip blending mode if no blending can happen to this layer
       if (objmode == STCKCOLOR && can_skip_blend)
-        render_scanline_objs<dsttype, INDXCOLOR>(layer & 0x3, start, end, dst_ptr);
+        render_scanline_objs<dsttype, INDXCOLOR>(
+          layer & 0x3, start, end, dst_ptr, &palette_ram_converted[0x100]);
       else
-        render_scanline_objs<dsttype, objmode>(layer & 0x3, start, end, dst_ptr);
+        render_scanline_objs<dsttype, objmode>(
+          layer & 0x3, start, end, dst_ptr, &palette_ram_converted[0x100]);
 
       base_done = 1;
     }
@@ -1576,7 +1583,7 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
           render_scanline_affine<dsttype, INDXCOLOR, true>,
           render_scanline_affine<dsttype, INDXCOLOR, false>,
         };
-        rdfns[fnidx](layer, start, end, dst_ptr);
+        rdfns[fnidx](layer, start, end, dst_ptr, palette_ram_converted);
       } else {
         static const tile_render_function rdfns[8] = {
           render_scanline_text<dsttype, bgmode, true, false>,
@@ -1588,7 +1595,7 @@ void render_layers(u32 start, u32 end, dsttype *dst_ptr, u32 enabled_layers) {
           render_scanline_affine<dsttype, bgmode, true>,
           render_scanline_affine<dsttype, bgmode, false>,
         };
-        rdfns[fnidx](layer, start, end, dst_ptr);
+        rdfns[fnidx](layer, start, end, dst_ptr, palette_ram_converted);
       }
 
       base_done = 1;
@@ -1744,7 +1751,8 @@ static void render_conditional_bitmap(
     if(current_layer & 0x04)
     {
       if(enable_flags & 0x10)
-        render_scanline_objs<u16, FULLCOLOR>(current_layer & 3, start, end, scanline);
+        render_scanline_objs<u16, FULLCOLOR>(
+          current_layer & 3, start, end, scanline, &palette_ram_converted[0x100]);
     }
     else
     {
@@ -1800,7 +1808,7 @@ static void render_windowobj_pass(u16 *scanline, u32 start, u32 end)
   // WinObj-mode to a temporary buffer and performs a "copy-mode" render.
   // In this mode, we copy pixels from the temp buffer to the final buffer
   // whenever an object pixel is rendered.
-  render_scanline_objs<u16, PIXCOPY>(4, start, end, scanline);
+  render_scanline_objs<u16, PIXCOPY>(4, start, end, scanline, NULL);
 
   // TODO: Evaluate whether it's better to render the whole line and copy,
   // or render subsegments and copy as we go (depends on the pixel/obj count)
