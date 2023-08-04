@@ -539,9 +539,7 @@ static inline void render_affine_background(
 
         // Move to the next pixel, update coords accordingly
         cnt--;
-        source_x += dx;
-        if (rotate)
-          source_y += dy;
+        source_x += dx; source_y += dy;
       }
     } else {
       // Specialized version for scaled-only backgrounds
