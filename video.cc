@@ -181,6 +181,7 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
   } else {
     // In 4bpp mode, the tile[15..12] bits contain the sub-palette number.
     u16 tilepal = (tile >> 12) << 4;
+    u16 pxflg = px_comb | tilepal;
     // Only 32 bits (8 pixels * 4 bits)
     for (u32 i = start; i < end; i++, dest_ptr++) {
       u32 selb = hflip ? (3-i/2) : i/2;
@@ -190,9 +191,9 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
         if (rdtype == FULLCOLOR)
           *dest_ptr = paltbl[tilepal | pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = px_comb | tilepal | pval;
+          *dest_ptr = pxflg | pval;
         else if (rdtype == STCKCOLOR)
-          *dest_ptr = px_comb | tilepal | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+          *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
@@ -239,6 +240,7 @@ static inline void render_tile_Nbpp(
     }
   } else {
     u16 tilepal = (tile >> 12) << 4;
+    u16 pxflg = px_comb | tilepal;
     const u16 *subpal = &paltbl[tilepal];
     u32 tilepix = eswap32(*(u32*)tile_ptr);
     for (u32 i = 0; i < 8; i++, dest_ptr++) {
@@ -247,9 +249,9 @@ static inline void render_tile_Nbpp(
         if (rdtype == FULLCOLOR)
           *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = px_comb | tilepal | pval;
+          *dest_ptr = pxflg | pval;
         else if (rdtype == STCKCOLOR)
-          *dest_ptr = px_comb | tilepal | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+          *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
