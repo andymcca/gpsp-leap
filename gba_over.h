@@ -364,6 +364,20 @@ static const ini_t gbaover[] = {
       0,                           /* translation_gate_target_3 */
    },
    {
+      // Dragon Ball Z - The Legacy of Goku II (USA)
+      "DBZLGCYGOKU2",               /* gamepak_title        */
+      "ALFE",                      /* gamepak_code         */
+      "70",                        /* gamepak_maker        */
+      0,                           /* flash_size           */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      3,                           /* save_type            */
+      0,                           /* rtc_enabled          */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
       // Drill Dozer (U)
       "DRILL DOZER",               /* gamepak_title        */
       "V49E",                      /* gamepak_code         */
@@ -2261,6 +2275,20 @@ static const ini_t gbaover[] = {
       0,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0x8000f66,                   /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
+      // Yggdra Union - We'll Never Fight Alone (U)
+      "YGGDRA UNION",              /* gamepak_title        */
+      "BYUE",                      /* gamepak_code         */
+      "EB",                        /* gamepak_maker        */
+      0,                           /* flash_size           */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      3,                           /* save_type            */
+      0,                           /* rtc_enabled          */
+      0,                           /* idle_loop_target_pc  */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */
