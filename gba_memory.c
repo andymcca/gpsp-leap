@@ -1745,16 +1745,20 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
         translation_gate_targets++;
      }
 
-     save_type     = gbaover[i].save_type;
-     if (save_type == sram)
+     u8 save_type     = gbaover[i].save_type;
+     if (save_type == 1)
         backup_type = BACKUP_SRAM;
-     if (save_type == eeprom)
+     if (save_type == 2)
         backup_type = BACKUP_EEPROM;
-     if (save_type == flash)
+        eeprom_size = EEPROM_512_BYTE;
+     if (save_type == 3)
         backup_type = BACKUP_FLASH;
+     if (save_type == 4)
+        backup_type = BACKUP_EEPROM;
+        eeprom_size = EEPROM_8_KBYTE;
     
      printf("found entry in over ini file.\n");
-     printf("save type set to : %d\n", backup_type);
+     printf("(1=SRAM, 2=EEPROM_1K, 3=FLASH, 4=EEPROM_8K - Save type set to : %d\n", save_type);
 
      return 0;
   }
@@ -2528,7 +2532,7 @@ void init_memory(void)
 
   flash_bank_num = 0;
   flash_command_position = 0;
-  eeprom_size = EEPROM_512_BYTE;
+  // eeprom_size = EEPROM_512_BYTE;
   eeprom_mode = EEPROM_BASE_MODE;
   eeprom_address = 0;
   eeprom_counter = 0;
