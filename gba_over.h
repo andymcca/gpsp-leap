@@ -370,7 +370,21 @@ static const ini_t gbaover[] = {
       "70",                        /* gamepak_maker        */
       0,                           /* flash_size           */
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
-      3,                           /* save_type            */
+      4,                           /* save_type            */
+      0,                           /* rtc_enabled          */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
+      // Dragon Ball Z - Taiketsu (USA)
+      "DBZ TAIKETSU",               /* gamepak_title        */
+      "BDBE",                      /* gamepak_code         */
+      "70",                        /* gamepak_maker        */
+      0,                           /* flash_size           */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      4,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* idle_loop_target_pc  */
       0,                           /* translation_gate_target_1 */
@@ -2286,7 +2300,7 @@ static const ini_t gbaover[] = {
       "EB",                        /* gamepak_maker        */
       0,                           /* flash_size           */
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
-      3,                           /* save_type            */
+      4,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* idle_loop_target_pc  */
       0,                           /* translation_gate_target_1 */
