@@ -1122,6 +1122,9 @@ size_t retro_get_memory_size(unsigned id)
 
          case BACKUP_EEPROM:
             return 0x200 * eeprom_size;
+           
+         case BACKUP_DISABLED:
+            return 0;
 
          // assume 128KB save, regardless if rom supports battery saves
          // this is needed because gba cannot provide initially the backup save size 
