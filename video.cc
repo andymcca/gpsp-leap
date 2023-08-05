@@ -182,14 +182,17 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
     // In 4bpp mode, the tile[15..12] bits contain the sub-palette number.
     u16 tilepal = (tile >> 12) << 4;
     u16 pxflg = px_comb | tilepal;
+    const u16 *subpal = &paltbl[tilepal];
+    // Read packed pixel data, skip start pixels
+    u32 tilepix = eswap32(*(u32*)tile_ptr);
+    if (hflip) tilepix <<= (start * 4);
+    else       tilepix >>= (start * 4);
     // Only 32 bits (8 pixels * 4 bits)
     for (u32 i = start; i < end; i++, dest_ptr++) {
-      u32 selb = hflip ? (3-i/2) : i/2;
-      u32 seln = hflip ? ((i & 1) ^ 1) : (i & 1);
-      u8 pval = (tile_ptr[selb] >> (seln * 4)) & 0xF;
+      u8 pval = hflip ? tilepix >> 28 : tilepix & 0xF;
       if (pval) {
         if (rdtype == FULLCOLOR)
-          *dest_ptr = paltbl[tilepal | pval];
+          *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = pxflg | pval;
         else if (rdtype == STCKCOLOR)
@@ -201,6 +204,9 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
         else
           *dest_ptr = 0 | bg_comb;
       }
+      // Advance to next packed data
+      if (hflip) tilepix <<= 4;
+      else       tilepix >>= 4;
     }
   }
 }
