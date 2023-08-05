@@ -2210,6 +2210,20 @@ static const ini_t gbaover[] = {
       0,                           /* translation_gate_target_3 */
    },
    {
+      // Top Gun - Combat Zones (USA)
+      "TOPGUN CZ",                 /* gamepak_title        */
+      "A2YE",                      /* gamepak_code         */
+      "60",                        /* gamepak_maker        */
+      0,                           /* flash_size           */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      5,                           /* save_type            */
+      0,                           /* rtc_enabled          */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
       // Tottoko Hamutaro Hamuhamu Sports (J/U)
       "HAMSPORTS",                 /* gamepak_title        */
       "B85A",                      /* gamepak_code         */
@@ -2244,7 +2258,7 @@ static const ini_t gbaover[] = {
       "D9",                        /* gamepak_maker        */
       0,                           /* flash_size           */
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
-      0,                           /* save_type            */
+      4,                           /* save_type            */
       0,                           /* rtc_enabled          */
       0,                           /* idle_loop_target_pc  */
       0,                           /* translation_gate_target_1 */
