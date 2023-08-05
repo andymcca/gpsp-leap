@@ -1762,7 +1762,7 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
         backup_type = BACKUP_DISABLED;
     
      printf("found entry in over ini file.\n");
-     printf("(0=NO OVERRIDE, 1=SRAM, 2=EEPROM_1K, 3=FLASH, 4=EEPROM_8K - Save type set to : %d\n", save_type);
+     printf("(0=NO OVERRIDE, 1=SRAM, 2=EEPROM_1K, 3=FLASH, 4=EEPROM_8K, 5=BACKUP DISABLED - Save type set to : %d\n", save_type);
 
      return 0;
   }
