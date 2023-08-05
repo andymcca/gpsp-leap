@@ -1758,7 +1758,7 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
         eeprom_size = EEPROM_8_KBYTE;
     
      printf("found entry in over ini file.\n");
-     printf("(1=SRAM, 2=EEPROM_1K, 3=FLASH, 4=EEPROM_8K - Save type set to : %d\n", save_type);
+     printf("(0=NO OVERRIDE, 1=SRAM, 2=EEPROM_1K, 3=FLASH, 4=EEPROM_8K - Save type set to : %d\n", save_type);
 
      return 0;
   }
@@ -1844,14 +1844,20 @@ static s32 load_game_config(gamepak_info_t *gpinfo)
                     backup_type = BACKUP_SRAM;
       
             if(!strcmp(current_variable, "save_type") &&
-                    !strcmp(current_value, "eeprom"))
+                    !strcmp(current_value, "eeprom1k"))
                     backup_type = BACKUP_EEPROM;
+                    eeprom_size = EEPROM_512_BYTE;
+
+            if(!strcmp(current_variable, "save_type") &&
+                    !strcmp(current_value, "eeprom8k"))
+                    backup_type = BACKUP_EEPROM;
+                    eeprom_size = EEPROM_8_KBYTE;
        
             if(!strcmp(current_variable, "save_type") &&
                     !strcmp(current_value, "flash"))
                     backup_type = BACKUP_FLASH;
       
-            printf("save type set to : %d\n", backup_type);
+            printf("0=NO OVERRIDE, 1=SRAM, 2=EEPROM, 3=FLASH - Save type set to : %d\n", backup_type);
 
           }
         }
