@@ -1006,11 +1006,13 @@ cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
 
 void function_cc write_backup(u32 address, u32 value)
 {
-  value &= 0xFF;
+  if(backup_type == BACKUP_DISABLED)
+    return;
 
+  value &= 0xFF;
+  
   if(backup_type == BACKUP_NONE)
     backup_type = BACKUP_SRAM;
-
 
   // gamepak SRAM or Flash ROM
   if((address == 0x5555) && (flash_mode != FLASH_WRITE_MODE))
@@ -1756,6 +1758,8 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
      if (save_type == 4)
         backup_type = BACKUP_EEPROM;
         eeprom_size = EEPROM_8_KBYTE;
+    if (save_type == 5)
+        backup_type = BACKUP_DISABLED;
     
      printf("found entry in over ini file.\n");
      printf("(0=NO OVERRIDE, 1=SRAM, 2=EEPROM_1K, 3=FLASH, 4=EEPROM_8K - Save type set to : %d\n", save_type);
