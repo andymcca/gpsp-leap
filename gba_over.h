@@ -312,6 +312,30 @@ static const ini_t gbaover[] = {
       0,                           /* translation_gate_target_3 */
    },
    {
+      // Dragon Ball Z - The Legacy of Goku II (USA)
+      "DBZLGCYGOKU2",              /* gamepak_title        */
+      "ALFE",                      /* gamepak_code         */
+      "70",                        /* gamepak_maker        */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      BACKUP_EEPROM,               /* save_override        */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
+      // Dragon Ball Z - Taiketsu (USA)
+      "DBZ TAIKETSU",              /* gamepak_title        */
+      "BDBE",                      /* gamepak_code         */
+      "70",                        /* gamepak_maker        */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      BACKUP_EEPROM,               /* save_override        */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
       // Drill Dozer (U)
       "DRILL DOZER",               /* gamepak_title        */
       "V49E",                      /* gamepak_code         */
@@ -1872,6 +1896,18 @@ static const ini_t gbaover[] = {
       0,                           /* translation_gate_target_3 */
    },
    {
+      // Top Gun - Combat Zones (USA)
+      "TOPGUN CZ",                 /* gamepak_title        */
+      "A2YE",                      /* gamepak_code         */
+      "60",                        /* gamepak_maker        */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      BACKUP_DISABLED,             /* save_override        */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
       // Tottoko Hamutaro Hamuhamu Sports (J/U)
       "HAMSPORTS",                 /* gamepak_title        */
       "B85A",                      /* gamepak_code         */
@@ -1944,6 +1980,18 @@ static const ini_t gbaover[] = {
       0,                           /* translation_gate_target_3 */
    },
    {
+      // Yggdra Union - We'll Never Fight Alone (U)
+      "YGGDRA UNION",              /* gamepak_title        */
+      "BYUE",                      /* gamepak_code         */
+      "EB",                        /* gamepak_maker        */
+      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
+      BACKUP_EEPROM,               /* save_override        */
+      0,                           /* idle_loop_target_pc  */
+      0,                           /* translation_gate_target_1 */
+      0,                           /* translation_gate_target_2 */
+      0,                           /* translation_gate_target_3 */
+   },
+   {
       // Yu-Gi-Oh! - Dungeon Dice Monsters (U)
       "YU-GI-OH DDM",              /* gamepak_title        */
       "AYDE",                      /* gamepak_code         */
@@ -1999,30 +2047,6 @@ static const ini_t gbaover[] = {
       FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
       BACKUP_UNDEFINED,            /* save_override        */
       0x8089792,                   /* idle_loop_target_pc  */
-      0,                           /* translation_gate_target_1 */
-      0,                           /* translation_gate_target_2 */
-      0,                           /* translation_gate_target_3 */
-   },
-   {
-      // Dragon Ball Z - The Legacy of Goku II (USA)
-      "DBZLGCYGOKU2",               /* gamepak_title        */
-      "ALFE",                      /* gamepak_code         */
-      "70",                        /* gamepak_maker        */
-      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
-      BACKUP_EEPROM,               /* save_override        */
-      0,                           /* idle_loop_target_pc  */
-      0,                           /* translation_gate_target_1 */
-      0,                           /* translation_gate_target_2 */
-      0,                           /* translation_gate_target_3 */
-   },
-   {
-      // Dragon Ball Z - Taiketsu (USA)
-      "DBZ TAIKETSU",               /* gamepak_title        */
-      "BDBE",                      /* gamepak_code         */
-      "70",                        /* gamepak_maker        */
-      FLASH_DEVICE_UNDEFINED,      /* flash_device_id      */
-      BACKUP_EEPROM,                /* save_override        */
-      0,                           /* idle_loop_target_pc  */
       0,                           /* translation_gate_target_1 */
       0,                           /* translation_gate_target_2 */
       0,                           /* translation_gate_target_3 */

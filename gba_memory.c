@@ -383,9 +383,9 @@ u32 gbc_sound_wave_update = 0;
 
 // Keep it 32KB until the upper 64KB is accessed, then make it 64KB.
 
-u32 backup_type = BACKUP_NONE;
+u32 backup_type = BACKUP_UNDEFINED;
 u32 sram_bankcount = SRAM_SIZE_32KB;
-u32 initial_backup_type = BACKUP_NONE;
+u32 initial_backup_type = BACKUP_UNDEFINED;
 
 u32 flash_mode = FLASH_BASE_MODE;
 u32 flash_command_position = 0;
@@ -426,7 +426,7 @@ u8 read_backup(u32 address)
 {
   u8 value = 0;
 
-  if(backup_type == BACKUP_NONE)
+  if(backup_type == BACKUP_UNDEFINED)
     backup_type = BACKUP_SRAM;
 
   if(backup_type == BACKUP_SRAM)
@@ -481,6 +481,9 @@ u32 eeprom_counter = 0;
 
 void function_cc write_eeprom(u32 unused_address, u32 value)
 {
+  if (backup_type == BACKUP_DISABLED)
+    return;
+
   switch(eeprom_mode)
   {
     case EEPROM_BASE_MODE:
@@ -1009,7 +1012,9 @@ void function_cc write_backup(u32 address, u32 value)
 {
   value &= 0xFF;
 
-  if(backup_type == BACKUP_NONE)
+  if (backup_type == BACKUP_DISABLED)
+    return;
+  if(backup_type == BACKUP_UNDEFINED)
     backup_type = BACKUP_SRAM;
 
   // gamepak SRAM or Flash ROM
@@ -1581,7 +1586,7 @@ u32 load_backup(char *name)
   }
   else
   {
-    backup_type = BACKUP_NONE;
+    backup_type = BACKUP_UNDEFINED;
     memset(gamepak_backup, 0xFF, 1024 * 128);
   }
 
@@ -1590,7 +1595,9 @@ u32 load_backup(char *name)
 
 u32 save_backup(char *name)
 {
-  if(backup_type != BACKUP_NONE)
+  if(backup_type == BACKUP_SRAM ||
+     backup_type == BACKUP_FLASH ||
+     backup_type == BACKUP_EEPROM)
   {
     RFILE *fd = filestream_open(name, RETRO_VFS_FILE_ACCESS_WRITE,
                                 RETRO_VFS_FILE_ACCESS_HINT_NONE);
@@ -2598,7 +2605,7 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
    idle_loop_target_pc = 0xFFFFFFFF;
    translation_gate_targets = 0;
    flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
-   initial_backup_type = BACKUP_NONE;
+   initial_backup_type = BACKUP_UNDEFINED;
    flash_bank_cnt = FLASH_SIZE_64KB;
 
    // Load some overrides if present.

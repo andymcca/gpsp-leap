@@ -1126,7 +1126,7 @@ size_t retro_get_memory_size(unsigned id)
          // assume 128KB save, regardless if rom supports battery saves
          // this is needed because gba cannot provide initially the backup save size 
          // until a few cycles has passed (unless provided by a database)
-         case BACKUP_NONE:
+         case BACKUP_UNDEFINED:
          default:
             return (1024 * 128);
             break;
