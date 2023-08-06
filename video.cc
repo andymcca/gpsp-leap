@@ -792,7 +792,7 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
 ) {
   // Note that the last VRAM bank wrap around, hence the offset aliasing
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
-  u32 px_attr = px_comb | 0x100;  // Combine flags + high palette bit
+  u32 px_attr = px_comb | palette | 0x100;  // Combine flags + high palette bit
 
   if (is8bpp) {
     // Each byte is a color, mapped to a palete.
@@ -826,16 +826,15 @@ static inline void render_obj_part_tile_Nbpp(u32 px_comb,
       u8 pval = (tile_ptr[selb] >> (seln * 4)) & 0xF;
       const u16 *subpal = &pal[palette];
       if (pval) {
-        u8 colidx = pval | palette;
         if (rdtype == FULLCOLOR)
           *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = colidx | px_attr;
+          *dest_ptr = pval | px_attr;
         else if (rdtype == STCKCOLOR) {
           if (*dest_ptr & 0x100)
-            *dest_ptr = colidx | px_attr | ((*dest_ptr) & 0xFFFF0000);
+            *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
           else
-            *dest_ptr = colidx | px_attr | ((*dest_ptr) << 16);  // Stack pixels
+            *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);  // Stack pixels
         }
         else if (rdtype == PIXCOPY)
           *dest_ptr = dest_ptr[240];
@@ -850,7 +849,7 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
   dsttype *dest_ptr, u32 tile_offset, u16 palette, const u16 *pal
 ) {
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
-  u32 px_attr = px_comb | 0x100;  // Combine flags + high palette bit
+  u32 px_attr = px_comb | palette | 0x100;  // Combine flags + high palette bit
 
   if (is8bpp) {
     for (u32 j = 0; j < 2; j++) {
@@ -879,16 +878,15 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
       u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
       const u16 *subpal = &pal[palette];
       if (pval) {
-        u8 colidx = pval | palette;
         if (rdtype == FULLCOLOR)
           *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
-          *dest_ptr = colidx | px_attr;
+          *dest_ptr = pval | px_attr;
         else if (rdtype == STCKCOLOR) {
           if (*dest_ptr & 0x100)
-            *dest_ptr = colidx | px_attr | ((*dest_ptr) & 0xFFFF0000);
+            *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
           else
-            *dest_ptr = colidx | px_attr | ((*dest_ptr) << 16);  // Stack pixels
+            *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);  // Stack pixels
         }
         else if (rdtype == PIXCOPY)
           *dest_ptr = dest_ptr[240];
