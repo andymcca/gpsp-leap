@@ -226,45 +226,51 @@ static inline void render_tile_Nbpp(
   if (is8bpp) {
     for (u32 j = 0; j < 2; j++) {
       u32 tilepix = eswap32(((u32*)tile_ptr)[hflip ? 1-j : j]);
-      for (u32 i = 0; i < 4; i++, dest_ptr++) {
-        u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
-        if (pval) {
-          if (rdtype == FULLCOLOR)
-            *dest_ptr = paltbl[pval];
-          else if (rdtype == INDXCOLOR)
-            *dest_ptr = pval | px_comb;  // Add combine flags
-          else if (rdtype == STCKCOLOR)
-            *dest_ptr = pval | px_comb | ((isbase ? bg_comb : *dest_ptr) << 16);
+      if (tilepix) {
+        for (u32 i = 0; i < 4; i++, dest_ptr++) {
+          u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
+          if (pval) {
+            if (rdtype == FULLCOLOR)
+              *dest_ptr = paltbl[pval];
+            else if (rdtype == INDXCOLOR)
+              *dest_ptr = pval | px_comb;  // Add combine flags
+            else if (rdtype == STCKCOLOR)
+              *dest_ptr = pval | px_comb | ((isbase ? bg_comb : *dest_ptr) << 16);
+          }
+          else if (isbase) {
+            *dest_ptr = (rdtype == FULLCOLOR) ? bgcolor : 0 | bg_comb;
+          }
         }
-        else if (isbase) {
-          if (rdtype == FULLCOLOR)
-            *dest_ptr = bgcolor;
-          else
-            *dest_ptr = 0 | bg_comb;  // Add combine flags
-        }
+      } else {
+        for (u32 i = 0; i < 4; i++, dest_ptr++)
+          if (isbase)
+            *dest_ptr = (rdtype == FULLCOLOR) ? bgcolor : 0 | bg_comb;
       }
     }
   } else {
-    u16 tilepal = (tile >> 12) << 4;
-    u16 pxflg = px_comb | tilepal;
-    const u16 *subpal = &paltbl[tilepal];
     u32 tilepix = eswap32(*(u32*)tile_ptr);
-    for (u32 i = 0; i < 8; i++, dest_ptr++) {
-      u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
-      if (pval) {
-        if (rdtype == FULLCOLOR)
-          *dest_ptr = subpal[pval];
-        else if (rdtype == INDXCOLOR)
-          *dest_ptr = pxflg | pval;
-        else if (rdtype == STCKCOLOR)
-          *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+    if (tilepix) {  // We can skip it all if the row is transparent
+      u16 tilepal = (tile >> 12) << 4;
+      u16 pxflg = px_comb | tilepal;
+      const u16 *subpal = &paltbl[tilepal];
+      for (u32 i = 0; i < 8; i++, dest_ptr++) {
+        u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
+        if (pval) {
+          if (rdtype == FULLCOLOR)
+            *dest_ptr = subpal[pval];
+          else if (rdtype == INDXCOLOR)
+            *dest_ptr = pxflg | pval;
+          else if (rdtype == STCKCOLOR)
+            *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+        }
+        else if (isbase) {
+          *dest_ptr = (rdtype == FULLCOLOR) ? bgcolor : 0 | bg_comb;
+        }
       }
-      else if (isbase) {
-        if (rdtype == FULLCOLOR)
-          *dest_ptr = bgcolor;
-        else
-          *dest_ptr = 0 | bg_comb;
-      }
+    } else if (isbase) {
+      // In this case we simply fill the pixels with background pixels
+      for (u32 i = 0; i < 8; i++, dest_ptr++)
+        *dest_ptr = (rdtype == FULLCOLOR) ? bgcolor : 0 | bg_comb;
     }
   }
 }
@@ -854,42 +860,47 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
   if (is8bpp) {
     for (u32 j = 0; j < 2; j++) {
       u32 tilepix = eswap32(((u32*)tile_ptr)[hflip ? 1-j : j]);
-      for (u32 i = 0; i < 4; i++, dest_ptr++) {
-        u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
+      if (tilepix) {
+        for (u32 i = 0; i < 4; i++, dest_ptr++) {
+          u8 pval = hflip ? (tilepix >> (24 - i*8)) : (tilepix >> (i*8));
+          if (pval) {
+            if (rdtype == FULLCOLOR)
+              *dest_ptr = pal[pval];
+            else if (rdtype == INDXCOLOR)
+              *dest_ptr = pval | px_attr;  // Add combine flags
+            else if (rdtype == STCKCOLOR) {
+              if (*dest_ptr & 0x100)
+                *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
+              else
+                *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);
+            }
+            else if (rdtype == PIXCOPY)
+              *dest_ptr = dest_ptr[240];
+          }
+        }
+      } else
+        dest_ptr += 4;
+    }
+  } else {
+    u32 tilepix = eswap32(*(u32*)tile_ptr);
+    if (tilepix) {   // Can skip all pixels if the row is just transparent
+      for (u32 i = 0; i < 8; i++, dest_ptr++) {
+        u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
+        const u16 *subpal = &pal[palette];
         if (pval) {
           if (rdtype == FULLCOLOR)
-            *dest_ptr = pal[pval];
+            *dest_ptr = subpal[pval];
           else if (rdtype == INDXCOLOR)
-            *dest_ptr = pval | px_attr;  // Add combine flags
+            *dest_ptr = pval | px_attr;
           else if (rdtype == STCKCOLOR) {
             if (*dest_ptr & 0x100)
               *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
             else
-              *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);
+              *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);  // Stack pixels
           }
           else if (rdtype == PIXCOPY)
             *dest_ptr = dest_ptr[240];
         }
-      }
-    }
-  } else {
-    u32 tilepix = eswap32(*(u32*)tile_ptr);
-    for (u32 i = 0; i < 8; i++, dest_ptr++) {
-      u8 pval = (hflip ? (tilepix >> ((7-i)*4)) : (tilepix >> (i*4))) & 0xF;
-      const u16 *subpal = &pal[palette];
-      if (pval) {
-        if (rdtype == FULLCOLOR)
-          *dest_ptr = subpal[pval];
-        else if (rdtype == INDXCOLOR)
-          *dest_ptr = pval | px_attr;
-        else if (rdtype == STCKCOLOR) {
-          if (*dest_ptr & 0x100)
-            *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
-          else
-            *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);  // Stack pixels
-        }
-        else if (rdtype == PIXCOPY)
-          *dest_ptr = dest_ptr[240];
       }
     }
   }
