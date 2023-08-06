@@ -141,9 +141,9 @@ void video_reload_counters()
 // If isbase is not set, color 0 is interpreted as transparent, otherwise
 // we are drawing the base layer, so palette[0] is used (backdrop).
 
-template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
+template<typename dtype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
 static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
-  dsttype *dest_ptr, u32 start, u32 end, u16 tile,
+  dtype *dest_ptr, u32 start, u32 end, u16 tile,
   const u8 *tile_base, int vertical_pixel_flip, const u16 *paltbl
 ) {
   // Seek to the specified tile, using the tile number and size.
@@ -195,8 +195,8 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
           *dest_ptr = subpal[pval];
         else if (rdtype == INDXCOLOR)
           *dest_ptr = pxflg | pval;
-        else if (rdtype == STCKCOLOR)
-          *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+        else if (rdtype == STCKCOLOR)    // Stack pixels
+          *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);
       }
       else if (isbase) {
         if (rdtype == FULLCOLOR)
@@ -212,9 +212,9 @@ static inline void render_part_tile_Nbpp(u32 bg_comb, u32 px_comb,
 }
 
 // Same as above, but optimized for full tiles. Skip comments here.
-template<typename dsttype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
+template<typename dtype, rendtype rdtype, bool is8bpp, bool isbase, bool hflip>
 static inline void render_tile_Nbpp(
-  u32 bg_comb, u32 px_comb, dsttype *dest_ptr, u16 tile,
+  u32 bg_comb, u32 px_comb, dtype *dest_ptr, u16 tile,
   const u8 *tile_base, int vertical_pixel_flip, const u16 *paltbl
 ) {
   const u8 *tile_ptr = &tile_base[(tile & 0x3FF) * (is8bpp ? 64 : 32)];
@@ -261,7 +261,7 @@ static inline void render_tile_Nbpp(
           else if (rdtype == INDXCOLOR)
             *dest_ptr = pxflg | pval;
           else if (rdtype == STCKCOLOR)
-            *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);  // Stack pixels
+            *dest_ptr = pxflg | pval | ((isbase ? bg_comb : *dest_ptr) << 16);
         }
         else if (isbase) {
           *dest_ptr = (rdtype == FULLCOLOR) ? bgcolor : 0 | bg_comb;
@@ -382,10 +382,10 @@ static void render_scanline_text(u32 layer,
       u16 tile = eswap16(*map_ptr++);
       if (tile & 0x400)   // Tile horizontal flip
         render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
+          bg_comb, px_comb, &dest_ptr[i*8], tile, tile_base, vflip_off, paltbl);
       else
         render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-          bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
+          bg_comb, px_comb, &dest_ptr[i*8], tile, tile_base, vflip_off, paltbl);
     }
 
     end -= todraw * 8;
@@ -405,10 +405,10 @@ static void render_scanline_text(u32 layer,
         u16 tile = eswap16(*map_ptr++);
         if (tile & 0x400)   // Tile horizontal flip
           render_tile_Nbpp<stype, rdtype, is8bpp, isbase, true>(
-            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
+            bg_comb, px_comb, &dest_ptr[i*8], tile, tile_base, vflip_off, paltbl);
         else
           render_tile_Nbpp<stype, rdtype, is8bpp, isbase, false>(
-            bg_comb, px_comb, &dest_ptr[i * 8], tile, tile_base, vflip_off, paltbl);
+            bg_comb, px_comb, &dest_ptr[i*8], tile, tile_base, vflip_off, paltbl);
       }
 
       end -= todraw * 8;
@@ -462,7 +462,8 @@ static inline void render_pixel_8bpp(u32 layer,
 }
 
 template<typename dsttype, rendtype rdtype>
-static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr, u32 bg_comb, u16 bgcol) {
+static inline void render_bdrop_pixel_8bpp(
+  dsttype *dest_ptr, u32 bg_comb, u16 bgcol) {
   // Alhpa mode stacks previous value (unless rendering the first layer)
   if (rdtype == FULLCOLOR)
     *dest_ptr = bgcol;
@@ -473,10 +474,10 @@ static inline void render_bdrop_pixel_8bpp(dsttype *dest_ptr, u32 bg_comb, u16 b
 // Affine background rendering logic.
 // wrap extends the background infinitely, otherwise transparent/backdrop fill
 // rotate indicates if there's any rotation (optimized version for no-rotation)
-template <typename dsttype, rendtype rdtype, bool isbase, bool wrap, bool rotate>
+template <typename dtype, rendtype rdtype, bool isbase, bool wrap, bool rotate>
 static inline void render_affine_background(
   u32 layer, u32 start, u32 cnt, const u8 *map_base,
-  u32 map_size, const u8 *tile_base, dsttype *dst_ptr,
+  u32 map_size, const u8 *tile_base, dtype *dst_ptr,
   const u16* pal) {
 
   // Backdrop and current layer combine bits.
@@ -500,7 +501,7 @@ static inline void render_affine_background(
         u32 pixel_y = (u32)(source_y >> 8) & (width_height-1);
 
         // Lookup pixel and draw it.
-        render_pixel_8bpp<dsttype, rdtype, isbase>(
+        render_pixel_8bpp<dtype, rdtype, isbase>(
           layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
           tile_base, map_base, map_size, pal);
 
@@ -511,7 +512,7 @@ static inline void render_affine_background(
       const u32 pixel_y = (u32)(source_y >> 8) & (width_height-1);
       while (cnt--) {
         u32 pixel_x = (u32)(source_x >> 8) & (width_height-1);
-        render_pixel_8bpp<dsttype, rdtype, isbase>(
+        render_pixel_8bpp<dtype, rdtype, isbase>(
           layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
           tile_base, map_base, map_size, pal);
         source_x += dx;  // Only moving in the X direction.
@@ -531,7 +532,7 @@ static inline void render_affine_background(
 
         // Draw a backdrop pixel if we are the base layer.
         if (isbase)
-          render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb, bgcol);
+          render_bdrop_pixel_8bpp<dtype, rdtype>(dst_ptr, bg_comb, bgcol);
 
         dst_ptr++;
         source_x += dx; source_y += dy;
@@ -547,7 +548,7 @@ static inline void render_affine_background(
           break;
 
         // Lookup pixel and draw it.
-        render_pixel_8bpp<dsttype, rdtype, isbase>(
+        render_pixel_8bpp<dtype, rdtype, isbase>(
           layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
           tile_base, map_base, map_size, pal);
 
@@ -566,7 +567,7 @@ static inline void render_affine_background(
             break;
 
           if (isbase)
-            render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr, bg_comb, bgcol);
+            render_bdrop_pixel_8bpp<dtype, rdtype>(dst_ptr, bg_comb, bgcol);
 
           dst_ptr++;
           source_x += dx;
@@ -578,7 +579,7 @@ static inline void render_affine_background(
           if (pixel_x >= width_height)
             break;
 
-          render_pixel_8bpp<dsttype, rdtype, isbase>(
+          render_pixel_8bpp<dtype, rdtype, isbase>(
             layer, dst_ptr++, pixel_x, pixel_y, bg_comb, px_comb,
             tile_base, map_base, map_size, pal);
 
@@ -592,7 +593,7 @@ static inline void render_affine_background(
     // Only necessary for the base layer, otherwise we can safely finish.
     if (isbase)
       while (cnt--)
-        render_bdrop_pixel_8bpp<dsttype, rdtype>(dst_ptr++, bg_comb, bgcol);
+        render_bdrop_pixel_8bpp<dtype, rdtype>(dst_ptr++, bg_comb, bgcol);
   }
 }
 
@@ -600,7 +601,7 @@ static inline void render_affine_background(
 // Renders affine backgrounds. These differ substantially from non-affine
 // ones. Tile maps are byte arrays (instead of 16 bit), limiting the map to
 // 256 different tiles (with no flip bits and just one single 256 color pal).
-
+// Optimize for common cases: wrap/non-wrap, scaling/rotation.
 template<typename dsttype, rendtype rdtype, bool isbase>
 static void render_scanline_affine(u32 layer,
  u32 start, u32 end, void *scanline, const u16 *pal)
@@ -619,23 +620,25 @@ static void render_scanline_affine(u32 layer,
 
   bool has_rotation = read_ioreg(REG_BGxPC(layer)) != 0;
   bool has_wrap = (bg_control >> 13) & 1;
+  // Number of pixels to render
+  u32 cnt = end - start;
 
   // Four specialized versions for faster rendering on specific cases like
   // scaling only or non-wrapped backgrounds.
   if (has_wrap) {
     if (has_rotation)
       render_affine_background<dsttype, rdtype, isbase, true, true>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
+        layer, start, cnt, map_base, map_size, tile_base, dest_ptr, pal);
     else
       render_affine_background<dsttype, rdtype, isbase, true, false>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
+        layer, start, cnt, map_base, map_size, tile_base, dest_ptr, pal);
   } else {
     if (has_rotation)
       render_affine_background<dsttype, rdtype, isbase, false, true>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
+        layer, start, cnt, map_base, map_size, tile_base, dest_ptr, pal);
     else
       render_affine_background<dsttype, rdtype, isbase, false, false>(
-        layer, start, end - start, map_base, map_size, tile_base, dest_ptr, pal);
+        layer, start, cnt, map_base, map_size, tile_base, dest_ptr, pal);
   }
 }
 
@@ -648,8 +651,11 @@ typedef enum
 
 // Renders a bitmap honoring the pixel mode and any affine transformations.
 // There's optimized versions for bitmaps without scaling / rotation.
-template<unsigned mode, typename pixfmt, unsigned width, unsigned height, bm_rendmode rdmode>
-static inline void render_scanline_bitmap(u32 start, u32 end, void *scanline, const u16 * palptr) {
+template<unsigned mode, typename pixfmt, unsigned width, unsigned height,
+         bm_rendmode rdmode>
+static inline void render_scanline_bitmap(
+  u32 start, u32 end, void *scanline, const u16 * palptr
+) {
   s32 dx = (s16)read_ioreg(REG_BG2PA);
   s32 dy = (s16)read_ioreg(REG_BG2PC);
   s32 source_x = affine_reference_x[0] + (start * dx); // Always BG2
@@ -770,7 +776,6 @@ static const bitmap_layer_render_struct bitmap_mode_renderers[3] =
   bitmap_layer_render_functions(5, u16, 160, 128)
 };
 
-
 // Object/Sprite rendering logic
 
 static const u8 obj_dim_table[3][4][2] = {
@@ -793,8 +798,9 @@ typedef struct {
 // Renders a tile row (8 pixels) for a regular (non-affine) object/sprite.
 // tile_offset points to the VRAM offset where the data lives.
 template<typename dsttype, rendtype rdtype, bool is8bpp, bool hflip>
-static inline void render_obj_part_tile_Nbpp(u32 px_comb,
-  dsttype *dest_ptr, u32 start, u32 end, u32 tile_offset, u16 palette, const u16 *pal
+static inline void render_obj_part_tile_Nbpp(
+  u32 px_comb, dsttype *dest_ptr, u32 start, u32 end,
+  u32 tile_offset, u16 palette, const u16 *pal
 ) {
   // Note that the last VRAM bank wrap around, hence the offset aliasing
   const u8* tile_ptr = &vram[0x10000 + (tile_offset & 0x7FFF)];
@@ -892,11 +898,11 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
             *dest_ptr = subpal[pval];
           else if (rdtype == INDXCOLOR)
             *dest_ptr = pval | px_attr;
-          else if (rdtype == STCKCOLOR) {
+          else if (rdtype == STCKCOLOR) {  // Stack background, replace sprite
             if (*dest_ptr & 0x100)
               *dest_ptr = pval | px_attr | ((*dest_ptr) & 0xFFFF0000);
             else
-              *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);  // Stack pixels
+              *dest_ptr = pval | px_attr | ((*dest_ptr) << 16);
           }
           else if (rdtype == PIXCOPY)
             *dest_ptr = dest_ptr[240];
@@ -911,8 +917,8 @@ static inline void render_obj_tile_Nbpp(u32 px_comb,
 // cnt is the maximum number of pixels to draw, honoring window, obj width, etc.
 template <typename stype, rendtype rdtype, bool is8bpp, bool hflip>
 static void render_object(
-  s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u32 px_comb, u16 palette,
-  const u16* palptr
+  s32 delta_x, u32 cnt, stype *dst_ptr, u32 tile_offset, u32 px_comb,
+  u16 palette, const u16* palptr
 ) {
   // Tile size in bytes for each mode
   const u32 tile_bsize = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -949,7 +955,8 @@ static void render_object(
   s32 num_tiles = cnt / 8;
   while (num_tiles--) {
     // Render full tiles
-    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(px_comb, dst_ptr, tile_offset, palette, palptr);
+    render_obj_tile_Nbpp<stype, rdtype, is8bpp, hflip>(
+      px_comb, dst_ptr, tile_offset, palette, palptr);
     tile_offset += tile_size_off;
     dst_ptr += 8;
   }
@@ -963,6 +970,8 @@ static void render_object(
 
 
 // Renders an affine sprite row to screen.
+// They support 4bpp and 8bpp modes. 1D and 2D tile mapping modes.
+// Their render area is limited to their size (and optionally double size)
 template <typename stype, rendtype rdtype, bool is8bpp, bool rotate>
 static void render_affine_object(
   const t_sprite *obji, const t_affp *affp, bool is_double,
@@ -1052,7 +1061,7 @@ static void render_affine_object(
         ((pixel_y & 0x7) * tile_bwidth) +  // Skip vertical rows to the pixel
         ((pixel_x >> 1) & 0x3);            // Skip the horizontal offset
 
-      u8 pixpair = vram[0x10000 + (tile_off & 0x7FFF)];  // Read two pixels (4bit each)
+      u8 pixpair = vram[0x10000 + (tile_off & 0x7FFF)]; // Read 2 pixels @4bpp
       pixval = ((pixel_x & 1) ? pixpair >> 4 : pixpair & 0xF);
     }
 
@@ -1082,7 +1091,10 @@ static void render_affine_object(
   }
 }
 
-// Renders a single sprite on the current scanline
+// Renders a single sprite on the current scanline.
+// This function calls the affine or regular renderer depending on the sprite.
+// Will calculate whether sprite has certain effects (flip, rotation ...) to
+// use an optimized renderer function.
 template <typename stype, rendtype rdtype, bool is8bpp>
 inline static void render_sprite(
   const t_sprite *obji, bool is_affine, u32 start, u32 end, stype *scanline,
@@ -1119,7 +1131,8 @@ inline static void render_sprite(
     bool vflip = obji->attr1 & 0x2000;
 
     // Calulate the vertical offset (row) to be displayed. Account for vflip.
-    u32 voffset = vflip ? obji->obj_y + obji->obj_h - vcount - 1 : vcount - obji->obj_y;
+    u32 voffset = vflip ? obji->obj_y + obji->obj_h - vcount - 1
+                        : vcount - obji->obj_y;
 
     // Calculate base tile for the object (points to the row to be drawn).
     u32 tile_bsize  = is8bpp ? tile_size_8bpp : tile_size_4bpp;
@@ -1150,6 +1163,7 @@ inline static void render_sprite(
 }
 
 // Renders objects on a scanline for a given priority.
+// This function assumes that order_obj has been called to prepare the objects.
 template <typename stype, rendtype rdtype>
 void render_scanline_objs(
   u32 priority, u32 start, u32 end, void *raw_ptr, const u16* palptr
@@ -1230,7 +1244,8 @@ void render_scanline_objs(
 
 // Goes through the object list in the OAM (from #127 to #0) and adds objects
 // into a sorted list by priority for the current row.
-// Invisible objects are discarded.
+// Invisible objects are discarded. ST-objects are flagged. Cycle counting is
+// performed to discard excessive objects (to match HW capabilities).
 static void order_obj(u32 video_mode)
 {
   u32 obj_num;
@@ -1246,84 +1261,86 @@ static void order_obj(u32 video_mode)
   {
     t_oam *oam_ptr = &oam_base[obj_num];
     u16 obj_attr0 = eswap16(oam_ptr->attr0);
-    // Bit 9 disables regular sprites. Used as double bit for affine ones.
-    bool visible = (obj_attr0 & 0x0300) != 0x0200;
-    if (visible) {
-      u16 obj_shape = obj_attr0 >> 14;
-      u32 obj_mode = (obj_attr0 >> 10) & 0x03;
 
-      // Prohibited shape and mode
-      bool invalid = (obj_shape == 0x3) || (obj_mode == OBJ_MOD_INVALID);
-      if (!invalid) {
-        u16 obj_attr1 = eswap16(oam_ptr->attr1);
-        u16 obj_attr2 = eswap16(oam_ptr->attr2);
+    // Bit 9 disables regular sprites (that is, non-affine ones).
+    if ((obj_attr0 & 0x0300) == 0x0200)
+      continue;
+
+    u16 obj_shape = obj_attr0 >> 14;
+    u32 obj_mode = (obj_attr0 >> 10) & 0x03;
+
+    // Prohibited shape and mode
+    if ((obj_shape == 0x3) || (obj_mode == OBJ_MOD_INVALID))
+      continue;
+
+    u16 obj_attr2 = eswap16(oam_ptr->attr2);
+
+    // On bitmap modes, objs 0-511 are not usable, ingore them.
+    if ((video_mode >= 3) && (!(obj_attr2 & 0x200)))
+      continue;
+
+    u16 obj_attr1 = eswap16(oam_ptr->attr1);
+    // Calculate object size (from size and shape attr bits)
+    u16 obj_size = (obj_attr1 >> 14);
+    s32 obj_height = obj_dim_table[obj_shape][obj_size][1];
+    s32 obj_width  = obj_dim_table[obj_shape][obj_size][0];
+    s32 obj_y = obj_attr0 & 0xFF;
+
+    if(obj_y > 160)
+      obj_y -= 256;
+
+    // Double size for affine sprites with double bit set
+    if(obj_attr0 & 0x200)
+    {
+      obj_height *= 2;
+      obj_width *= 2;
+    }
+
+    if(((obj_y + obj_height) > 0) && (obj_y < 160))
+    {
+      s32 obj_x = (s32)(obj_attr1 << 23) >> 23;
+
+      if(((obj_x + obj_width) > 0) && (obj_x < 240))
+      {
         u32 obj_priority = (obj_attr2 >> 10) & 0x03;
+        bool is_affine = obj_attr0 & 0x100;
+        // Clip Y coord and height to the 0..159 interval
+        u32 starty = MAX(obj_y, 0);
+        u32 endy   = MIN(obj_y + obj_height, 160);
 
-        if (((video_mode < 3) || ((obj_attr2 & 0x3FF) >= 512)))
-        {
-          // Calculate object size (from size and shape attr bits)
-          u16 obj_size = (obj_attr1 >> 14);
-          s32 obj_height = obj_dim_table[obj_shape][obj_size][1];
-          s32 obj_width  = obj_dim_table[obj_shape][obj_size][0];
-          s32 obj_y = obj_attr0 & 0xFF;
+        // Calculate needed cycles to render the sprite
+        u16 cyccnt = is_affine ? (10 + obj_width * 2) : obj_width;
 
-          if(obj_y > 160)
-            obj_y -= 256;
-
-          // Double size for affine sprites with double bit set
-          if(obj_attr0 & 0x200)
+        switch (obj_mode) {
+        case OBJ_MOD_SEMITRAN:
+          for(row = starty; row < endy; row++)
           {
-            obj_height *= 2;
-            obj_width *= 2;
-          }
-
-          if(((obj_y + obj_height) > 0) && (obj_y < 160))
-          {
-            s32 obj_x = (s32)(obj_attr1 << 23) >> 23;
-
-            if(((obj_x + obj_width) > 0) && (obj_x < 240))
-            {
-              bool is_affine = obj_attr0 & 0x100;
-              // Clip Y coord and height to the 0..159 interval
-              u32 starty = MAX(obj_y, 0);
-              u32 endy   = MIN(obj_y + obj_height, 160);
-
-              // Calculate needed cycles to render the sprite
-              u16 cyccnt = is_affine ? (10 + obj_width * 2) : obj_width;
-
-              switch (obj_mode) {
-              case OBJ_MOD_SEMITRAN:
-                for(row = starty; row < endy; row++)
-                {
-                  if (rend_cycles[row] < REND_CYC_SCANLINE) {
-                    u32 cur_cnt = obj_priority_count[obj_priority][row];
-                    obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
-                    obj_priority_count[obj_priority][row] = cur_cnt + 1;
-                    rend_cycles[row] += cyccnt;
-                    // Mark the row as having semi-transparent objects
-                    obj_alpha_count[row] = 1;
-                  }
-                }
-                break;
-              case OBJ_MOD_WINDOW:
-                obj_priority = 4;
-                /* fallthrough */
-              case OBJ_MOD_NORMAL:
-                // Add the object to the list.
-                for(row = starty; row < endy; row++)
-                {
-                  if (rend_cycles[row] < REND_CYC_SCANLINE) {
-                    u32 cur_cnt = obj_priority_count[obj_priority][row];
-                    obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
-                    obj_priority_count[obj_priority][row] = cur_cnt + 1;
-                    rend_cycles[row] += cyccnt;
-                  }
-                }
-                break;
-              };
+            if (rend_cycles[row] < REND_CYC_SCANLINE) {
+              u32 cur_cnt = obj_priority_count[obj_priority][row];
+              obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+              obj_priority_count[obj_priority][row] = cur_cnt + 1;
+              rend_cycles[row] += cyccnt;
+              // Mark the row as having semi-transparent objects
+              obj_alpha_count[row] = 1;
             }
           }
-        }
+          break;
+        case OBJ_MOD_WINDOW:
+          obj_priority = 4;
+          /* fallthrough */
+        case OBJ_MOD_NORMAL:
+          // Add the object to the list.
+          for(row = starty; row < endy; row++)
+          {
+            if (rend_cycles[row] < REND_CYC_SCANLINE) {
+              u32 cur_cnt = obj_priority_count[obj_priority][row];
+              obj_priority_list[obj_priority][row][cur_cnt] = obj_num;
+              obj_priority_count[obj_priority][row] = cur_cnt + 1;
+              rend_cycles[row] += cyccnt;
+            }
+          }
+          break;
+        };
       }
     }
   }
