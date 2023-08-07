@@ -385,7 +385,6 @@ u32 gbc_sound_wave_update = 0;
 
 u32 backup_type = BACKUP_UNDEFINED;
 u32 sram_bankcount = SRAM_SIZE_32KB;
-u32 initial_backup_type = BACKUP_UNDEFINED;
 
 u32 flash_mode = FLASH_BASE_MODE;
 u32 flash_command_position = 0;
@@ -1543,52 +1542,53 @@ char backup_filename[512];
 
 u32 load_backup(char *name)
 {
-  RFILE *fd = filestream_open(name, RETRO_VFS_FILE_ACCESS_READ,
-                              RETRO_VFS_FILE_ACCESS_HINT_NONE);
-
-  if(fd)
+  if (backup_type != BACKUP_DISABLED)
   {
-    int64_t backup_size = filestream_get_size(fd);
+    RFILE *fd = filestream_open(name, RETRO_VFS_FILE_ACCESS_READ,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-    filestream_read(fd, gamepak_backup, backup_size);
-    filestream_close(fd);
-
-    // The size might give away what kind of backup it is.
-    switch(backup_size)
+    if(fd)
     {
-      case 0x200:
-        backup_type = BACKUP_EEPROM;
-        eeprom_size = EEPROM_512_BYTE;
-        break;
+      int64_t backup_size = filestream_get_size(fd);
 
-      case 0x2000:
-        backup_type = BACKUP_EEPROM;
-        eeprom_size = EEPROM_8_KBYTE;
-        break;
+      filestream_read(fd, gamepak_backup, backup_size);
+      filestream_close(fd);
 
-      case 0x8000:
-        backup_type = BACKUP_SRAM;
-        sram_bankcount = SRAM_SIZE_32KB;
-        break;
+      // The size might give away what kind of backup it is.
+      switch(backup_size)
+      {
+        case 0x200:
+          backup_type = BACKUP_EEPROM;
+          eeprom_size = EEPROM_512_BYTE;
+          break;
 
-      // Could be either flash or SRAM, go with flash
-      case 0x10000:
-        backup_type = BACKUP_FLASH;
-        sram_bankcount = SRAM_SIZE_64KB;
-        break;
+        case 0x2000:
+          backup_type = BACKUP_EEPROM;
+          eeprom_size = EEPROM_8_KBYTE;
+          break;
 
-      case 0x20000:
-        backup_type = BACKUP_FLASH;
-        flash_bank_cnt = FLASH_SIZE_128KB;
-        break;
+        case 0x8000:
+          backup_type = BACKUP_SRAM;
+          sram_bankcount = SRAM_SIZE_32KB;
+          break;
+
+        // Could be either flash or SRAM, go with flash
+        case 0x10000:
+          backup_type = BACKUP_FLASH;
+          sram_bankcount = SRAM_SIZE_64KB;
+          break;
+
+        case 0x20000:
+          backup_type = BACKUP_FLASH;
+          flash_bank_cnt = FLASH_SIZE_128KB;
+          break;
+      }
+      return 1;
     }
-    return 1;
   }
-  else
-  {
-    backup_type = BACKUP_UNDEFINED;
-    memset(gamepak_backup, 0xFF, 1024 * 128);
-  }
+
+  // Clear savegame buffer to a known state
+  memset(gamepak_backup, 0xFF, 1024 * 128);
 
   return 0;
 }
@@ -1687,7 +1687,7 @@ static s32 load_game_config_over(gamepak_info_t *gpinfo)
      flash_device_id = gbaover[i].flash_device_id;
      if (flash_device_id == FLASH_DEVICE_MACRONIX_128KB)
        flash_bank_cnt = FLASH_SIZE_128KB;
-     initial_backup_type = gbaover[i].save_override;
+     backup_type = gbaover[i].save_override;
 
      if (gbaover[i].translation_gate_target_1 != 0)
      {
@@ -2371,8 +2371,6 @@ void init_memory(void)
 
   reload_timing_info();
 
-  backup_type = initial_backup_type;
-
   sram_bankcount = SRAM_SIZE_32KB;
   //flash_size = FLASH_SIZE_64KB;
 
@@ -2593,9 +2591,6 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
    if (p)
       strcpy(p, ".sav");
 
-   if (!use_libretro_save_method)
-     load_backup(backup_filename);
-
    // Buffer 0 always has the first 1MB chunk of the ROM
    memset(&gpinfo, 0, sizeof(gpinfo));
    memcpy(gpinfo.gamepak_title, &gamepak_buffers[0][0xA0], 12);
@@ -2605,11 +2600,14 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
    idle_loop_target_pc = 0xFFFFFFFF;
    translation_gate_targets = 0;
    flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
-   initial_backup_type = BACKUP_UNDEFINED;
+   backup_type = BACKUP_UNDEFINED;  // Default, unknown
    flash_bank_cnt = FLASH_SIZE_64KB;
 
    // Load some overrides if present.
    load_game_config_over(&gpinfo);
+
+   if (!use_libretro_save_method)
+     load_backup(backup_filename);
 
    return 0;
 }
