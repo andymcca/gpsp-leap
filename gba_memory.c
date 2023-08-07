@@ -2376,7 +2376,6 @@ void init_memory(void)
 
   flash_bank_num = 0;
   flash_command_position = 0;
-  eeprom_size = EEPROM_512_BYTE;
   eeprom_mode = EEPROM_BASE_MODE;
   eeprom_address = 0;
   eeprom_counter = 0;
@@ -2599,8 +2598,12 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
 
    idle_loop_target_pc = 0xFFFFFFFF;
    translation_gate_targets = 0;
+
+   // Defaults for backup storage, unknown at boot time
+   // (unless an override exists or a save file file is loaded)
+   backup_type = BACKUP_UNDEFINED;
+   eeprom_size = EEPROM_512_BYTE;
    flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
-   backup_type = BACKUP_UNDEFINED;  // Default, unknown
    flash_bank_cnt = FLASH_SIZE_64KB;
 
    // Load some overrides if present.
