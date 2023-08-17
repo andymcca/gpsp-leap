@@ -1527,11 +1527,12 @@ static void merge_brightness(u32 start, u32 end, u16 *srcdst) {
 template<rendtype rdmode, typename dsttype>
 void fill_line_background(u32 start, u32 end, dsttype *scanline) {
   dsttype bgcol = palette_ram_converted[0];
+  u16 bg_comb = color_flags(5);
   while (start < end)
     if (rdmode == FULLCOLOR)
       scanline[start++] = bgcol;
     else
-      scanline[start++] = 0;
+      scanline[start++] = 0 | bg_comb;
 }
 
 // Renders the backdrop color (ie. whenever no layer is active) applying
