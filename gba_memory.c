@@ -1550,8 +1550,10 @@ u32 load_backup(char *name)
     if(fd)
     {
       int64_t backup_size = filestream_get_size(fd);
-
-      filestream_read(fd, gamepak_backup, backup_size);
+      
+      if (!use_libretro_save_method)
+        filestream_read(fd, gamepak_backup, backup_size);
+      
       filestream_close(fd);
 
       // The size might give away what kind of backup it is.
@@ -2609,8 +2611,7 @@ u32 load_gamepak(const struct retro_game_info* info, const char *name)
    // Load some overrides if present.
    load_game_config_over(&gpinfo);
 
-   if (!use_libretro_save_method)
-     load_backup(backup_filename);
+   load_backup(backup_filename);
 
    return 0;
 }
