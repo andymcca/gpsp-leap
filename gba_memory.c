@@ -482,6 +482,13 @@ void function_cc write_eeprom(u32 unused_address, u32 value)
 {
   if (backup_type == BACKUP_DISABLED)
     return;
+  
+  // ROM is restricted to 8000000h-9FFFeFFh
+  // (max.1FFFF00h bytes = 32MB minus 256 bytes)
+  if (gamepak_size > 0x1FFFF00)
+  {
+    gamepak_size = 0x1FFFF00;
+  }
 
   switch(eeprom_mode)
   {
